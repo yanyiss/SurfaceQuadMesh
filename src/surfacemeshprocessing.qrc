@@ -1,0 +1,33 @@
+<RCC>
+    <qresource prefix="SurfaceQuadMesh">
+      <file>../resource/Images/flat.png</file>
+      <file>../resource/Images/flatlines.png</file>
+      <file>../resource/Images/points.png</file>
+      <file>../resource/Images/smooth.png</file>
+      <file>../resource/Images/wire.png</file>
+      <file>../resource/Images/hiddenlines.png</file>
+      <file>../resource/Images/Update.png</file>
+      <file>../resource/Images/remesher.png</file>
+      <file>../resource/Images/ClearMesh.png</file>
+      <file>../resource/Images/saveScreen.png</file>
+      <file>../resource/Images/Open.png</file>
+      <file>../resource/Images/Save.png</file>
+      <file>../resource/Images/clear_select.png</file>
+      <file>../resource/Images/move_vertex.png</file>
+      <file>../resource/Images/selectEdges.png</file>
+      <file>../resource/Images/selectFaces.png</file>
+      <file>../resource/Images/selectVertices.png</file>
+      <file>../resource/Images/doubleviewmode.png</file>
+      <file>../resource/Images/singleviewmode.png</file>
+      <file>../resource/Images/multiviewmode.png</file>
+      <file>../resource/Images/boundary.png</file>
+      <file>../resource/Images/curvature.png</file>
+      <file>../resource/Images/selections.png</file>
+      <file>../resource/Images/bbox.png</file>
+      <file>../resource/Images/topology-edgeCollapse.png</file>
+      <file>../resource/Images/topology-edgeSplit.png</file>
+      <file>../resource/Images/topology-edgeFlip.png</file>
+      <file>../resource/Images/edit-redo.png</file>
+      <file>../resource/Images/edit-undo.png</file>
+    </qresource>
+</RCC>

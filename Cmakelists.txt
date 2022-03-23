@@ -1,12 +1,11 @@
 cmake_minimum_required(VERSION 3.10)
-project(HybridGridProcessor)
+project(SurfaceQuadMesh)
 
 add_subdirectory(src/Dependency/ANN)
-add_subdirectory(src/Dependency/BSpline)
 if (CMAKE_GENERATOR MATCHES "Visual Studio")
   set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 endif()
-set_property(TARGET ANN BSpline PROPERTY FOLDER "Dependency")
+set_property(TARGET ANN PROPERTY FOLDER "Dependency")
 
 #设置不生成MinSizeRel;RelWithDebInfo
 set(CMAKE_CONFIGURATION_TYPES "Debug;Release")
@@ -36,13 +35,9 @@ endif()
 SET(EIGEN_PATH "D:/eigen3")
 SET(OPENMESH_PATH "D:/OpenMesh 8.1/include")
 SET(TBB_PATH "D:/tbb/tbb/include")
-SET(OPENCASCADE_PATH "D:/OpenCASCADE-7.4.0-vc14-64/opencascade-7.4.0/inc")
-SET(TRIANGLE_PATH src/Dependency/triangle)
 #lib
 SET(OPENMESH_LIB_PATH "D:/OpenMesh 8.1/lib")
 SET(TBB_LIB_PATH "D:/tbb/tbb/lib/intel64/vc14")
-SET(OPENCASCADE_LIB_PATH "D:/OpenCASCADE-7.4.0-vc14-64/opencascade-7.4.0/win64/vc14/lib")
-SET(TRIANGLE_LIB_PATH src/Dependency/triangle)
 
 #QT
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
@@ -64,13 +59,9 @@ qt5_add_resources(QRC_FILES ${QRC_SOURCE_FILES})
 include_directories(${EIGEN_PATH})
 include_directories(${OPENMESH_PATH})
 include_directories(${TBB_PATH})
-include_directories(${OPENCASCADE_PATH})
-include_directories(${TRIANGLE_PATH})
 
 link_directories(${OPENMESH_LIB_PATH})
 link_directories(${TBB_LIB_PATH})
-link_directories(${OPENCASCADE_LIB_PATH})
-link_directories(${TRIANGLE_LIB_PATH})
 
 
 file (GLOB CPS_FILE
@@ -96,14 +87,11 @@ file (GLOB MeshViewer_FILE
 )
 
 file (GLOB Algorithm_FILE
-    src/Algorithm/CheckBoard/*
-    src/Algorithm/SurfaceMesher/Generator/*
-    src/Algorithm/SurfaceMesher/Optimizer/*
+    src/Algorithm/*
 )
 
 file (GLOB Toolbox_FILE
-    src/Toolbox/dprinter/*
-    src/Toolbox/Math/*
+    src/Toolbox/*
 )
 
 add_executable(${PROJECT_NAME} ${SRCFILES} 
@@ -130,38 +118,12 @@ source_group(MeshViewer FILES ${MeshViewer_FILE})
 source_group(Algorithm FILES ${Algorithm_FILE})
 source_group(Toolbox FILES ${Toolbox_FILE})
 
-target_link_libraries(${PROJECT_NAME} Qt5::Widgets Qt5::Core Qt5::Gui Qt5::OpenGL ANN BSpline
+target_link_libraries(${PROJECT_NAME} Qt5::Widgets Qt5::Core Qt5::Gui Qt5::OpenGL ANN
 #OpenMesh
     optimized OpenMeshCore 
     optimized OpenMeshTools
     debug OpenMeshCored 
     debug OpenMeshToolsd
-#OpenCASCADE
-    TKernel.lib
-    TKMath.lib
-    TKG2d.lib
-    TKG3d.lib
-    TKBRep.lib
-    TKGeomBase.lib
-    TKGeomAlgo.lib
-    TKTopAlgo.lib
-    TKPrim.lib
-    TKBO.lib
-    TKBool.lib
-    TKOffset.lib
-    TKService.lib
-    TKV3d.lib
-    TKOpenGl.lib
-    TKFillet.lib
-    TKXSBase.lib
-    TKXDEIGES.lib
-    TKSTEP.lib
-    TKIGES.lib
-    TKXMESH.lib
-    TKMESH.lib
-    TKMESHVS.lib
-#triangle
-    triangle.lib
 )
 if (CMAKE_SYSTEM_NAME MATCHES "Windows")
 target_link_libraries(${PROJECT_NAME} 
