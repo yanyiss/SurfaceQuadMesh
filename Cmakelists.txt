@@ -12,6 +12,7 @@ set(CMAKE_CONFIGURATION_TYPES "Debug;Release")
 
 add_definitions(/D_USE_MATH_DEFINES)
 add_definitions(-DUSE_AVX)
+add_definitions(-DEIGEN_DONT_VECTORIZE)
 
 #Complier
 if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
@@ -32,7 +33,7 @@ endif()
 
 #path
 #include
-SET(EIGEN_PATH "D:/eigen3")
+SET(EIGEN_PATH "D:/eigen3.4")
 SET(OPENMESH_PATH "D:/OpenMesh 8.1/include")
 SET(TBB_PATH "D:/tbb/tbb/include")
 #lib

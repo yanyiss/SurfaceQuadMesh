@@ -55,13 +55,13 @@ void MeshViewerWidget::updateMeshCenter()
 	typedef Mesh::Point Point;
 	Mesh::VertexIter vIt = mesh.vertices_begin();
 	Mesh::VertexIter vEnd = mesh.vertices_end();
-	bbMin = bbMax = OpenMesh::vector_cast<OpenMesh::Vec3d>(mesh.point(vIt));
+	bbMin = bbMax = mesh.point(vIt);
 
 	size_t count = 0;
 	for(; vIt != vEnd; ++vIt, ++count)
 	{
-		bbMin.minimize( OpenMesh::vector_cast<OpenMesh::Vec3d>( mesh.point(vIt) ) );
-		bbMax.maximize( OpenMesh::vector_cast<OpenMesh::Vec3d>( mesh.point(vIt) ) );
+		bbMin.cwiseMin(mesh.point(vIt));
+		bbMin.cwiseMax(mesh.point(vIt));
 	}
 
 	Mesh::EdgeIter e_it = mesh.edges_begin();
@@ -399,59 +399,59 @@ void MeshViewerWidget::draw_scene(int drawmode)
 
 	if(draw_BBox_OK)
 	{
-		OpenMesh::Vec3d temp0 = bbMin;
-		OpenMesh::Vec3d temp1;
+		Vector3d temp0 = bbMin;
+		Vector3d temp1;
 		glLineWidth(2.0);
 		glColor3f(1.0, 1.0, 0.0);
 		glBegin(GL_LINES);
-		temp1 = bbMin; temp1[0] = bbMax[0];
+		temp1 = bbMin; temp1(0) = bbMax(0);
 		glVertex3dv( temp0.data() );
 		glVertex3dv( temp1.data() );
-		temp1 = bbMin; temp1[1] = bbMax[1];
+		temp1 = bbMin; temp1(1) = bbMax(1);
 		glVertex3dv( temp0.data() );
 		glVertex3dv( temp1.data() );
-		temp1 = bbMin; temp1[2] = bbMax[2];
-		glVertex3dv( temp0.data() );
-		glVertex3dv( temp1.data() );
-
-		temp0 = bbMin; temp0[0] = bbMax[0];
-		temp1 = bbMax; temp1[1] = bbMin[1];
+		temp1 = bbMin; temp1(2) = bbMax(2);
 		glVertex3dv( temp0.data() );
 		glVertex3dv( temp1.data() );
 
-		temp0 = bbMin; temp0[0] = bbMax[0];
-		temp1 = bbMax; temp1[2] = bbMin[2];
+		temp0 = bbMin; temp0(0) = bbMax(0);
+		temp1 = bbMax; temp1(1) = bbMin(1);
 		glVertex3dv( temp0.data() );
 		glVertex3dv( temp1.data() );
 
-		temp0 = bbMin; temp0[1] = bbMax[1];
-		temp1 = bbMax; temp1[2] = bbMin[2];
+		temp0 = bbMin; temp0(0) = bbMax(0);
+		temp1 = bbMax; temp1(2) = bbMin(2);
 		glVertex3dv( temp0.data() );
 		glVertex3dv( temp1.data() );
 
-		temp0 = bbMin; temp0[1] = bbMax[1];
-		temp1 = bbMax; temp1[0] = bbMin[0];
+		temp0 = bbMin; temp0(1) = bbMax(1);
+		temp1 = bbMax; temp1(2) = bbMin(2);
 		glVertex3dv( temp0.data() );
 		glVertex3dv( temp1.data() );
 
-		temp0 = bbMin; temp0[2] = bbMax[2];
-		temp1 = bbMax; temp1[1] = bbMin[1];
+		temp0 = bbMin; temp0(1) = bbMax(1);
+		temp1 = bbMax; temp1(0) = bbMin(0);
 		glVertex3dv( temp0.data() );
 		glVertex3dv( temp1.data() );
 
-		temp0 = bbMin; temp0[2] = bbMax[2];
-		temp1 = bbMax; temp1[0] = bbMin[0];
+		temp0 = bbMin; temp0(2) = bbMax(2);
+		temp1 = bbMax; temp1(1) = bbMin(1);
+		glVertex3dv( temp0.data() );
+		glVertex3dv( temp1.data() );
+
+		temp0 = bbMin; temp0(2) = bbMax(2);
+		temp1 = bbMax; temp1(0) = bbMin(0);
 		glVertex3dv( temp0.data() );
 		glVertex3dv( temp1.data() );
 
 		temp0 = bbMax;
-		temp1 = bbMax; temp1[0] = bbMin[0];
+		temp1 = bbMax; temp1(0) = bbMin(0);
 		glVertex3dv( temp0.data() );
 		glVertex3dv( temp1.data() );
-		temp1 = bbMax; temp1[1] = bbMin[1];
+		temp1 = bbMax; temp1(1) = bbMin(1);
 		glVertex3dv( temp0.data() );
 		glVertex3dv( temp1.data() );
-		temp1 = bbMax; temp1[2] = bbMin[2];
+		temp1 = bbMax; temp1(2) = bbMin(2);
 		glVertex3dv( temp0.data() );
 		glVertex3dv( temp1.data() );
 		glEnd();
@@ -656,7 +656,7 @@ void MeshViewerWidget::draw_mesh_hidden_lines() const
 			fv_it = mesh.cfv_iter(f_it); 
 			for(fv_it;fv_it;++fv_it)
 			{
-				glVertex3dv(&mesh.point(fv_it)[0]);
+				glVertex3dv(mesh.point(fv_it).data());
 			}
 
 		}
@@ -669,7 +669,7 @@ void MeshViewerWidget::draw_mesh_hidden_lines() const
 			fv_it = mesh.cfv_iter(f_it); 
 			for(fv_it;fv_it;++fv_it)
 			{
-				glVertex3dv(&mesh.point(fv_it)[0]);
+				glVertex3dv(mesh.point(fv_it).data());
 			}
 		}
 		glEnd();
@@ -681,7 +681,7 @@ void MeshViewerWidget::draw_mesh_hidden_lines() const
 			glBegin(GL_POLYGON);
 			for(fv_it;fv_it;++fv_it)
 			{
-				glVertex3dv(&mesh.point(fv_it)[0]);
+				glVertex3dv(mesh.point(fv_it).data());
 			}
 			glEnd();
 		}
@@ -702,7 +702,7 @@ void MeshViewerWidget::draw_mesh_hidden_lines() const
 			fv_it = mesh.cfv_iter(f_it); 
 			for(fv_it;fv_it;++fv_it)
 			{
-				glVertex3dv(&mesh.point(fv_it)[0]);
+				glVertex3dv(mesh.point(fv_it).data());
 			}
 		}
 		glEnd();
@@ -714,7 +714,7 @@ void MeshViewerWidget::draw_mesh_hidden_lines() const
 			fv_it = mesh.cfv_iter(f_it); 
 			for(fv_it;fv_it;++fv_it)
 			{
-				glVertex3dv(&mesh.point(fv_it)[0]);
+				glVertex3dv(mesh.point(fv_it).data());
 			}
 		}
 		glEnd();
@@ -726,7 +726,7 @@ void MeshViewerWidget::draw_mesh_hidden_lines() const
 			glBegin(GL_POLYGON);
 			for(fv_it;fv_it;++fv_it)
 			{
-				glVertex3dv(&mesh.point(fv_it)[0]);
+				glVertex3dv(mesh.point(fv_it).data());
 			}
 			glEnd();
 		}
@@ -772,11 +772,11 @@ void MeshViewerWidget::draw_mesh_solidflat() const
 		glBegin(GL_QUADS);
 		for (;fIt != fEnd; ++fIt) 
 		{
-			glNormal3dv(&mesh.normal(fIt)[0]);
+			glNormal3dv(mesh.normal(fIt).data());
 			fvIt = mesh.cfv_iter(fIt.handle());
 			for(fvIt; fvIt; ++fvIt)
 			{
-				glVertex3dv(&mesh.point(fvIt)[0]);
+				glVertex3dv(mesh.point(fvIt).data());
 			}
 		}
 		glEnd();
@@ -785,11 +785,11 @@ void MeshViewerWidget::draw_mesh_solidflat() const
 		for (; fIt != fEnd; ++fIt) 
 		{
 			glBegin(GL_POLYGON);
-			glNormal3dv(&mesh.normal(fIt)[0]);
+			glNormal3dv(mesh.normal(fIt).data());
 			fvIt = mesh.cfv_iter(fIt.handle());
 			for(fvIt; fvIt; ++fvIt)
 			{
-				glVertex3dv(&mesh.point(fvIt)[0]);
+				glVertex3dv(mesh.point(fvIt).data());
 			}
 			glEnd();
 		}

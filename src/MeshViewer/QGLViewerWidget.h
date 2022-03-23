@@ -1,7 +1,7 @@
 #ifndef MESHPROCESSING_QGLVIEWERWIDGET_HH
 #define MESHPROCESSING_QGLVIEWERWIDGET_HH
 
-#include <OpenMesh/Core/Geometry/VectorT.hh>
+#include <OpenMesh/Core/Geometry/EigenVectorT.hh>
 #include "OpenglHeaders.h"
 
 #include <vector>
@@ -24,14 +24,14 @@ public:
 	/* Sets the center and size of the whole scene. 
 	   The _center is used as fixpoint for rotations and for adjusting
 	   the camera/viewer (see view_all()). */
-	void set_scene_pos(const OpenMesh::Vec3d& _center, float _radius);  
+	void set_scene_pos(const Eigen::Vector3d& _center, float _radius);
 
 	/* view the whole scene: the eye point is moved far enough from the
 	   center so that the whole scene is visible. */
 	void view_all();
 
 	float radius() const { return Radius; }
-	const OpenMesh::Vec3d& center() const { return Center; }
+	const Eigen::Vector3d& center() const { return Center; }
 
 	const GLdouble* modelview_matrix() const  { return &ModelViewMatrix[0]; }
 	void reset_modelview_matrix()
@@ -107,7 +107,7 @@ public slots:
 	}
 	void rotate_mesh_by_angle_slot(double angle)
 	{
-		rotate(OpenMesh::Vec3d(0,1,0), angle);
+		rotate(Eigen::Vector3d(0,1,0), angle);
 		updateGL();
 	}
 	void set_ORTHOTROPIC2D_slot(double w_left_, double w_right_, double w_bottom_, double w_top_)
@@ -115,7 +115,7 @@ public slots:
 		/*w_left = w_left_; w_right = w_right_; w_top = w_top_; w_bottom = w_bottom_;
 		set_pro_mode(ORTHOTROPIC2D);*/
 
-		OpenMesh::Vec3d c((w_left_ + w_right_)*0.5, (w_left_ + w_right_)*0.5, 0.0);
+		Eigen::Vector3d c((w_left_ + w_right_)*0.5, (w_left_ + w_right_)*0.5, 0.0);
 		set_scene_pos(c, c.norm());
 	}
 protected:
@@ -130,9 +130,9 @@ private:
 	void update_projection_matrix();
 	void update_projection_matrix_one_viewer();
 	// translate the scene and update modelview matrix
-	void translate(const OpenMesh::Vec3d& _trans);
+	void translate(const Eigen::Vector3d& _trans);
 	// rotate the scene (around its center) and update modelview matrix
-	void rotate(const OpenMesh::Vec3d& _axis, double _angle);
+	void rotate(const Eigen::Vector3d& _axis, double _angle);
 
 	void translation(QPoint p);
 	void rotation(QPoint p);
@@ -146,16 +146,16 @@ protected:
 	GLdouble projection_matrix_[16];
 	GLdouble modelview_matrix_[16];*/
 
-	OpenMesh::Vec3d Center;
+	Eigen::Vector3d Center;
 	double Radius;
 	std::vector<double> ProjectionMatrix;
 	std::vector<double> ModelViewMatrix;
 
 	// virtual trackball: map 2D screen point to unit sphere
-	bool map_to_sphere(const QPoint& _point, OpenMesh::Vec3d& _result);
+	bool map_to_sphere(const QPoint& _point, Eigen::Vector3d& _result);
 	
 	QPoint           last_point_2D_;
-	OpenMesh::Vec3d  last_point_3D_;
+	Eigen::Vector3d  last_point_3D_;
 	bool             last_point_ok_;
 };
 

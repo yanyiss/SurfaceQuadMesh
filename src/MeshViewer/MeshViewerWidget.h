@@ -73,8 +73,8 @@ private:
 
 protected:
 	bool first_init;
-	OpenMesh::Vec3d bbMin;
-	OpenMesh::Vec3d bbMax;
+	Vector3d bbMin;
+	Vector3d bbMax;
 	Mesh mesh;
 	bool draw_BBox_OK;
 	bool draw_mesh_boundary_ok;

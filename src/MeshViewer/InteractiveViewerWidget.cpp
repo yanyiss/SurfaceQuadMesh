@@ -76,11 +76,11 @@ void InteractiveViewerWidget::mousePressEvent(QMouseEvent *_event)
 				if(desired_edge >= 0) 
 				{
 					Mesh::HalfedgeHandle heh = mesh.halfedge_handle( mesh.edge_handle(desired_edge), 0 );
-					OpenMesh::Vec3d from_p = mesh.point(mesh.from_vertex_handle(heh));
-					OpenMesh::Vec3d to_p = mesh.point(mesh.to_vertex_handle(heh));
-					OpenMesh::Vec3d sp(selectedPoint[0],selectedPoint[1],selectedPoint[2]);
+					auto from_p = mesh.point(mesh.from_vertex_handle(heh));
+					auto to_p = mesh.point(mesh.to_vertex_handle(heh));
+					Vector3d sp(selectedPoint[0],selectedPoint[1],selectedPoint[2]);
 					bool collapse_ok = true;
-					if( (sp-from_p).sqrnorm() > (to_p-sp).sqrnorm() )
+					if( (sp-from_p).squaredNorm() > (to_p-sp).squaredNorm() )
 					{
 						if( mesh.is_collapse_ok(heh) )
 						{
@@ -154,8 +154,8 @@ void InteractiveViewerWidget::mousePressEvent(QMouseEvent *_event)
 					Mesh::HalfedgeHandle heh_ = mesh.halfedge_handle( eh, 1 );
 					Mesh::VertexHandle vh0 = mesh.to_vertex_handle(heh);
 					Mesh::VertexHandle vh1 = mesh.to_vertex_handle(heh_);
-					OpenMesh::Vec3d s = mesh.point( vh1 );
-					OpenMesh::Vec3d e = mesh.point( vh0 );
+					auto s = mesh.point( vh1 );
+					auto e = mesh.point( vh0 );
 					Mesh::VertexHandle vh = mesh.add_vertex( (s + e)*0.5 );
 					std::vector<Mesh::VertexHandle> one_face(3);
 					if(mesh.is_boundary(eh))
@@ -369,8 +369,8 @@ void InteractiveViewerWidget::move_point_based_lastVertex(int x,int y)
 	GLdouble winX = 0.0;
 	GLdouble winY = 0.0;
 	GLdouble winZ = 0.0;
-	OpenMesh::Vec3d p = mesh.point(mesh.vertex_handle(lastestVertex));
-	gluProject(p[0], p[1], p[2],  &ModelViewMatrix[0], &ProjectionMatrix[0], viewport, &winX, &winY, &winZ);
+	auto p = mesh.point(mesh.vertex_handle(lastestVertex));
+	gluProject(p(0) , p(1), p(2), &ModelViewMatrix[0], &ProjectionMatrix[0], viewport, &winX, &winY, &winZ);
 	
 	gluUnProject((GLdouble)(x), (GLdouble)( height() - y ), winZ,  &ModelViewMatrix[0], &ProjectionMatrix[0], viewport, &selectedPoint[0], &selectedPoint[1], &selectedPoint[2]);
 }
@@ -388,14 +388,14 @@ int InteractiveViewerWidget::find_face_using_selected_point()
 	int rv = find_vertex_using_selected_point();
 	Mesh::VertexFaceIter vf_it = mesh.vf_iter( mesh.vertex_handle(rv) );
 	int desiredFace = -1; //double minLen = 10*radius();
-	std::vector<OpenMesh::Vec3d> tri_p(3); int tri_count = 0;
+	Matrix3Xd tri_p(3); int tri_count = 0;
 	Mesh::Point resultP(selectedPoint[0],selectedPoint[1],selectedPoint[2]);
 	for( vf_it; vf_it; ++vf_it )
 	{
 		tri_count = 0;
 		for(Mesh::FaceVertexIter fv_it = mesh.fv_iter(vf_it.handle()); fv_it; ++fv_it)
 		{
-			tri_p[tri_count] = mesh.point(fv_it); ++tri_count;
+			tri_p.col(tri_count) = mesh.point(fv_it); ++tri_count;
 		}
 		if( check_in_triangle_face(tri_p, resultP) )
 		{
@@ -409,7 +409,7 @@ int InteractiveViewerWidget::find_face_using_selected_point()
 			tri_count = 0;
 			for(Mesh::FaceVertexIter fv_it = mesh.fv_iter(f_it.handle()); fv_it; ++fv_it)
 			{
-				tri_p[tri_count] = mesh.point(fv_it); ++tri_count;
+				tri_p.col(tri_count) = mesh.point(fv_it); ++tri_count;
 			}
 			if( check_in_triangle_face(tri_p, resultP) )
 			{
@@ -429,9 +429,10 @@ int InteractiveViewerWidget::find_edge_using_selected_point()
 	Mesh::Point resultP(selectedPoint[0],selectedPoint[1],selectedPoint[2]);
 	for(Mesh::FaceHalfedgeIter fhe_it = mesh.fh_iter(fh); fhe_it; ++fhe_it)
 	{
-		OpenMesh::Vec3d s = mesh.point( mesh.from_vertex_handle(fhe_it) );
-		OpenMesh::Vec3d e = mesh.point( mesh.to_vertex_handle(fhe_it) );
-		double dis = OpenMesh::cross(resultP - s, resultP - e).norm() / (s - e).norm();
+		auto s = mesh.point( mesh.from_vertex_handle(fhe_it) );
+		auto e = mesh.point( mesh.to_vertex_handle(fhe_it) );
+		//double dis = OpenMesh::cross(resultP - s, resultP - e).norm() / (s - e).norm();
+		double dis = (resultP - s).cross(resultP - e).norm() / (s - e).norm();
 		if(dis < min_len){ min_len = dis; desiredEdge = mesh.edge_handle(fhe_it.handle()).idx(); }
 	}
 	
@@ -452,7 +453,7 @@ void InteractiveViewerWidget::buildIndex()
 	for(; v_it != v_end; ++v_it)
 	{
 		p = mesh.point(v_it);
-		dataPts[count][0] = p[0]; dataPts[count][1] = p[1]; dataPts[count][2] = p[2];
+		dataPts[count][0] = p(0); dataPts[count][1] = p(1); dataPts[count][2] = p(2);
 		++count;
 	}
 
@@ -556,7 +557,7 @@ void InteractiveViewerWidget::draw_selected_face()
 			glBegin(GL_POLYGON);
 			for( fv_it; fv_it; ++fv_it )
 			{
-				glVertex3dv(&mesh.point(fv_it)[0]);
+				glVertex3dv(&mesh.point(fv_it)(0));
 			}
 			glEnd();
 		}

@@ -47,7 +47,7 @@ void QGLViewerWidget::init(void)
 	ModelViewMatrix.resize(16, 0.0);
 	ProjectionMatrix.resize(16, 0.0);
 	
-	Center = OpenMesh::Vec3d(0,0,0);
+	Center = Eigen::Vector3d(0,0,0);
 	Radius = 0.0;
 
 	//SetGlWindoPosFunc();
@@ -170,7 +170,7 @@ void QGLViewerWidget::initializeGL()
 	//for initialize all the viewports
 	glGetDoublev( GL_MODELVIEW_MATRIX, &ModelViewMatrix[0] );
 	
-	set_scene_pos(OpenMesh::Vec3d(0.0, 0.0, 0.0), 1.0);
+	set_scene_pos(Eigen::Vector3d(0.0, 0.0, 0.0), 1.0);
 }
 
 void QGLViewerWidget::resizeGL( int _w, int _h )
@@ -276,7 +276,7 @@ void QGLViewerWidget::wheelEvent(QWheelEvent* _event)
 {
 	// Use the mouse wheel to zoom in/out
 	float d = -(float)_event->delta() / 120.0 * 0.05 * Radius;
-	translate(OpenMesh::Vec3d(0.0, 0.0, d));
+	translate(Eigen::Vector3d(0.0, 0.0, d));
 	updateGL();
 	_event->accept();
 }
@@ -313,12 +313,12 @@ void QGLViewerWidget::translation(QPoint p)
 	double dx = p.x() - last_point_2D_.x();
 	double dy = p.y() - last_point_2D_.y();
 
-	translate(OpenMesh::Vec3d( 2.0*dx/w*right/near_plane*z, 
+	translate(Eigen::Vector3d( 2.0*dx/w*right/near_plane*z,
 								-2.0*dy/h*top/near_plane*z, 
 								0.0f));
 }
 
-void QGLViewerWidget::translate(const OpenMesh::Vec3d& _trans)
+void QGLViewerWidget::translate(const Eigen::Vector3d& _trans)
 {
 	// Translate the object by _trans
 	// Update modelview_matrix_
@@ -331,21 +331,21 @@ void QGLViewerWidget::translate(const OpenMesh::Vec3d& _trans)
 
 void QGLViewerWidget::rotation(QPoint p)
 {
-	OpenMesh::Vec3d  newPoint3D;
+	Eigen::Vector3d newPoint3D;
 	bool newPoint_hitSphere = map_to_sphere(p, newPoint3D);
 	if (newPoint_hitSphere)
 	{
-		OpenMesh::Vec3d axis = last_point_3D_ % newPoint3D;
-		if (axis.sqrnorm() < 1e-7)
+		Eigen::Vector3d axis = last_point_3D_.cross(newPoint3D);
+		if (axis.squaredNorm() < 1e-7)
 		{
-			axis = OpenMesh::Vec3d(1,0,0);
+			axis = Eigen::Vector3d(1,0,0);
 		} 
 		else 
 		{
 			axis.normalize();
 		}
 		// find the amount of rotation
-		OpenMesh::Vec3d d = last_point_3D_ - newPoint3D;
+		Eigen::Vector3d d = last_point_3D_ - newPoint3D;
 		double t = 0.5*d.norm()/TRACKBALL_RADIUS;
 		if (t<-1.0) t=-1.0;
 		else if (t>1.0) t=1.0;
@@ -354,12 +354,12 @@ void QGLViewerWidget::rotation(QPoint p)
 		rotate( axis, angle );
 	}
 }
-void QGLViewerWidget::rotate(const OpenMesh::Vec3d& _axis, double _angle)
+void QGLViewerWidget::rotate(const Eigen::Vector3d& _axis, double _angle)
 {
 	// Rotate around center center_, axis _axis, by angle _angle
 	// Update modelview_matrix_
 
-	OpenMesh::Vec3d t( ModelViewMatrix[0]*Center[0] + 
+	Eigen::Vector3d t( ModelViewMatrix[0]*Center[0] +
 		ModelViewMatrix[4]*Center[1] +
 		ModelViewMatrix[8]*Center[2] + 
 		ModelViewMatrix[12],
@@ -381,7 +381,7 @@ void QGLViewerWidget::rotate(const OpenMesh::Vec3d& _axis, double _angle)
 	glGetDoublev(GL_MODELVIEW_MATRIX, &ModelViewMatrix[0]);
 }
 
-bool QGLViewerWidget::map_to_sphere(const QPoint& _v2D, OpenMesh::Vec3d& _v3D)
+bool QGLViewerWidget::map_to_sphere(const QPoint& _v2D, Eigen::Vector3d& _v3D)
 {
 	// This is actually doing the Sphere/Hyperbolic sheet hybrid thing,
     // based on Ken Shoemake's ArcBall in Graphics Gems IV, 1993.
@@ -442,7 +442,7 @@ void QGLViewerWidget::update_projection_matrix_one_viewer()
 
 void QGLViewerWidget::view_all()
 {
-	OpenMesh::Vec3d _trans = OpenMesh::Vec3d( -(ModelViewMatrix[0]*Center[0] + 
+	Eigen::Vector3d _trans = Eigen::Vector3d( -(ModelViewMatrix[0]*Center[0] +
 		ModelViewMatrix[4]*Center[1] +
 		ModelViewMatrix[8]*Center[2] + 
 		ModelViewMatrix[12]),
@@ -463,7 +463,7 @@ void QGLViewerWidget::view_all()
 	glGetDoublev(GL_MODELVIEW_MATRIX, &ModelViewMatrix[0]);
 }
 
-void QGLViewerWidget::set_scene_pos(const OpenMesh::Vec3d& _center, float _radius)
+void QGLViewerWidget::set_scene_pos(const Eigen::Vector3d& _center, float _radius)
 {
 	Center = _center;
 	Radius = _radius;
