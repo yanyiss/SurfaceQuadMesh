@@ -1,0 +1,176 @@
+cmake_minimum_required(VERSION 3.10)
+project(HybridGridProcessor)
+
+add_subdirectory(src/Dependency/ANN)
+add_subdirectory(src/Dependency/BSpline)
+if (CMAKE_GENERATOR MATCHES "Visual Studio")
+  set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+endif()
+set_property(TARGET ANN BSpline PROPERTY FOLDER "Dependency")
+
+#设置不生成MinSizeRel;RelWithDebInfo
+set(CMAKE_CONFIGURATION_TYPES "Debug;Release")
+
+add_definitions(/D_USE_MATH_DEFINES)
+add_definitions(-DUSE_AVX)
+
+#Complier
+if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+    message(STATUS "编译器是gcc")
+elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
+    message(STATUS "编译器是msvc")
+elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang")
+    message(STATUS "编译器是AppleClang")
+    set(Qt5Core_DIR /Users/chenhonghu/Downloads/meigyoku/qt/5.14.2/clang_64/lib/cmake/Qt5Core)#设置QT的目录
+    set(Qt5Gui_DIR /Users/chenhonghu/Downloads/meigyoku/qt/5.14.2/clang_64/lib/cmake/Qt5Gui)
+    set(Qt5OpenGL_DIR /Users/chenhonghu/Downloads/meigyoku/qt/5.14.2/clang_64/lib/cmake/Qt5OpenGL)
+    set(Qt5Widgets_DIR /Users/chenhonghu/Downloads/meigyoku/qt/5.14.2/clang_64/lib/cmake/Qt5Widgets)
+    find_package(OpenGL REQUIRED)
+    include_directories(${OPENGL_INCLUDE_DIR})
+    find_package(GLUT REQUIRED)
+    include_directories(${GLUT_INCLUDE_DIR})
+endif()
+
+#path
+#include
+SET(EIGEN_PATH "D:/eigen3")
+SET(OPENMESH_PATH "D:/OpenMesh 8.1/include")
+SET(TBB_PATH "D:/tbb/tbb/include")
+SET(OPENCASCADE_PATH "D:/OpenCASCADE-7.4.0-vc14-64/opencascade-7.4.0/inc")
+SET(TRIANGLE_PATH src/Dependency/triangle)
+#lib
+SET(OPENMESH_LIB_PATH "D:/OpenMesh 8.1/lib")
+SET(TBB_LIB_PATH "D:/tbb/tbb/lib/intel64/vc14")
+SET(OPENCASCADE_LIB_PATH "D:/OpenCASCADE-7.4.0-vc14-64/opencascade-7.4.0/win64/vc14/lib")
+SET(TRIANGLE_LIB_PATH src/Dependency/triangle)
+
+#QT
+set(CMAKE_INCLUDE_CURRENT_DIR ON)
+set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTORCC ON)
+set(CMAKE_AUTOUIC ON)
+find_package(Qt5Widgets REQUIRED)  
+find_package(Qt5Core REQUIRED)
+find_package(Qt5Gui REQUIRED)
+find_package(Qt5OpenGL REQUIRED)
+get_target_property(_qmake_executable Qt5::qmake IMPORTED_LOCATION)# https://zhuanlan.zhihu.com/p/73469206，调用windepolyqt进行自动部署
+get_filename_component(_qt_bin_dir "${_qmake_executable}" DIRECTORY)
+find_program(DEPLOYQT_EXECUTABLE NAMES windeployqt macdeployqt HINTS "${_qt_bin_dir}")
+
+
+set(QRC_SOURCE_FILES src/surfacemeshprocessing.qrc)
+qt5_add_resources(QRC_FILES ${QRC_SOURCE_FILES})
+
+include_directories(${EIGEN_PATH})
+include_directories(${OPENMESH_PATH})
+include_directories(${TBB_PATH})
+include_directories(${OPENCASCADE_PATH})
+include_directories(${TRIANGLE_PATH})
+
+link_directories(${OPENMESH_LIB_PATH})
+link_directories(${TBB_LIB_PATH})
+link_directories(${OPENCASCADE_LIB_PATH})
+link_directories(${TRIANGLE_LIB_PATH})
+
+
+file (GLOB CPS_FILE
+    src/Dependency/CPS/*
+)
+
+file (GLOB GUI_FILE
+    src/MeshViewer/Aux_Transform_Mesh_Dialog.h
+    src/main.cpp
+    src/MeshViewer/MainViewerWidget.*
+    src/MeshViewer/MeshParamDialog.*
+    src/surfacemeshprocessing.cpp
+    src/surfacemeshprocessing.h
+)
+
+file (GLOB MeshViewer_FILE
+    src/MeshViewer/Auxiliary_Function_Mesh.cpp
+    src/MeshViewer/InteractiveViewerWidget.*
+    src/MeshViewer/MeshDefinition.*
+    src/MeshViewer/MeshViewerWidget.*
+    src/MeshViewer/OpenglHeaders.h
+    src/MeshViewer/QGLViewerWidget.*
+)
+
+file (GLOB Algorithm_FILE
+    src/Algorithm/CheckBoard/*
+    src/Algorithm/SurfaceMesher/Generator/*
+    src/Algorithm/SurfaceMesher/Optimizer/*
+)
+
+file (GLOB Toolbox_FILE
+    src/Toolbox/dprinter/*
+    src/Toolbox/Math/*
+)
+
+add_executable(${PROJECT_NAME} ${SRCFILES} 
+    ${CPS_FILE}
+    ${GUI_FILE}
+    ${MeshViewer_FILE}
+    ${Algorithm_FILE}
+    ${Toolbox_FILE}
+    ${QRC_FILES}
+)
+
+
+if(WIN32)
+add_custom_command(TARGET ${PROJECT_NAME}
+POST_BUILD
+COMMAND ${DEPLOYQT_EXECUTABLE} "$<TARGET_FILE:${PROJECT_NAME}>"
+    --$<LOWER_CASE:$<CONFIG>> --qmldir ${CMAKE_SOURCE_DIR}
+)
+endif()
+
+source_group(CPS FILES ${CPS_FILE})
+source_group(GUI FILES ${GUI_FILE})
+source_group(MeshViewer FILES ${MeshViewer_FILE})
+source_group(Algorithm FILES ${Algorithm_FILE})
+source_group(Toolbox FILES ${Toolbox_FILE})
+
+target_link_libraries(${PROJECT_NAME} Qt5::Widgets Qt5::Core Qt5::Gui Qt5::OpenGL ANN BSpline
+#OpenMesh
+    optimized OpenMeshCore 
+    optimized OpenMeshTools
+    debug OpenMeshCored 
+    debug OpenMeshToolsd
+#OpenCASCADE
+    TKernel.lib
+    TKMath.lib
+    TKG2d.lib
+    TKG3d.lib
+    TKBRep.lib
+    TKGeomBase.lib
+    TKGeomAlgo.lib
+    TKTopAlgo.lib
+    TKPrim.lib
+    TKBO.lib
+    TKBool.lib
+    TKOffset.lib
+    TKService.lib
+    TKV3d.lib
+    TKOpenGl.lib
+    TKFillet.lib
+    TKXSBase.lib
+    TKXDEIGES.lib
+    TKSTEP.lib
+    TKIGES.lib
+    TKXMESH.lib
+    TKMESH.lib
+    TKMESHVS.lib
+#triangle
+    triangle.lib
+)
+if (CMAKE_SYSTEM_NAME MATCHES "Windows")
+target_link_libraries(${PROJECT_NAME} 
+    opengl32
+    glu32   
+)
+elseif (CMAKE_SYSTEM_NAME MATCHES "Darwin")
+    target_link_libraries(${PROJECT_NAME} 
+    ${GLUT_LIBRARY} 
+    ${OPENGL_LIBRARY}
+)
+endif()
