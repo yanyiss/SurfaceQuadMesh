@@ -69,6 +69,10 @@ private:
 	void draw_mesh_solidsmooth() const;
 	void draw_mesh_pointset() const;
 
+	void draw_CrossField();
+	bool flag = true;
+	//void draw_AnisotropicMesh();//see definition of diagonal mesh in paper: Checkerboard Patterns with Black Rectangles
+
 	std::string file;
 
 protected:

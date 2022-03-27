@@ -156,6 +156,7 @@ void MeshViewerWidget::initMesh()
 	printBasicMeshInfo();
 	updateMesh();
 	ifUpdateMesh = true;
+	flag = true;
 }
 
 void MeshViewerWidget::printBasicMeshInfo()
@@ -540,21 +541,13 @@ void MeshViewerWidget::draw_scene_mesh(int drawmode)
 		draw_mesh_pointset();
 		break;
 	case CHECKBOARD:
-		//draw_IsotropicMesh();
+		draw_CrossField();
 
-		//glEnable(GL_POLYGON_OFFSET_FILL);
-		//glPolygonOffset(1.5f, 2.0f);
-		//glEnable(GL_LIGHTING);
-		//glShadeModel(GL_FLAT);
-		//draw_mesh_solidflat();
-		//glDisable(GL_POLYGON_OFFSET_FILL);
-		////draw_meshpointset();
-		//glDisable(GL_LIGHTING);
-
-		//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-		//draw_mesh_wireframe();
-		//draw_feature();
-		//glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+		glEnable(GL_LIGHTING);
+		glShadeModel(GL_FLAT);
+		draw_mesh_solidflat();
+		//draw_meshpointset();
+		glDisable(GL_LIGHTING);
 		break;
 	case DIAGONAL_MESH:
 		//glEnable(GL_POLYGON_OFFSET_FILL);
@@ -869,5 +862,50 @@ void MeshViewerWidget::draw_mesh_pointset() const
 
 	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
+}
+
+#include "..\Algorithm\crossField.h"
+#include "..\Toolbox\dprint.h"
+void MeshViewerWidget::draw_CrossField()
+{
+	static std::vector<OpenMesh::Vec3d> crossfield;
+	if (flag)
+	{
+		crossField cf(&mesh);
+		mesh.update_face_normals();
+		std::vector<size_t> constraintId; constraintId.push_back(0);
+		std::vector<OpenMesh::Vec3d> constraintVector;
+		constraintVector.push_back(OpenMesh::Vec3d(0, 0, 1).cross(mesh.normal(mesh.face_handle(0))));
+		cf.crossfieldCreator(crossfield, constraintId, constraintVector);
+
+		for (auto &tf : mesh.faces())
+		{
+			double r = 0;
+			for (auto &tfe : mesh.fe_range(tf))
+			{
+				r += mesh.calc_edge_length(tfe);
+			}
+			r = 2 * mesh.calc_face_area(tf) / r;
+			r = 1;
+			OpenMesh::Vec3d c = mesh.calc_centroid(tf);
+			int i = tf.idx() * 4;
+			for (; i < tf.idx() * 4 + 4; ++i)
+			{
+				crossfield[i] = crossfield[i] * r + c;
+			}
+			std::swap(crossfield[i + 1], crossfield[i + 2]);
+		}
+		flag = false;
+	}
+
+	glBegin(GL_LINES);
+	for (auto &cp : crossfield)
+	{
+		glVertex3dv(cp.data());
+	}
+	glEnd();
+
+	glBegin(GL_POINTS);
+	glEnd();
 }
 
