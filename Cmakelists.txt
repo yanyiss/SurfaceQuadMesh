@@ -32,12 +32,10 @@ endif()
 
 #path
 #include
-SET(EIGEN_PATH "D:/eigen3")
-SET(OPENMESH_PATH "D:/OpenMesh 8.1/include")
-SET(TBB_PATH "D:/tbb/tbb/include")
+SET(EIGEN_PATH "D:/OpenSource/Include")
+SET(OPENMESH_PATH "D:/OpenSource/Include")
 #lib
-SET(OPENMESH_LIB_PATH "D:/OpenMesh 8.1/lib")
-SET(TBB_LIB_PATH "D:/tbb/tbb/lib/intel64/vc14")
+SET(OPENMESH_LIB_PATH "D:/OpenSource/Lib")
 
 #QT
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
@@ -58,10 +56,8 @@ qt5_add_resources(QRC_FILES ${QRC_SOURCE_FILES})
 
 include_directories(${EIGEN_PATH})
 include_directories(${OPENMESH_PATH})
-include_directories(${TBB_PATH})
 
 link_directories(${OPENMESH_LIB_PATH})
-link_directories(${TBB_LIB_PATH})
 
 
 file (GLOB CPS_FILE
