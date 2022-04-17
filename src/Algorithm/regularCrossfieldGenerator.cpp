@@ -25,9 +25,10 @@ void regularCrossfieldGenerator::run(std::vector<OpenMesh::Vec3d>& crossfield)
 	size_t nf = mesh->n_faces();
 	size_t ne = mesh->n_edges();
 
-	SimplicialLDLT<Eigen::SparseMatrix<double>> solver;
-	Eigen::SparseMatrix<double> B_CCB, Hessian;
+	SimplicialLDLT<SparseMatrix<double>> solver;
+	SparseMatrix<double> B_CCB, ATA, Hessian;
 	B_CCB.resize(ne * 2, nf * 2);
+	ATA.resize(nf * 2, nf * 2);
 	Hessian.resize(nf * 2, nf * 2);
 	VectorXd x(nf * 2); x.setConstant(1.0);
 	VectorXd b(nf * 2);
@@ -70,6 +71,7 @@ void regularCrossfieldGenerator::run(std::vector<OpenMesh::Vec3d>& crossfield)
 
 		B_CCB.setZero();
  		B_CCB.setFromTriplets(tri.begin(), tri.end());
+		ATA = B_CCB.transpose().eval() * B_CCB;
 		tri.clear();
 		tri.reserve(4 * nf);
 		for (count = 0; count < nf; ++count)
@@ -83,23 +85,28 @@ void regularCrossfieldGenerator::run(std::vector<OpenMesh::Vec3d>& crossfield)
 		}
 		Hessian.setZero();
 		Hessian.setFromTriplets(tri.begin(), tri.end());
-		Hessian += B_CCB.transpose() * B_CCB;
-
+		Hessian += ATA;
+		
 		for (count = 0; count < nf; ++count)
 		{
-			double temp = 2 * (1 - 1.0 / (x(count) * x(count) + x(count + nf) * x(count + nf)));
+			double temp = x(count) * x(count) + x(count + nf) * x(count + nf);
+			temp = 2 * (1 - 1.0 / temp * temp);
 			b(count) = x(count) * temp;
 			b(count + nf) = x(count + nf) * temp;
 		}
-		b += B_CCB.transpose() * B_CCB * x;
-
+		b += ATA * x;
 		
-		solver.compute(Hessian);
+		if (!itertimes)
+		{
+			solver.analyzePattern(Hessian);
+		}
+		//solver.compute(Hessian);
+		solver.factorize(Hessian);
 		x -= solver.solve(b);
 		for (count = 0; count < nf; ++count)
 		{
 			double temp = x(count) * x(count) + x(count + nf) * x(count + nf);
-			if (temp < 1)
+			if (temp < 1.0)
 			{
 				temp = std::sqrt(temp);
 				x(count) /= temp;
