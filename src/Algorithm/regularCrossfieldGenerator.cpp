@@ -22,96 +22,99 @@ void regularCrossfieldGenerator::run(std::vector<OpenMesh::Vec3d>& crossfield)
 	using namespace Eigen;
 	typedef complex<double> COMPLEX;
 
-	auto nf = mesh->n_faces();
-	auto ne = mesh->n_edges();
-	int count = 0;
+	size_t nf = mesh->n_faces();
+	size_t ne = mesh->n_edges();
 
-	/*Eigen::SimplicialLDLT<Eigen::SparseMatrix<COMPLEX>> slu;
-	Eigen::SparseMatrix<COMPLEX> A;
-	Eigen::VectorXcd b(fnum);
-	vector<Eigen::Triplet<COMPLEX>> tris;*/
 	SimplicialLDLT<Eigen::SparseMatrix<double>> solver;
-	Eigen::SparseMatrix<double> B_CCB, ATA, Hessian;
-	B_CCB.resize(ne << 1, nf << 1);
-	ATA.resize(nf << 1, nf << 1);
-	Hessian.resize(nf << 1, nf << 1);
-	VectorXd b(nf << 1);
+	Eigen::SparseMatrix<double> B_CCB, Hessian;
+	B_CCB.resize(ne * 2, nf * 2);
+	Hessian.resize(nf * 2, nf * 2);
+	VectorXd x(nf * 2); x.setConstant(1.0);
+	VectorXd b(nf * 2);
 	vector<Triplet<double>> tri;
 
-	count = 0;
-	for (auto& tf : mesh->faces())
+	for(int itertimes = 0; itertimes < 10; ++itertimes)
 	{
-		int id_f = tf.idx();
-
-		COMPLEX sum = 0;
-		for (auto& tfh : mesh->fh_range(tf))
+		dprint("itertimes:", itertimes);
+		int count = 0;
+		tri.reserve(8 * ne);
+		for (auto& th : mesh->halfedges())
 		{
-			if (!mesh->is_boundary(tfh.edge()))
+			if (mesh->is_boundary(th.edge()))
+				continue;
+			size_t id_f = th.face().idx();
+			size_t id_g = th.opp().face().idx();
+			if (id_f < id_g)
 			{
-				auto id_g = mesh->face_handle(tfh.opp()).idx();
-				if (id_f < id_g)
-				{
-					auto p1 = mesh->point(tfh.to());
-					auto p2 = mesh->point(tfh.from());
-					OpenMesh::Vec3d e = (p2 - p1).normalized();
-					COMPLEX ef = COMPLEX(dot(e, faceBase[id_f << 1]), -dot(e, faceBase[(id_f << 1) + 1]));
-					ef *= ef; ef *= ef;
-					COMPLEX eg = COMPLEX(dot(e, faceBase[id_g << 1]), -dot(e, faceBase[(id_g << 1) + 1]));
-					eg *= eg; eg *= eg;
+				auto& p1 = mesh->point(th.to());
+				auto& p2 = mesh->point(th.from());
+				OpenMesh::Vec3d e = (p2 - p1).normalized();
+				COMPLEX ef = COMPLEX(dot(e, faceBase[id_f * 2]), -dot(e, faceBase[id_f * 2 + 1]));
+				ef *= ef; ef *= ef;
+				COMPLEX eg = COMPLEX(dot(e, faceBase[id_g * 2]), -dot(e, faceBase[id_g * 2 + 1]));
+				eg *= eg; eg *= -eg;
 
-					/*OpenMesh::Vec3d e = (p2 - p1).normalized();
+				tri.emplace_back(count, id_f, ef.real());
+				tri.emplace_back(count + ne, id_f + nf, ef.real());
+				tri.emplace_back(count, id_f + nf, -ef.imag());
+				tri.emplace_back(count + ne, id_f, ef.imag());
 
-					COMPLEX e_f = COMPLEX(dot(e, faceBase[id_f * 2]), dot(e, faceBase[id_f * 2 + 1]));
-					COMPLEX e_g = COMPLEX(dot(e, faceBase[id_g * 2]), dot(e, faceBase[id_g * 2 + 1]));
+				tri.emplace_back(count, id_g, eg.real());
+				tri.emplace_back(count + ne, id_g + nf, eg.real());
+				tri.emplace_back(count, id_g + nf, -eg.imag());
+				tri.emplace_back(count + ne, id_g, eg.imag());
 
-					COMPLEX e_f_c_4 = pow(conj(e_f), 4);
-					COMPLEX e_g_c_4 = pow(conj(e_g), 4);
-
-					if (status[id_f] == 0)
-					{
-						tris.emplace_back(count, id2sln[id_f], e_f_c_4);
-					}
-					else
-					{
-						b_pre[count] += -e_f_c_4 * f_dir[id_f];
-					}
-					if (status[id_g] == 0)
-					{
-						tris.emplace_back(count, id2sln[id_g], -e_g_c_4);
-					}
-					else
-					{
-						b_pre[count] += e_g_c_4 * f_dir[id_g];
-					}*/
-
-
-					count++;
-				}
+				++count;
 			}
 		}
 
+		B_CCB.setZero();
+ 		B_CCB.setFromTriplets(tri.begin(), tri.end());
+		tri.clear();
+		tri.reserve(4 * nf);
+		for (count = 0; count < nf; ++count)
+		{
+			double temp = 1.0 / (x(count) * x(count) + x(count + nf) * x(count + nf));
+			double t1 = temp * temp; double t2 = temp * t1;
+			tri.emplace_back(count, count, 2 * (1 - t1) + 8 * x(count) * x(count) * t2);
+			tri.emplace_back(count, count + nf, 8 * x(count) * x(count + nf) * t2);
+			tri.emplace_back(count + nf, count, 8 * x(count) * x(count + nf) * t2);
+			tri.emplace_back(count + nf, count + nf, 2 * (1 - t1) + 8 * x(count + nf) * x(count + nf) * t2);
+		}
+		Hessian.setZero();
+		Hessian.setFromTriplets(tri.begin(), tri.end());
+		Hessian += B_CCB.transpose() * B_CCB;
+
+		for (count = 0; count < nf; ++count)
+		{
+			double temp = 2 * (1 - 1.0 / (x(count) * x(count) + x(count + nf) * x(count + nf)));
+			b(count) = x(count) * temp;
+			b(count + nf) = x(count + nf) * temp;
+		}
+		b += B_CCB.transpose() * B_CCB * x;
+
+		
+		solver.compute(Hessian);
+		x -= solver.solve(b);
+		for (count = 0; count < nf; ++count)
+		{
+			double temp = x(count) * x(count) + x(count + nf) * x(count + nf);
+			if (temp < 1)
+			{
+				temp = std::sqrt(temp);
+				x(count) /= temp;
+				x(count + nf) /= temp;
+			}
+		}
 	}
-	A.resize(count, sln2id.size());
-	b.resize(count);
-	b = b_pre.head(count);
-	A.setFromTriplets(tris.begin(), tris.end());
-	Eigen::SparseMatrix<COMPLEX> AT = A.adjoint();
-	slu.compute(AT * A);
-	Eigen::VectorXcd x = slu.solve(AT * b);
-#if 0
-	for (int i = 0; i < x.size(); i++)
+	crossfield.resize(4 * nf);
+	for (int i = 0; i < nf; ++i)
 	{
-		dprint(std::sqrt(x(i).real() * x(i).real() + x(i).imag() * x(i).imag()));
-	}
-#endif
-	crossfield.resize(4 * fnum);
-	for (int i = 0; i < fnum; i++)
-	{
-		double length = std::sqrt(f_dir[i].real() * f_dir[i].real() + f_dir[i].imag() * f_dir[i].imag());
-		double arg = std::arg(f_dir[i]) / 4;
+		//dprint(i);
+		double arg = std::arg(COMPLEX(x(i), x(i + nf))) * 0.25;
 		for (int j = 0; j < 4; j++)
 		{
-			crossfield[i * 4 + j] = faceBase[i * 2] * length * cos(arg + j * PI * 0.5) + faceBase[i * 2 + 1] * length * sin(arg + j * PI * 0.5);
+			crossfield[i * 4 + j] = faceBase[i * 2] * cos(arg + j * PI * 0.5) + faceBase[i * 2 + 1] * sin(arg + j * PI * 0.5);
 		}
 	}
 }

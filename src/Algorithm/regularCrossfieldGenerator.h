@@ -10,9 +10,9 @@ class regularCrossfieldGenerator
 {
 public:
 	regularCrossfieldGenerator(TriMesh* m) : mesh(m) { calculateMeshFaceBase(); };
-	~regularCrossfieldGenerator(std::vector<OpenMesh::Vec3d>& crossfield);
+	~regularCrossfieldGenerator() {};
 public:
-	void run();
+	void run(std::vector<OpenMesh::Vec3d>& crossfield);
 	void calculateMeshFaceBase();
 
 private:

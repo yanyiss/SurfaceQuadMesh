@@ -157,6 +157,7 @@ void MeshViewerWidget::initMesh()
 	updateMesh();
 	ifUpdateMesh = true;
 	flag = true;
+	regularflag = true;
 }
 
 void MeshViewerWidget::printBasicMeshInfo()
@@ -562,6 +563,13 @@ void MeshViewerWidget::draw_scene_mesh(int drawmode)
 		//draw_mesh_wireframe();
 		////draw_meshpointset();
 		//glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+		draw_RegularCrossField();
+
+		glEnable(GL_LIGHTING);
+		glShadeModel(GL_FLAT);
+		draw_mesh_solidflat();
+		//draw_meshpointset();
+		glDisable(GL_LIGHTING);
 		break;
 	default:
 		break;
@@ -886,14 +894,13 @@ void MeshViewerWidget::draw_CrossField()
 				r += mesh.calc_edge_length(tfe);
 			}
 			r = 2 * mesh.calc_face_area(tf) / r;
-			r = 1;
 			OpenMesh::Vec3d c = mesh.calc_centroid(tf);
 			int i = tf.idx() * 4;
 			for (; i < tf.idx() * 4 + 4; ++i)
 			{
 				crossfield[i] = crossfield[i] * r + c;
 			}
-			std::swap(crossfield[i + 1], crossfield[i + 2]);
+			std::swap(crossfield[i - 3], crossfield[i - 2]);
 		}
 		flag = false;
 	}
@@ -906,6 +913,42 @@ void MeshViewerWidget::draw_CrossField()
 	glEnd();
 
 	glBegin(GL_POINTS);
+	glEnd();
+}
+#include "..\Algorithm\regularCrossfieldGenerator.h"
+void MeshViewerWidget::draw_RegularCrossField()
+{
+	static std::vector<OpenMesh::Vec3d> crossfield;
+	if (regularflag)
+	{
+		regularCrossfieldGenerator rcg(&mesh);
+		mesh.update_face_normals();
+		rcg.run(crossfield);
+
+		for (auto& tf : mesh.faces())
+		{
+			double r = 0;
+			for (auto& tfe : mesh.fe_range(tf))
+			{
+				r += mesh.calc_edge_length(tfe);
+			}
+			r = 2 * mesh.calc_face_area(tf) / r;
+			OpenMesh::Vec3d c = mesh.calc_centroid(tf);
+			int i = tf.idx() * 4;
+			for (; i < tf.idx() * 4 + 4; ++i)
+			{
+				crossfield[i] = crossfield[i] * r + c;
+			}
+			std::swap(crossfield[i - 3], crossfield[i - 2]);
+		}
+		regularflag = false;
+	}
+
+	glBegin(GL_LINES);
+	for (auto& cp : crossfield)
+	{
+		glVertex3dv(cp.data());
+	}
 	glEnd();
 }
 

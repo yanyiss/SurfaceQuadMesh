@@ -35,7 +35,7 @@ endif()
 SET(EIGEN_PATH "D:/OpenSource/Include")
 SET(OPENMESH_PATH "D:/OpenSource/Include")
 #lib
-SET(OPENMESH_LIB_PATH "D:/OpenSource/Lib")
+SET(OPENMESH_LIB_PATH "D:/OpenSource/Lib/OpenMesh")
 
 #QT
 set(CMAKE_INCLUDE_CURRENT_DIR ON)

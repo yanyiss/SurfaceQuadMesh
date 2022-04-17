@@ -70,7 +70,9 @@ private:
 	void draw_mesh_pointset() const;
 
 	void draw_CrossField();
+	void draw_RegularCrossField();
 	bool flag = true;
+	bool regularflag = true;
 	//void draw_AnisotropicMesh();//see definition of diagonal mesh in paper: Checkerboard Patterns with Black Rectangles
 
 	std::string file;

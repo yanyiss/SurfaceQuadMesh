@@ -70,7 +70,7 @@ public:
 		{
 			int id_f = tf.idx();
 
-			COMPLEX sum = 0;
+			//COMPLEX sum = 0;
 			for(auto &tfh : mesh->fh_range(tf))
 			{
 				if(!mesh->is_boundary(tfh.edge()))
@@ -142,7 +142,7 @@ public:
 			double arg = std::arg(f_dir[i]) / 4;
 			for (int j = 0; j < 4; j++)
 			{
-				crossfield[i * 4 + j] = faceBase[i * 2] * length * cos(arg + j * PI * 0.5) + faceBase[i * 2 + 1] * length * sin(arg + j * PI * 0.5);
+				crossfield[i * 4 + j] = faceBase[i * 2] * cos(arg + j * PI * 0.5) + faceBase[i * 2 + 1] * sin(arg + j * PI * 0.5);
 			}
 		}
 		/*auto cnorm = [&](COMPLEX c)
