@@ -4,7 +4,7 @@
 #include <OpenMesh/Core/Geometry/VectorT.hh>
 #include <OpenMesh/Core/IO/MeshIO.hh>
 #include <OpenMesh/Core/Mesh/TriMesh_ArrayKernelT.hh>
-//#include <OpenMesh/Core/Mesh/PolyMesh_ArrayKernelT.hh>
+#include <OpenMesh/Core/Mesh/PolyMesh_ArrayKernelT.hh>
 #include <Eigen/Dense>
 
 struct MeshTraits : public OpenMesh::DefaultTraits
@@ -54,8 +54,8 @@ struct MeshTraits : public OpenMesh::DefaultTraits
 };
 
 typedef OpenMesh::TriMesh_ArrayKernelT<MeshTraits> TriMesh;
-//typedef OpenMesh::PolyMesh_ArrayKernelT<MeshTraits> PolyMesh;
-typedef TriMesh Mesh;
+typedef OpenMesh::PolyMesh_ArrayKernelT<MeshTraits> Mesh;
+//typedef TriMesh Mesh;
 
 
 double calc_mesh_ave_edge_length(Mesh* mesh_);
@@ -88,7 +88,7 @@ void compute_principal_curvature(Mesh* mesh_,
 								 std::vector<double>& K1, std::vector<double>& K2, 
 								 std::vector<OpenMesh::Vec3d>& dir1,std::vector<OpenMesh::Vec3d>& dir2);
 
-
+#if 0
 #pragma region functions by yanyisheshou at GCL
 double meshMinAngle(TriMesh &mesh);
 
@@ -130,5 +130,5 @@ double meshAverageLength(T &mesh)
 	return le / mesh.n_edges();
 }
 #pragma endregion
-
+#endif
 #endif

@@ -876,15 +876,18 @@ void MeshViewerWidget::draw_mesh_pointset() const
 #include "..\Toolbox\dprint.h"
 void MeshViewerWidget::draw_CrossField()
 {
-	static std::vector<OpenMesh::Vec3d> crossfield;
+	//static std::vector<OpenMesh::Vec3d> crossfield1;
+	//static std::vector<int> constraintId;
+	static Eigen::Matrix3Xd crossfield;
+	static Eigen::VectorXi constraintId;
+	static Eigen::VectorXi singularity;
 	if (flag)
 	{
 		crossField cf(&mesh);
-		mesh.update_face_normals();
-		std::vector<size_t> constraintId; constraintId.push_back(0);
-		std::vector<OpenMesh::Vec3d> constraintVector;
-		constraintVector.push_back(OpenMesh::Vec3d(0, 0, 1).cross(mesh.normal(mesh.face_handle(0))));
-		cf.crossfieldCreator(crossfield, constraintId, constraintVector);
+		cf.runPolynomial();
+		crossfield = cf.getCrossField();
+		constraintId = cf.getConstraintFace();
+		singularity = cf.getSingularity();
 
 		for (auto &tf : mesh.faces())
 		{
@@ -893,37 +896,61 @@ void MeshViewerWidget::draw_CrossField()
 			{
 				r += mesh.calc_edge_length(tfe);
 			}
-			r = 2 * mesh.calc_face_area(tf) / r;
+			r /= 8.0;
 			OpenMesh::Vec3d c = mesh.calc_centroid(tf);
 			int i = tf.idx() * 4;
+			Eigen::Vector3d vc(c[0], c[1], c[2]);
 			for (; i < tf.idx() * 4 + 4; ++i)
 			{
-				crossfield[i] = crossfield[i] * r + c;
+				crossfield.col(i) = crossfield.col(i)*r + vc;
 			}
-			std::swap(crossfield[i - 3], crossfield[i - 2]);
+			Eigen::Vector3d tep = crossfield.col(i - 3);
+			crossfield.col(i - 3) = crossfield.col(i - 2);
+			crossfield.col(i - 2) = tep;
+			//std::swap(crossfield.col(i - 3), crossfield.col(i - 2));
 		}
 		flag = false;
 	}
 
+	glColor3d(0.1, 0.1, 0.1);
 	glBegin(GL_LINES);
-	for (auto &cp : crossfield)
+	for (int i = 0; i < crossfield.cols(); ++i)
 	{
-		glVertex3dv(cp.data());
+		auto temp = crossfield.col(i);
+		glVertex3d(temp(0), temp(1), temp(2));
+		//glVertex3dv(crossfield.col(i).data());
 	}
 	glEnd();
 
+	glColor3d(0.9, 0.5, 0.5);
+	glBegin(GL_TRIANGLES);
+	for (auto &id : constraintId)
+	{
+		for (auto &tfv : mesh.fv_range(mesh.face_handle(id)))
+		{
+			glVertex3dv(mesh.point(tfv).data());
+		}
+	}
+	glEnd();
+
+	glColor3d(0.1, 0.1, 0.9);
+	glPointSize(10);
 	glBegin(GL_POINTS);
+	for (int i = 0; i < singularity.size(); ++i)
+	{
+		glVertex3dv(mesh.point(mesh.vertex_handle(singularity(i))).data());
+	}
 	glEnd();
 }
-#include "..\Algorithm\regularCrossfieldGenerator.h"
+
 void MeshViewerWidget::draw_RegularCrossField()
 {
-	static std::vector<OpenMesh::Vec3d> crossfield;
+	/*static std::vector<OpenMesh::Vec3d> crossfield;
 	if (regularflag)
 	{
-		regularCrossfieldGenerator rcg(&mesh);
+		crossField rcg(&mesh);
 		mesh.update_face_normals();
-		rcg.run(crossfield);
+		rcg.runIteration(crossfield);
 
 		for (auto& tf : mesh.faces())
 		{
@@ -932,7 +959,7 @@ void MeshViewerWidget::draw_RegularCrossField()
 			{
 				r += mesh.calc_edge_length(tfe);
 			}
-			r = 2 * mesh.calc_face_area(tf) / r;
+			r /= 10.0;
 			OpenMesh::Vec3d c = mesh.calc_centroid(tf);
 			int i = tf.idx() * 4;
 			for (; i < tf.idx() * 4 + 4; ++i)
@@ -949,6 +976,6 @@ void MeshViewerWidget::draw_RegularCrossField()
 	{
 		glVertex3dv(cp.data());
 	}
-	glEnd();
+	glEnd();*/
 }
 

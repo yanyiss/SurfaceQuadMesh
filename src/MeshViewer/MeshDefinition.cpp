@@ -499,7 +499,7 @@ void compute_principal_curvature(Mesh* mesh_,
 	}
 }
 
-
+#if 0
 #pragma region functions by yanyisheshou at GCL
 #include "..\src\Toolbox\dprint.h"
 double meshMinAngle(TriMesh &mesh)
@@ -540,3 +540,4 @@ void printMeshQuality(TriMesh &mesh)
 		"\nmin and avg quality:", minQuality, avgQuality / mesh.n_faces());
 }
 #pragma endregion
+#endif
