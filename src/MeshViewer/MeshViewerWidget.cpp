@@ -872,15 +872,15 @@ void MeshViewerWidget::draw_mesh_pointset() const
 
 }
 
-#include "..\Algorithm\crossField.h"
+#include "..\Algorithm\dualLoop.h"
 #include "..\Toolbox\dprint.h"
 void MeshViewerWidget::draw_CrossField()
 {
 	//static std::vector<OpenMesh::Vec3d> crossfield1;
 	//static std::vector<int> constraintId;
 	static Eigen::Matrix3Xd crossfield;
-	static Eigen::VectorXi constraintId;
-	static Eigen::VectorXi singularity;
+	static std::vector<int> constraintId;
+	static std::vector<int> singularity;
 	if (flag)
 	{
 		crossField cf(&mesh);
@@ -936,46 +936,30 @@ void MeshViewerWidget::draw_CrossField()
 	glColor3d(0.1, 0.1, 0.9);
 	glPointSize(10);
 	glBegin(GL_POINTS);
-	for (int i = 0; i < singularity.size(); ++i)
+	/*for (int i = 0; i < singularity.size(); ++i)
 	{
-		glVertex3dv(mesh.point(mesh.vertex_handle(singularity(i))).data());
-	}
+		glVertex3dv(mesh.point(mesh.vertex_handle(singularity[i])).data());
+	}*/
+	//glColor3d(0.9, 0.9, 0.9);
+	glVertex3dv(mesh.point(mesh.vertex_handle(0)).data());
 	glEnd();
 }
 
 void MeshViewerWidget::draw_RegularCrossField()
 {
-	/*static std::vector<OpenMesh::Vec3d> crossfield;
+	static std::vector<int> loop;
+	static double length;
 	if (regularflag)
 	{
-		crossField rcg(&mesh);
-		mesh.update_face_normals();
-		rcg.runIteration(crossfield);
-
-		for (auto& tf : mesh.faces())
-		{
-			double r = 0;
-			for (auto& tfe : mesh.fe_range(tf))
-			{
-				r += mesh.calc_edge_length(tfe);
-			}
-			r /= 10.0;
-			OpenMesh::Vec3d c = mesh.calc_centroid(tf);
-			int i = tf.idx() * 4;
-			for (; i < tf.idx() * 4 + 4; ++i)
-			{
-				crossfield[i] = crossfield[i] * r + c;
-			}
-			std::swap(crossfield[i - 3], crossfield[i - 2]);
-		}
-		regularflag = false;
+		QuadLayout::dualLoop dl(&mesh);
+		dl.DijkstraLoop(1, 0, loop, length);
 	}
-
 	glBegin(GL_LINES);
-	for (auto& cp : crossfield)
+	for (int i = 0; i < loop.size() - 1; ++i)
 	{
-		glVertex3dv(cp.data());
+		glVertex3dv(mesh.point(mesh.vertex_handle(loop[i])).data());
+		glVertex3dv(mesh.point(mesh.vertex_handle(loop[i + 1])).data());
 	}
-	glEnd();*/
+	glEnd();
 }
 

@@ -47,7 +47,7 @@ void crossField::runPolynomial()
 	}*/
 	for (int i = 0; i < constraintId.size(); ++i)
 	{
-		int fid = constraintId(i);
+		int fid = constraintId[i];
 		status[fid] = 1;
 		constraintVector.col(i).normalize();
 		f_dir[fid] = std::pow(COMPLEX(constraintVector.col(i).dot(faceBase.col(fid * 2)), constraintVector.col(i).dot(faceBase.col(fid * 2 + 1))), 4);
@@ -457,7 +457,7 @@ void crossField::setCurvatureConstraint()
 	constraintVector.resize(3, id.size());
 	for (int i = 0; i < id.size(); ++i)
 	{
-		constraintId(i) = id[i];
+		constraintId[i] = id[i];
 		constraintVector.col(i) = mesh->property(f0, mesh->face_handle(id[i]));
 	}
 
@@ -511,60 +511,59 @@ void crossField::setCurvatureConstraint()
 //	delete C;
 //}
 
-Eigen::VectorXi& crossField::getMatching()
+std::vector<int>& crossField::getMatching()
 {
 	if (!matching.size())
 	{
 		matching.resize(mesh->n_halfedges());
-		matching.setZero();
+		//matching.setZero();
 		double invHalfPI = 2.0 / PI;
 		for (auto &te : mesh->edges())
 		{
-			if (mesh->is_boundary(te))
+			if (te.is_boundary())
+			{
+				matching[te.h0().idx()] = 0;
+				matching[te.h1().idx()] = 0;
 				continue;
+			}
 			auto fid = mesh->face_handle(te.h0()).idx();
 			auto gid = mesh->face_handle(te.h1()).idx();
-
-			/*auto ev = mesh->calc_edge_vector(te.h0());
-			auto fec = COMPLEX(faceBase[fid * 2].dot(ev), faceBase[fid * 2 + 1].dot(ev));
-			auto gec = COMPLEX(faceBase[gid * 2].dot(ev), faceBase[gid * 2 + 1].dot(ev));
-			int m = std::floor((std::arg(f_dir[fid] * gec / (f_dir[gid] * fec)) + PI * 0.25) * invHalfPI);*/
 			Eigen::Vector3d ev = position.col(te.h0().to().idx()) - position.col(te.h0().from().idx());
 			auto fec = COMPLEX(faceBase.col(fid * 2).dot(ev), faceBase.col(fid * 2 + 1).dot(ev));
 			auto gec = COMPLEX(faceBase.col(gid * 2).dot(ev), faceBase.col(gid * 2 + 1).dot(ev));
 			auto fc = COMPLEX(crossfield.col(fid * 4).dot(faceBase.col(fid * 2)), crossfield.col(fid * 4).dot(faceBase.col(fid * 2 + 1)));
 			auto gc = COMPLEX(crossfield.col(gid * 4).dot(faceBase.col(gid * 2)), crossfield.col(gid * 4).dot(faceBase.col(gid * 2 + 1)));
 			int m = std::floor((std::arg(fc*gec / (gc*fec)) + PI * 0.25)*invHalfPI);
-			matching(te.h0().idx()) = m;
-			matching(te.h1().idx()) = 4 - m;
+			matching[te.h0().idx()] = m;
+			matching[te.h1().idx()] = (4 - m) % 4;
 		}
 	}
 	return matching;
 }
 
-Eigen::VectorXi& crossField::getSingularity()
+std::vector<int>& crossField::getSingularity()
 {
 	if (!matching.size())
 		getMatching();
 	if (!singularity.size())
 	{
-		singularity.resize(mesh->n_vertices());
 		int count = 0;
 		for (auto &tv : mesh->vertices())
 		{
 			int sum = 0;
 			for (auto &tvoh : mesh->voh_range(tv))
 			{
-				sum += matching(tvoh.idx());
+				sum += matching[tvoh.idx()];
 			}
 			if (sum % 4)
 			{
 				//dprint(tv.idx());
-				singularity(count) = tv.idx();
+				//singularity[count] = tv.idx();
+				singularity.push_back(tv.idx());
 				++count;
 			}
 		}
-		singularity = singularity.head(count).eval();
+		//singularity = singularity.head(count).eval();
 	}
 	dprint("#singularity: ", singularity.size());
 	return singularity;

@@ -32,10 +32,10 @@ endif()
 
 #path
 #include
-SET(EIGEN_PATH "D:/OpenSource/Include")
-SET(OPENMESH_PATH "D:/OpenSource/Include")
+SET(EIGEN_PATH "D:/eigen3.4")
+SET(OPENMESH_PATH "D:/OpenMesh 8.1/include")
 #lib
-SET(OPENMESH_LIB_PATH "D:/OpenSource/Lib/OpenMesh")
+SET(OPENMESH_LIB_PATH "D:/OpenMesh 8.1/lib")
 
 #QT
 set(CMAKE_INCLUDE_CURRENT_DIR ON)

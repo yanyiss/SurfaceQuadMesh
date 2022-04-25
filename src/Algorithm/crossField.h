@@ -37,15 +37,11 @@ public:
 	//void runIteration(std::vector<OpenMesh::Vec3d>& crossfield);
 
 	void setCurvatureConstraint();
-	Eigen::VectorXi& getConstraintFace() {
-		return constraintId;
-	}
-	Eigen::Matrix3Xd& getCrossField()
-	{
-		return crossfield;
-	}
-	Eigen::VectorXi& getMatching();
-	Eigen::VectorXi& getSingularity();
+	std::vector<int>& getConstraintFace() { return constraintId; }
+	Eigen::Matrix3Xd& getCrossField() { return crossfield; }
+	Eigen::Matrix3Xd& getPosition() { return position; }
+	std::vector<int>& getMatching();
+	std::vector<int>& getSingularity();
 
 private:
 	typedef std::complex<double> COMPLEX;
@@ -57,13 +53,13 @@ private:
 
 	std::vector<COMPLEX> ec4;
 	Eigen::Matrix3Xd faceBase;
-	Eigen::VectorXi constraintId;
+	std::vector<int> constraintId;
 	Eigen::Matrix3Xd constraintVector;
 	Eigen::Matrix3Xd crossfield;
 	Eigen::Matrix3Xd position;
 
-	Eigen::VectorXi matching;
-	Eigen::VectorXi singularity;
+	std::vector<int> matching;
+	std::vector<int> singularity;
 };
 
 
