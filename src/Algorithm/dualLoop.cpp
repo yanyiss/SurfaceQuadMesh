@@ -1,10 +1,11 @@
 #include "dualLoop.h"
 namespace QuadLayout
 {
+#if 0
 	void dualLoop::computeGraphWeight(double alpha = 900)
 	{
 		int nv = mesh->n_vertices();
-		double invHalfPi = 2 / PI;
+		double invHalfPi = 2.0 / PI;
 		auto &crossfield = cf->getCrossField();
 		auto &matching = cf->getMatching();
 		auto &position = cf->getPosition();
@@ -131,7 +132,7 @@ namespace QuadLayout
 		length = distance[vid];
 		return true;
 	}
-
+#endif
 	//bool dualLoop::DijkstraLoop(int vid, int cfid, std::vector<int> &path, double length)
 	//{
 	//	int nv = mesh->n_vertices();

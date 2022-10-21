@@ -872,7 +872,8 @@ void MeshViewerWidget::draw_mesh_pointset() const
 
 }
 
-#include "..\Algorithm\dualLoop.h"
+//#include "..\Algorithm\dualLoop.h"
+#include "..\Algorithm\LoopToolbox.h"
 #include "..\Toolbox\dprint.h"
 void MeshViewerWidget::draw_CrossField()
 {
@@ -979,6 +980,51 @@ void MeshViewerWidget::draw_CrossField()
 
 void MeshViewerWidget::draw_RegularCrossField()
 {
+	static bool flag = true;
+	static std::vector<int> loop;
+	static Eigen::Matrix3Xd crossfield;
+	static double avglen = calc_mesh_ave_edge_length(&mesh) * 0.125;
+	if (flag)
+	{
+		LoopGen::LoopGen lg(mesh);
+		lg.InitializeField();
+		crossfield = lg.cf->getCrossField();
+		//lg.cf->write_field();
+		lg.InitializeGraphWeight();
+		lg.FieldAligned_PlanarLoop(mesh.vertex_handle(0), loop, 0);
+		flag = false;
+	}
+
+	glColor3d(0.1, 0.1, 0.9);
+	glBegin(GL_LINES);
+	for (int i = 0; i < loop.size() - 1; ++i)
+	{
+		glVertex3dv(mesh.point(mesh.vertex_handle(loop[i])).data());
+		glVertex3dv(mesh.point(mesh.vertex_handle(loop[i + 1])).data());
+	}
+	glEnd();
+
+	/*glColor3d(0.1, 0.8, 0.8);
+	glBegin(GL_POINT);
+	glVertex3dv(mesh.point(mesh.vertex_handle(0)).data());
+	glEnd();*/
+
+	glColor3d(0.9, 0.1, 0.1);
+	glBegin(GL_LINES);
+	for (auto tf : mesh.faces())
+	{
+		OpenMesh::Vec3d c = mesh.calc_centroid(tf);
+		int i = tf.idx() * 4;
+		Eigen::Vector3d vc(c[0], c[1], c[2]);
+		for (; i < tf.idx() * 4 + 4; ++i)
+		{
+			Eigen::Vector3d pos = vc + crossfield.col(i) * avglen;
+			glVertex3dv(vc.data());
+			glVertex3dv(pos.data());
+		}
+	}
+	glEnd();
+
 #if 0
 	static Eigen::Matrix3Xd crossfield;
 	static std::vector<int> constraintId;
@@ -1025,7 +1071,7 @@ void MeshViewerWidget::draw_RegularCrossField()
 	glEnd();
 
 	
-#else
+
 	static std::vector<int> loop;
 	static double length;
 	if (regularflag)

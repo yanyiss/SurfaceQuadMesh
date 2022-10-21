@@ -1,17 +1,13 @@
 #include "LoopToolbox.h"
 namespace LoopGen
 {
-	bool LoopGen::FieldAligned_PlanarLoop(VertexHandle v, std::vector<int>& loop, double dist, int shift)
+	bool LoopGen::FieldAligned_PlanarLoop(VertexHandle v, std::vector<int>& loop, int shift)
 	{
-		int nv = m->n_vertices();
+		int nv = mesh->n_vertices();
 		int vid = v.idx();
-		bool* visited = new bool[nv];
-		double* distance = new double[nv];
-		HalfedgeHandle* prev = new HalfedgeHandle[nv];
-		for (int i = 0; i < nv; ++i) {
-			visited[i] = false;
-			distance[i] = DBL_MAX;
-		}
+		std::deque<bool> visited(nv, false);
+		std::vector<double> distance(nv, DBL_MAX);
+		std::vector<HalfedgeHandle> prev(nv);
 		shift %= 2;
 
 		struct VertexPQ
@@ -33,42 +29,22 @@ namespace LoopGen
 		auto& crossfield = cf->getCrossField();
 		auto& matching = cf->getMatching();
 		auto& position = cf->getPosition();
-		auto& normal = cf->getNormal();
-		/*
-		注意测试
-		这里的
-		法向
-		是否正确！！！！！！！！！！！！！！！！！！！！！！！！！！！！
-		*/
+
 		double halfPI = PI * 0.5;
 		double doublePI = PI * 2.0;
 		double triple_halfPI = halfPI * 3.0;
-		for (auto voh = m->voh_begin(v); voh != m->voh_end(v); ++voh)
+		for (auto voh = mesh->voh_begin(v); voh != mesh->voh_end(v); ++voh)
 		{
-			int fid = m->face_handle(voh.handle()).idx();
-			int gid = m->face_handle(m->opposite_halfedge_handle(voh.handle())).idx();
+			int fid = mesh->face_handle(voh.handle()).idx();
 			plane_normal += crossfield.col(4 * fid + shift + 1);
-			auto& v0 = crossfield.col(4 * fid + shift);
-			int shift_ = shift;
-			shift += matching[voh->idx()];
-			shift %= 4;
-			auto& v1 = crossfield.col(4 * gid + shift);
-			int toid = m->to_vertex_handle(voh.handle()).idx();
-			auto ev = (position.col(toid) - position.col(vid)).normalized();
-
-			//double arc = atan2(ev.cross(v0).dot(normal.col(m->face_handle(voh.handle()).idx())) +
-			//	ev.cross(v1).dot(normal.col(m->face_handle(m->opposite_halfedge_handle(voh.handle())).idx())), ev.dot(v0 + v1));
-			//arc += arc > 0 ? 0 : 2 * PI;
-			double arc0 = atan2(ev.cross(v0).dot(normal.col(fid)), ev.dot(v0)); arc0 += arc0 > 0 ? 0 : doublePI;
-			double arc1 = atan2(ev.cross(v1).dot(normal.col(gid)), ev.dot(v1)); arc1 += arc1 > 0 ? 0 : doublePI;
-			double arc = 0.5 * fabs(arc0 + arc1);
-			if (arc >= halfPI && arc <= triple_halfPI)
-				continue;
-
-			distance[toid] = fabs(sin(arc));
-			pq.emplace(toid, shift_, distance[toid], ++count[toid]);
-			prev[toid] = voh.handle();
-			visited[toid] = true;
+			if (weight(shift, voh->idx()) < 2)
+			{
+				int toid = mesh->to_vertex_handle(voh.handle()).idx();
+				distance[toid] = weight(shift, voh->idx());
+				pq.emplace(toid, shift, distance[toid], ++count[toid]);
+				prev[toid] = voh.handle();
+			}
+			shift += matching[voh->idx()]; shift %= 4;
 		}
 		plane_normal.normalize();
 
@@ -77,88 +53,115 @@ namespace LoopGen
 			VertexPQ vert;
 			do
 			{
-				if (pq.empty()) return false;
+				if (pq.empty())
+				{ 
+					return false;
+				}
 				vert = pq.top();
 				pq.pop();
 			} while (vert.count != count[vert.id]);
 
 
 			int fromid = vert.id;
+			visited[fromid] = true;
 			if (fromid == vid)
 			{
 				break;
 			}
-
+			auto voh = mesh->next_halfedge_handle(prev[fromid]);
+			int valence = mesh->valence(mesh->vertex_handle(fromid)) - 1;
 			shift = vert.shift;
-			fromid = vert.id;
-			auto voh = m->next_halfedge_handle(prev[fromid]);
-			int valence = m->valence(m->vertex_handle(fromid)) - 1;
 			for (int i = 0; i < valence; ++i)
 			{
-				int toid = m->to_vertex_handle(voh).idx();
-				if (visited[toid])
-					continue;
-				int fid = m->face_handle(voh).idx();
-				int gid = m->face_handle(m->opposite_halfedge_handle(voh)).idx();
-				//plane_normal += crossfield.col(4 * fid + shift + 1);
-				auto& v0 = crossfield.col(4 * fid + shift);
-				int shift_ = shift;
-				shift += matching[voh.idx()];
-				shift %= 4;
-				auto& v1 = crossfield.col(4 * gid + shift);
-				auto ev = (position.col(toid) - position.col(fromid)).normalized();
-
-				//double arc = atan2(ev.cross(v0).dot(normal.col(m->face_handle(voh.handle()).idx())) +
-				//	ev.cross(v1).dot(normal.col(m->face_handle(m->opposite_halfedge_handle(voh.handle())).idx())), ev.dot(v0 + v1));
-				//arc += arc > 0 ? 0 : 2 * PI;
-				double arc0 = atan2(ev.cross(v0).dot(normal.col(fid)), ev.dot(v0)); arc0 += arc0 > 0 ? 0 : doublePI;
-				double arc1 = atan2(ev.cross(v1).dot(normal.col(gid)), ev.dot(v1)); arc1 += arc1 > 0 ? 0 : doublePI;
-				double arc = 0.5 * fabs(arc0 + arc1);
-				if (arc >= halfPI && arc <= triple_halfPI)
-					continue;
-
-				double s = sin(arc);
-				double c = ev.dot(plane_normal);
-				double w = sqrt(s * s + c * c / ev.squaredNorm());
-				if (distance[fromid] + w < distance[toid])
+				double w = weight(shift, voh.idx()); w *= w;
+				if (w < 2)
 				{
-					distance[toid] = distance[fromid] + w;
-					pq.emplace(toid, shift_, distance[toid], ++count[toid]);
-					prev[toid] = voh;
+					int toid = mesh->to_vertex_handle(voh).idx();
+					double dot_ = (position.col(toid) - position.col(fromid)).normalized().dot(plane_normal); dot_ *= dot_;
+					w = sqrt(w + dot_);
+					if (distance[fromid] + w < distance[toid])
+					{
+						distance[toid] = distance[fromid] + w;
+						pq.emplace(toid, shift, distance[toid], ++count[toid]);
+						prev[toid] = voh;
+					}
 				}
-				/*pq.emplace(toid, shift_, distance[toid], ++count[toid]);
-				prev[toid] = voh.handle();*/
-				visited[fromid] = true;
-				voh = m->next_halfedge_handle(m->opposite_halfedge_handle(voh));
+				voh = mesh->next_halfedge_handle(mesh->opposite_halfedge_handle(voh));
+				shift += matching[voh.idx()]; shift %= 4;
 			}
-
-			//cfid = faceAlignId[prev[fromid].opp().face().idx()];
-			//int valence = mesh->valence(mesh->vertex_handle(fromid)) - 1;
-			//auto tvoh = prev[fromid].opp().prev().opp();
-			//for (int i = 0; i < valence; ++i)
-			//{
-			//	cfid += matching[tvoh.idx()]; cfid %= 4;
-			//	faceAlignId[tvoh.face().idx()] = cfid;
-			//	if (halfedgeAlignId[tvoh.idx()] + cfid == 4)
-			//	{
-			//		int toid = tvoh.to().idx();
-			//		if (!visited[toid] && distance[fromid] + weight(fromid, toid) < distance[toid])
-			//		{
-			//			distance[toid] = distance[fromid] + weight(fromid, toid);
-			//			pq.emplace(toid, distance[toid], ++count[toid]);
-			//			prev[toid] = tvoh;
-			//			//visited[toid] = true;
-			//		}
-			//	}
-			//}
 		}
+
+		loop.push_back(vid);
+		int previd = mesh->from_vertex_handle(prev[vid]).idx();
+		while (previd != vid)
+		{
+			loop.push_back(previd);
+			previd = mesh->from_vertex_handle(prev[previd]).idx();
+		}
+		loop.push_back(vid);
 		return true;
 	}
 
 	void LoopGen::InitializeField()
 	{
-		cf = new crossField(m);
-		cf->runPolynomial();
+#if 0
+		cf = new crossField(mesh);
+#else
+		cf = new crossField("..//resource//field//vase.field");
+#endif
+	}
+
+	void LoopGen::InitializeGraphWeight()
+	{
+		auto& crossfield = cf->getCrossField();
+		auto& matching = cf->getMatching();
+		auto& normal = cf->getNormal();
+		auto& position = cf->getPosition();
+
+		double doublePI = 2.0 * PI;
+		double halfPI = 0.5 * PI;
+		double _PI = -1.0 * PI;
+		double _halfPI = -0.5 * PI;
+
+		weight.resize(4, mesh->n_halfedges());
+		for (auto eitr = mesh->edges_begin(); eitr != mesh->edges_end(); ++eitr)
+		{
+			auto h0 = mesh->halfedge_handle(eitr.handle(), 0);
+			auto h1 = mesh->halfedge_handle(eitr.handle(), 1);
+			auto fid = mesh->face_handle(h0).idx();
+			auto gid = mesh->face_handle(h1).idx();
+			auto& fv = crossfield.col(fid * 4);
+			auto& gv = crossfield.col(gid * 4 + matching[h0.idx()]);
+			auto ev = position.col(mesh->to_vertex_handle(h0).idx()) - position.col(mesh->from_vertex_handle(h0).idx());
+			double arc0 = atan2(ev.cross(fv).dot(normal.col(fid)), ev.dot(fv)); //arc0 += arc0 > 0 ? 0 : doublePI;
+			double arc1 = atan2(ev.cross(gv).dot(normal.col(gid)), ev.dot(gv)); //arc1 += arc1 > 0 ? 0 : doublePI;
+			double arc = atan2(sin(arc0) + sin(arc1), cos(arc0) + cos(arc1));
+
+			auto& w0 = weight.col(h0.idx());
+			auto& w1 = weight.col(h1.idx());
+			double s = fabs(sin(arc));
+			double c = fabs(cos(arc));
+			if (arc >= 0 && arc < halfPI)
+			{
+				w0 << s, DBL_MAX, DBL_MAX, c;
+				w1 << DBL_MAX, c, s, DBL_MAX;
+			}
+			else if (arc >= halfPI && arc < PI)
+			{
+				w0 << DBL_MAX, DBL_MAX, s, c;
+				w1 << s, c, DBL_MAX, DBL_MAX;
+			}
+			else if (arc >= _PI && arc < _halfPI)
+			{
+				w0 << DBL_MAX, c, s, DBL_MAX;
+				w1 << s, DBL_MAX, DBL_MAX, c;
+			}
+			else
+			{
+				w0 << s, c, DBL_MAX, DBL_MAX;
+				w1 << DBL_MAX, DBL_MAX, s, c;
+			}
+		}
 	}
 
 	void LoopGen::InitializePQ()
@@ -169,7 +172,7 @@ namespace LoopGen
 			//for (auto &k : cur[i])
 				//k = fabs(k);
 		}
-		for (auto v : m->vertices())
+		for (auto v : mesh->vertices())
 		{
 			auto vid = v.idx();
 			EnergyOnVertex ev;

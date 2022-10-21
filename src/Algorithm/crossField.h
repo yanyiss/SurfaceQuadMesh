@@ -1,3 +1,4 @@
+#pragma once
 #include "..\MeshViewer\MeshDefinition.h"
 #include <complex>
 #include <Eigen\Sparse>
@@ -26,7 +27,9 @@ public:
 			position.col(tv.idx()) << p[0], p[1], p[2];
 		}
 		calculateMeshFaceBase(); 
+		runPolynomial();
 	};
+	crossField(std::string filename);
 	crossField(const crossField& cf) = delete;
 	~crossField() {};
 
@@ -41,12 +44,14 @@ public:
 	void setSingularity();
 	void setNormal();
 
-	std::vector<int>& getConstraintFace() { return constraintId; }
-	Eigen::Matrix3Xd& getCrossField() { return crossfield; }
-	Eigen::Matrix3Xd& getPosition() { return position; }
-	Eigen::Matrix3Xd& getNormal() { return normal; }
-	std::vector<int>& getMatching() { return matching; }
-	std::vector<int>& getSingularity() { return singularity; }
+	void write_field();
+
+	const std::vector<int>& getConstraintFace() { return constraintId; }
+	const Eigen::Matrix3Xd& getCrossField() { return crossfield; }
+	const Eigen::Matrix3Xd& getPosition() { return position; }
+	const Eigen::Matrix3Xd& getNormal() { return normal; }
+	const std::vector<int>& getMatching() { return matching; }
+	const std::vector<int>& getSingularity() { return singularity; }
 	
 
 private:

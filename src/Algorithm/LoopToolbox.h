@@ -4,6 +4,7 @@
 #include <queue>
 namespace LoopGen
 {
+
 	class LocalParametrization
 	{
 	public:
@@ -19,13 +20,14 @@ namespace LoopGen
 	class LoopGen
 	{
 	public:
-		LoopGen(Mesh &mesh):m(&mesh) { };
+		LoopGen(Mesh &mesh_):mesh(&mesh_) { };
 		~LoopGen(){};
 	public:
 
 
 	//private:
-		Mesh* m;
+		Mesh* mesh;
+		Eigen::Matrix4Xd weight;
 		crossField* cf = nullptr;
 
 		struct EnergyOnVertex {
@@ -36,11 +38,11 @@ namespace LoopGen
 				return energy > right.energy;
 			}
 		};
-
 		std::priority_queue<EnergyOnVertex, std::vector<EnergyOnVertex>, std::greater<EnergyOnVertex>> pq;
 
 		void InitializeField();
+		void InitializeGraphWeight();
 		void InitializePQ();
-		bool FieldAligned_PlanarLoop(VertexHandle v, std::vector<int> &loop, double dist, int shift = 0);
+		bool FieldAligned_PlanarLoop(VertexHandle v, std::vector<int> &loop, int shift = 0);
 	};
 }

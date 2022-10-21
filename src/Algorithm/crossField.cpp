@@ -187,6 +187,7 @@ void crossField::runPolynomial()
 			crossfield.col(i * 4 + j) = faceBase.col(i * 2)*cos(arg + j * PI*0.5) + faceBase.col(i * 2 + 1)*sin(arg + j * PI*0.5);
 		}
 	}
+	setNormal();
 	setMatching();
 	setSingularity();
 }
@@ -515,6 +516,7 @@ void crossField::setCurvatureConstraint()
 
 void crossField::setNormal()
 {
+	normal.resize(3, mesh->n_faces());
 	for (auto& tf : mesh->faces())
 	{
 		std::vector<int> id; id.reserve(3);
@@ -544,7 +546,7 @@ void crossField::setMatching()
 		auto fc = COMPLEX(crossfield.col(fid * 4).dot(faceBase.col(fid * 2)), crossfield.col(fid * 4).dot(faceBase.col(fid * 2 + 1)));
 		auto gc = COMPLEX(crossfield.col(gid * 4).dot(faceBase.col(gid * 2)), crossfield.col(gid * 4).dot(faceBase.col(gid * 2 + 1)));
 		int m = std::floor((std::arg(fc * gec / (gc * fec)) + PI * 0.25) * invHalfPI);
-		matching[te.h0().idx()] = m;
+		matching[te.h0().idx()] = (m + 4) % 4;
 		matching[te.h1().idx()] = (4 - m) % 4;
 	}
 }
@@ -568,3 +570,69 @@ void crossField::setMatching()
 		 }
 	 }
 }
+
+ crossField::crossField(std::string filename)
+ {
+	 std::ifstream file_reader;
+	 file_reader.open(filename, std::ios::in);
+	 char line[1024] = { 0 };
+	 file_reader.getline(line, sizeof(line));
+	 std::stringstream n(line);
+	 int mark[5];
+	 n >> mark[0] >> mark[1] >> mark[2] >> mark[3] >> mark[4];
+	 crossfield.resize(3, mark[0]); mark[0] += 1;
+	 normal.resize(3, mark[1]);     mark[1] += mark[0];
+	 matching.resize(mark[2]);      mark[2] += mark[1];
+	 position.resize(3, mark[3]);   mark[3] += mark[2];
+	 singularity.resize(mark[4]);   mark[4] += mark[3];
+	 int row = 1;
+	 while (file_reader.getline(line, sizeof(line)))
+	 {
+		 std::stringstream num(line);
+		 if (row < mark[0])
+		 {
+			 num >> crossfield(0, row - 1) >> crossfield(1, row - 1) >> crossfield(2, row - 1);
+		 }
+		 else if (row < mark[1])
+		 {
+			 num >> normal(0, row - mark[0]) >> normal(1, row - mark[0]) >> normal(2, row - mark[0]);
+		 }
+		 else if (row < mark[2])
+		 {
+			 num >> matching[row - mark[1]];
+		 }
+		 else if (row < mark[3])
+		 {
+			 num >> position(0, row - mark[2]) >> position(1, row - mark[2]) >> position(2, row - mark[2]);
+		 }
+		 else
+		 {
+			 num >> singularity[row - mark[3]];
+		 }
+		 ++row;
+	 }
+	 file_reader.close();
+ }
+
+ void crossField::write_field()
+ {
+	 std::ofstream file_writer;
+	 file_writer.open("..//resource//field//vase.field");
+	 if (file_writer.fail()) {
+		 std::cout << "fail to open\n";
+	 }
+	 //crossfield, normal, matching, position, singularity
+	 file_writer << mesh->n_faces() * 4 << " " << mesh->n_faces() << " " << mesh->n_halfedges() << " " << mesh->n_vertices() << " " << singularity.size() << "\n";
+	 for (auto i = 0; i < crossfield.cols(); ++i)
+		 file_writer << crossfield(0, i) << " " << crossfield(1, i) << " " << crossfield(2, i) << "\n";
+	 for (auto i = 0; i < normal.cols(); ++i)
+		 file_writer << normal(0, i) << " " << normal(1, i) << " " << normal(2, i) << "\n";
+	 for (auto match : matching)
+		 file_writer << match << "\n";
+	 for (auto i = 0; i < position.cols(); ++i)
+		 file_writer << position(0, i) << " " << position(1, i) << " " << position(2, i) << "\n";
+	 for (auto sing : singularity)
+		 file_writer << sing << "\n";
+
+	 file_writer.close();
+ }
