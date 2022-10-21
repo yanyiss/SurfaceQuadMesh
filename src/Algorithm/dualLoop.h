@@ -61,7 +61,7 @@ namespace QuadLayout
 			double dist;
 			int count;
 			VertexPQ(){}
-			VertexPQ(int id_, double dist_, int count_) :id(id_), dist(dist_), count(count) {}
+			VertexPQ(int id_, double dist_, int count_) :id(id_), dist(dist_), count(count_) {}
 			bool operator>(const VertexPQ &x) const { return dist > x.dist; }
 		};
 #pragma endregion

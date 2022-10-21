@@ -876,6 +876,7 @@ void MeshViewerWidget::draw_mesh_pointset() const
 #include "..\Toolbox\dprint.h"
 void MeshViewerWidget::draw_CrossField()
 {
+#if 0
 	//static std::vector<OpenMesh::Vec3d> crossfield1;
 	//static std::vector<int> constraintId;
 	static Eigen::Matrix3Xd crossfield;
@@ -943,16 +944,94 @@ void MeshViewerWidget::draw_CrossField()
 	//glColor3d(0.9, 0.9, 0.9);
 	glVertex3dv(mesh.point(mesh.vertex_handle(0)).data());
 	glEnd();
+
+
+#else
+	static std::vector<double> k1, k2;
+	static std::vector<OpenMesh::Vec3d> dir1, dir2;
+	static bool flag = true;
+	if (flag)
+	{
+		compute_principal_curvature(&mesh, k1, k2, dir1, dir2);
+		flag = false;
+	}
+	static double ave = calc_mesh_ave_edge_length(&mesh) * 10;
+
+
+	glColor3d(0.9, 0.1, 0.1);
+	glBegin(GL_LINES);
+	for (auto v : mesh.vertices())
+	{
+		int vid = v.idx();
+		auto pos = mesh.point(v);
+		glVertex3dv(pos.data());
+		glVertex3dv((pos + dir1[vid] * ave * k1[vid]).data());
+		glVertex3dv(pos.data());
+		glVertex3dv((pos - dir1[vid] * ave * k1[vid]).data());
+		glVertex3dv(pos.data());
+		glVertex3dv((pos + dir2[vid] * ave * k2[vid]).data());
+		glVertex3dv(pos.data());
+		glVertex3dv((pos - dir2[vid] * ave * k2[vid]).data());
+	}
+	glEnd();
+#endif
 }
 
 void MeshViewerWidget::draw_RegularCrossField()
 {
+#if 0
+	static Eigen::Matrix3Xd crossfield;
+	static std::vector<int> constraintId;
+	static std::vector<int> singularity;
+	if (flag)
+	{
+		crossField cf(&mesh);
+		cf.runPolynomial();
+		crossfield = cf.getCrossField();
+		constraintId = cf.getConstraintFace();
+		singularity = cf.getSingularity();
+
+		for (auto& tf : mesh.faces())
+		{
+			double r = 0;
+			for (auto& tfe : mesh.fe_range(tf))
+			{
+				r += mesh.calc_edge_length(tfe);
+			}
+			r /= 8.0;
+			OpenMesh::Vec3d c = mesh.calc_centroid(tf);
+			int i = tf.idx() * 4;
+			Eigen::Vector3d vc(c[0], c[1], c[2]);
+			for (; i < tf.idx() * 4 + 4; ++i)
+			{
+				crossfield.col(i) = crossfield.col(i) * r + vc;
+			}
+			Eigen::Vector3d tep = crossfield.col(i - 3);
+			crossfield.col(i - 3) = crossfield.col(i - 2);
+			crossfield.col(i - 2) = tep;
+			//std::swap(crossfield.col(i - 3), crossfield.col(i - 2));
+}
+		flag = false;
+	}
+
+	glColor3d(0.9, 0.1, 0.1);
+	glBegin(GL_LINES);
+	for (int i = 0; i < crossfield.cols(); ++i)
+	{
+		auto temp = crossfield.col(i);
+		glVertex3d(temp(0), temp(1), temp(2));
+		//glVertex3dv(crossfield.col(i).data());
+	}
+	glEnd();
+
+	
+#else
 	static std::vector<int> loop;
 	static double length;
 	if (regularflag)
 	{
 		QuadLayout::dualLoop dl(&mesh);
-		dl.DijkstraLoop(1, 0, loop, length);
+		dl.DijkstraLoop(11, 0, loop, length);
 	}
 	glBegin(GL_LINES);
 	for (int i = 0; i < loop.size() - 1; ++i)
@@ -961,5 +1040,6 @@ void MeshViewerWidget::draw_RegularCrossField()
 		glVertex3dv(mesh.point(mesh.vertex_handle(loop[i + 1])).data());
 	}
 	glEnd();
+#endif
 }
 

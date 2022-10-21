@@ -78,6 +78,7 @@ namespace QuadLayout
 			{
 				int toid = tvoh.to().idx();
 				pq.emplace(toid, weight(vid, toid), ++count[toid]);
+				dprint(count[toid], pq.top().count);
 				distance[toid] = weight(vid, toid);
 				prev[toid] = tvoh;
 			}
@@ -91,6 +92,7 @@ namespace QuadLayout
 			{
 				if (pq.empty()) return false;
 				tv = pq.top();
+				dprint(tv.count);
 				pq.pop();
 			} while (tv.count != count[tv.id]);
 			int fromid = tv.id;
@@ -113,6 +115,7 @@ namespace QuadLayout
 						distance[toid] = distance[fromid] + weight(fromid, toid);
 						pq.emplace(toid, distance[toid], ++count[toid]);
 						prev[toid] = tvoh;
+						//visited[toid] = true;
 					}
 				}
 			}

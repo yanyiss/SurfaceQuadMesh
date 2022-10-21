@@ -53,10 +53,13 @@ struct MeshTraits : public OpenMesh::DefaultTraits
 	};
 };
 
-typedef OpenMesh::TriMesh_ArrayKernelT<MeshTraits> TriMesh;
-typedef OpenMesh::PolyMesh_ArrayKernelT<MeshTraits> Mesh;
+typedef OpenMesh::TriMesh_ArrayKernelT<MeshTraits> Mesh;
 //typedef TriMesh Mesh;
-
+typedef Mesh::VertexHandle VertexHandle;
+typedef Mesh::HalfedgeHandle HalfedgeHandle;
+typedef Mesh::EdgeHandle EdgeHandle;
+typedef Mesh::FaceHandle FaceHandle;
+typedef OpenMesh::Vec3d Vec3d;
 
 double calc_mesh_ave_edge_length(Mesh* mesh_);
 

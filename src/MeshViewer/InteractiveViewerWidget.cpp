@@ -609,7 +609,7 @@ void InteractiveViewerWidget::render_text_slot(OpenMesh::Vec3d pos, QString str)
 	render_text(pos[0],pos[1],pos[2],str);
 }
 
-
+#include "../Algorithm/LoopToolbox.h"
 void InteractiveViewerWidget::showFeature()
 {
 
