@@ -37,6 +37,7 @@ namespace LoopGen
 		{
 			int fid = mesh->face_handle(voh.handle()).idx();
 			plane_normal += crossfield.col(4 * fid + shift + 1);
+			dprint(mesh->to_vertex_handle(voh.handle()).idx());
 			if (weight(shift, voh->idx()) < 2)
 			{
 				int toid = mesh->to_vertex_handle(voh.handle()).idx();
@@ -62,6 +63,7 @@ namespace LoopGen
 			} while (vert.count != count[vert.id]);
 
 
+			//loop.push_back(vert.id);
 			int fromid = vert.id;
 			visited[fromid] = true;
 			if (fromid == vid)
@@ -73,12 +75,14 @@ namespace LoopGen
 			shift = vert.shift;
 			for (int i = 0; i < valence; ++i)
 			{
+				//dprint(voh.idx(), weight(0, voh.idx()), weight(1, voh.idx()), weight(2, voh.idx()), weight(3, voh.idx()));
 				double w = weight(shift, voh.idx()); w *= w;
 				if (w < 2)
 				{
 					int toid = mesh->to_vertex_handle(voh).idx();
-					double dot_ = (position.col(toid) - position.col(fromid)).normalized().dot(plane_normal); dot_ *= dot_;
-					w = sqrt(w + dot_);
+					/*double dot_ = (position.col(toid) - position.col(fromid)).normalized().dot(plane_normal); dot_ *= dot_;
+					w = sqrt(w + dot_);*/
+					w = sqrt(w * 900 + 1 - w);
 					if (distance[fromid] + w < distance[toid])
 					{
 						distance[toid] = distance[fromid] + w;
@@ -141,6 +145,19 @@ namespace LoopGen
 			auto& w1 = weight.col(h1.idx());
 			double s = fabs(sin(arc));
 			double c = fabs(cos(arc));
+
+			if (eitr->idx() == 6255)
+			{
+				dprint(fv.dot(ev.normalized()), gv.dot(ev.normalized()), crossfield.col(4 * gid).dot(ev.normalized()));
+				dprint(mesh->from_vertex_handle(h0).idx(), mesh->to_vertex_handle(h0).idx());
+				dprint(matching[h0.idx()]);
+				int p = 0;
+			}
+
+			if (s < c)
+				c = DBL_MAX;
+			else
+				s = DBL_MAX;
 			if (arc >= 0 && arc < halfPI)
 			{
 				w0 << s, DBL_MAX, DBL_MAX, c;
