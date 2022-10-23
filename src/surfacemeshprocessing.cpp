@@ -95,14 +95,14 @@ void SurfaceMeshProcessing::createActions()
 	pointSetAction->setChecked(false);
 	connect(pointSetAction, SIGNAL(triggered()), this, SLOT(pointSetShow()));
 
-	checkboardAction = new QAction("Check Board",this);
+	checkboardAction = new QAction("Draw CrossField",this);
 	checkboardAction->setIcon(QIcon("../resource/Images/curvature.png"));
 	checkboardAction->setStatusTip(tr("Using Check Board showing method"));
 	checkboardAction->setCheckable(true);
 	checkboardAction->setChecked(false);
 	connect(checkboardAction, SIGNAL(triggered()), this, SLOT(checkboardShow()));
 
-	diagonalmeshAction = new QAction("Diagonal Mesh",this);
+	diagonalmeshAction = new QAction("Draw Loop",this);
 	diagonalmeshAction->setIcon(QIcon("../resource/Images/curvature.png"));
 	diagonalmeshAction->setStatusTip(tr("Using Diagonal Mesh showing method"));
 	diagonalmeshAction->setCheckable(true);

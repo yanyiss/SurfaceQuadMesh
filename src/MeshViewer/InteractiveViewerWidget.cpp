@@ -497,6 +497,7 @@ void InteractiveViewerWidget::draw_interactive_portion(int drawmode)
 			draw_selected_vertex();
 			draw_selected_face();
 			draw_selected_edge();
+			//showIsotropicMesh();
 			break;
 		}
 	}
@@ -528,7 +529,7 @@ void InteractiveViewerWidget::draw_selected_vertex()
 	if( selectedVertex.size() > 0 )
 	{
 		Mesh::Point p;
-		glColor3f(1.0, 0.5, 0.0);
+		glColor3f(1.0, 0.1, 0.1);
 		glPointSize(12);
 		glBegin(GL_POINTS);
 		for(unsigned int i=0;i<selectedVertex.size();++i)
@@ -567,7 +568,7 @@ void InteractiveViewerWidget::draw_selected_edge()
 {
 	if( selectedEdge.size() > 0)
 	{
-		glColor3f(1.0, 0.5, 1.0);
+		glColor3f(0.1, 0.1, 0.1);
 		Mesh::Point p1; Mesh::Point p2;
 		Mesh::EdgeHandle e_handle;
 		Mesh::HalfedgeHandle he_handle;
@@ -617,48 +618,77 @@ void InteractiveViewerWidget::showFeature()
 
 void InteractiveViewerWidget::showIsotropicMesh()
 {
-	std::vector<int> loop;
-	double avglen = calc_mesh_ave_edge_length(&mesh) * 0.125;
-
-	LoopGen::LoopGen lg(mesh);
-	lg.InitializeField();
-	auto &crossfield = lg.cf->getCrossField();
-	//lg.cf->write_field();
-	lg.InitializeGraphWeight();
-	lg.FieldAligned_PlanarLoop(mesh.vertex_handle(0), loop, 0);
-
-	glColor3d(0.1, 0.1, 0.9);
-	glBegin(GL_LINES);
-	for (int i = 0; i < loop.size() - 1; ++i)
+	/*if (!if_has_field)
 	{
-		//glVertex3dv(mesh.point(mesh.vertex_handle(loop[i])).data());
-		//glVertex3dv(mesh.point(mesh.vertex_handle(loop[i + 1])).data());
-	}
-	glEnd();
-
-	glColor3d(0.1, 0.8, 0.8);
-	glBegin(GL_POINT);
-	glVertex3dv(mesh.point(mesh.vertex_handle(0)).data());
-	glEnd();
-
-	glColor3d(0.9, 0.1, 0.1);
-	glBegin(GL_LINES);
-	for (auto tf : mesh.faces())
-	{
-		OpenMesh::Vec3d c = mesh.calc_centroid(tf);
-		int i = tf.idx() * 4;
-		Eigen::Vector3d vc(c[0], c[1], c[2]);
-		for (; i < tf.idx() * 4 + 4; ++i)
+		if_has_field = true;
+		lg = new LoopGen::LoopGen(mesh);
+		lg->InitializeField();
+		crossfield = lg->cf->getCrossField();
+		avgLen = 0.2 * calc_mesh_ave_edge_length(&mesh);
+		for (auto tf : mesh.faces())
 		{
-			Eigen::Vector3d pos = vc + crossfield.col(i) * avglen;
-			glVertex3dv(vc.data());
-			glVertex3dv(pos.data());
+			OpenMesh::Vec3d c = mesh.calc_centroid(tf);
+			int i = tf.idx() * 4;
+			Eigen::Vector3d vc(c[0], c[1], c[2]);
+			Eigen::Vector3d temp = crossfield.col(i + 1);
+			crossfield.col(i) = vc + crossfield.col(i) * avgLen;
+			crossfield.col(i + 1) = vc + crossfield.col(i + 2) * avgLen;
+			crossfield.col(i + 2) = vc + temp * avgLen;
+			crossfield.col(i + 3) = vc + crossfield.col(i + 3) * avgLen;
 		}
 	}
-	glEnd();
-
+	glLineWidth(2);
+	glColor3d(0.9, 0.1, 0.1);
+	glBegin(GL_LINES);
+	for (int i = 0; i < crossfield.cols(); i += 2)
+	{
+		glVertex3dv(crossfield.col(i).data());
+		glVertex3dv(crossfield.col(i + 1).data());
+	}
+	glEnd();*/
+	setDrawMode(InteractiveViewerWidget::SOLID_FLAT);
 	setMouseMode(InteractiveViewerWidget::TRANS);
+	if (!if_has_field)
+	{
+		if_has_field = true;
+		lg = new LoopGen::LoopGen(mesh);
+		lg->InitializeField();
+	}
+	if (!loop_gen_init)
+	{
+		lg->InitializeGraphWeight();
+	}
+	if (selectedVertex.empty())
+		return;
+	selectedVertex = { selectedVertex.back() };
+	selectedEdge.clear();
+	if (lg->FieldAligned_PlanarLoop(mesh.vertex_handle(selectedVertex.back()), loop, 0))
+	{
+		for (int i = 0; i < loop.size() - 1; ++i)
+		{
+			selectedEdge.push_back(mesh.find_halfedge(mesh.vertex_handle(loop[i]), mesh.vertex_handle(loop[i + 1])).idx() / 2);
+		}
+	}
+	if (lg->FieldAligned_PlanarLoop(mesh.vertex_handle(selectedVertex.back()), loop, 1))
+	{
+		for (int i = 0; i < loop.size() - 1; ++i)
+		{
+			selectedEdge.push_back(mesh.find_halfedge(mesh.vertex_handle(loop[i]), mesh.vertex_handle(loop[i + 1])).idx() / 2);
+		}
+	}
+	//glLineWidth(10);
+	/*glBegin(GL_LINES);
+	for (int i = 0; i < loop.size() - 1; ++i)
+	{
+		glVertex3dv(mesh.point(mesh.vertex_handle(loop[i])).data());
+		glVertex3dv(mesh.point(mesh.vertex_handle(loop[i + 1])).data());
+	}
+	glEnd();*/
+
+
+
 	updateGL();
+
 }
 
 void InteractiveViewerWidget::showAnisotropicMesh()

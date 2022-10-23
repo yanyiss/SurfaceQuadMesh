@@ -7,6 +7,7 @@
 
 #include "QGLViewerWidget.h"
 #include "MeshDefinition.h"
+#include "..\Algorithm\LoopToolbox.h"
 
 class MeshViewerWidget : public QGLViewerWidget 
 {
@@ -100,6 +101,16 @@ private:
 	int mesh_mode_;
 	//std::vector<unsigned int> Indices;
 	//std::vector<unsigned int> VIndices;
+
+protected:
+#pragma region
+	bool if_has_field = false;
+	bool loop_gen_init = false;
+	LoopGen::LoopGen* lg = nullptr;
+	std::vector<int> loop;
+	Eigen::Matrix3Xd crossfield;
+	double avgLen;
+#pragma endregion
 };
 
 #endif // MESHPROCESSING_MESHVIEWERWIDGET_H

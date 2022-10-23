@@ -156,6 +156,15 @@ public:
 	void split_vertex_valence_eight();
 #pragma endregion
 
+
+#pragma region
+	bool if_has_field = false;
+	bool loop_gen_init = false;
+	LoopGen::LoopGen* lg = nullptr;
+	std::vector<int> loop;
+	Eigen::Matrix3Xd crossfield;
+	double avgLen;
+#pragma endregion
 };
 
 #endif
