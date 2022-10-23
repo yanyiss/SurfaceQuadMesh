@@ -501,7 +501,7 @@ void InteractiveViewerWidget::draw_interactive_portion(int drawmode)
 			break;
 		}
 	}
-
+	draw_field();
 	if(draw_new_mesh)
 	{
 		draw_scene_mesh(drawmode);
@@ -568,6 +568,7 @@ void InteractiveViewerWidget::draw_selected_edge()
 {
 	if( selectedEdge.size() > 0)
 	{
+		glLineWidth(2);
 		glColor3f(0.1, 0.1, 0.1);
 		Mesh::Point p1; Mesh::Point p2;
 		Mesh::EdgeHandle e_handle;
@@ -583,6 +584,22 @@ void InteractiveViewerWidget::draw_selected_edge()
 			glVertex3dv( p2.data() );
 			glEnd();
 		}
+	}
+}
+
+void InteractiveViewerWidget::draw_field()
+{
+	if (if_draw_field)
+	{
+		glLineWidth(1);
+		glColor3d(0.9, 0.1, 0.1);
+		glBegin(GL_LINES);
+		for (int i = 0; i < crossfield.cols(); i += 2)
+		{
+			glVertex3dv(crossfield.col(i).data());
+			glVertex3dv(crossfield.col(i + 1).data());
+		}
+		glEnd();
 	}
 }
 
@@ -613,12 +630,7 @@ void InteractiveViewerWidget::render_text_slot(OpenMesh::Vec3d pos, QString str)
 #include "../Algorithm/LoopToolbox.h"
 void InteractiveViewerWidget::showFeature()
 {
-
-}
-
-void InteractiveViewerWidget::showIsotropicMesh()
-{
-	/*if (!if_has_field)
+	if (!if_has_field)
 	{
 		if_has_field = true;
 		lg = new LoopGen::LoopGen(mesh);
@@ -637,15 +649,13 @@ void InteractiveViewerWidget::showIsotropicMesh()
 			crossfield.col(i + 3) = vc + crossfield.col(i + 3) * avgLen;
 		}
 	}
-	glLineWidth(2);
-	glColor3d(0.9, 0.1, 0.1);
-	glBegin(GL_LINES);
-	for (int i = 0; i < crossfield.cols(); i += 2)
-	{
-		glVertex3dv(crossfield.col(i).data());
-		glVertex3dv(crossfield.col(i + 1).data());
-	}
-	glEnd();*/
+	if_draw_field = !if_draw_field;
+	setDrawMode(InteractiveViewerWidget::SOLID_FLAT);
+	setMouseMode(InteractiveViewerWidget::TRANS);
+}
+
+void InteractiveViewerWidget::showIsotropicMesh()
+{
 	setDrawMode(InteractiveViewerWidget::SOLID_FLAT);
 	setMouseMode(InteractiveViewerWidget::TRANS);
 	if (!if_has_field)
@@ -676,19 +686,12 @@ void InteractiveViewerWidget::showIsotropicMesh()
 			selectedEdge.push_back(mesh.find_halfedge(mesh.vertex_handle(loop[i]), mesh.vertex_handle(loop[i + 1])).idx() / 2);
 		}
 	}
-	//glLineWidth(10);
-	/*glBegin(GL_LINES);
-	for (int i = 0; i < loop.size() - 1; ++i)
+	/*lg->FieldAligned_PlanarLoop(mesh.vertex_handle(29054), loop, 0);
+	for (int i = 0; i < loop.size() - 1; i += 2)
 	{
-		glVertex3dv(mesh.point(mesh.vertex_handle(loop[i])).data());
-		glVertex3dv(mesh.point(mesh.vertex_handle(loop[i + 1])).data());
-	}
-	glEnd();*/
-
-
-
+		selectedEdge.push_back(mesh.find_halfedge(mesh.vertex_handle(loop[i]), mesh.vertex_handle(loop[i + 1])).idx() / 2);
+	}*/
 	updateGL();
-
 }
 
 void InteractiveViewerWidget::showAnisotropicMesh()

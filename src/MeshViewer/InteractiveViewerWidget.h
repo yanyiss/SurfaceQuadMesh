@@ -160,10 +160,12 @@ public:
 #pragma region
 	bool if_has_field = false;
 	bool loop_gen_init = false;
+	bool if_draw_field = false;
 	LoopGen::LoopGen* lg = nullptr;
 	std::vector<int> loop;
 	Eigen::Matrix3Xd crossfield;
 	double avgLen;
+	void draw_field();
 #pragma endregion
 };
 
