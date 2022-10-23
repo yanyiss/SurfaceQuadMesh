@@ -660,9 +660,7 @@ void InteractiveViewerWidget::showIsotropicMesh()
 	setMouseMode(InteractiveViewerWidget::TRANS);
 	if (!if_has_field)
 	{
-		if_has_field = true;
-		lg = new LoopGen::LoopGen(mesh);
-		lg->InitializeField();
+		showFeature();
 	}
 	if (!loop_gen_init)
 	{

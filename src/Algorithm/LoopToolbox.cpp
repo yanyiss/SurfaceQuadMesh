@@ -13,7 +13,6 @@ namespace LoopGen
 		struct VertexPQ
 		{
 			int id;
-			//bool visited;
 			int shift;
 			HalfedgeHandle prev;
 			double dist;
@@ -37,7 +36,6 @@ namespace LoopGen
 		{
 			int fid = mesh->face_handle(voh.handle()).idx();
 			plane_normal += crossfield.col(4 * fid + shift + 1);
-			//dprint(mesh->to_vertex_handle(voh.handle()).idx());
 			if (weight(shift, voh->idx()) < 2)
 			{
 				int toid = mesh->to_vertex_handle(voh.handle()).idx();
@@ -60,9 +58,6 @@ namespace LoopGen
 				}
 				vert = pq.top();
 				pq.pop();
-
-				/*dprint("pq pop", vert.id, vert.shift, vert.dist, vert.count);
-				dprint("count compare:", vert.count, count[vert.id]);*/
 			} while (vert.count != count[vert.id]);
 
 			//loop.push_back(vert.id); loop.push_back(mesh->from_vertex_handle(prev[vert.id]).idx());
@@ -77,8 +72,6 @@ namespace LoopGen
 			shift = vert.shift;
 			for (int i = 0; i < valence; ++i)
 			{
-				/*dprint(voh.idx(), mesh->to_vertex_handle(voh).idx(), weight(0, voh.idx()), weight(1, voh.idx()), weight(2, voh.idx()), weight(3, voh.idx()));
-				dprint("shift:", shift, weight(shift,voh.idx()));*/
 				double w = weight(shift, voh.idx()); w *= w;
 				if (w < 2)
 				{
@@ -90,7 +83,6 @@ namespace LoopGen
 					{
 						distance[toid] = distance[fromid] + w;
 						pq.emplace(toid, shift, distance[toid], ++count[toid]);
-						//dprint("pq push", toid, shift, distance[toid], count[toid]);
 						prev[toid] = voh;
 					}
 				}
@@ -98,6 +90,8 @@ namespace LoopGen
 				voh = mesh->next_halfedge_handle(mesh->opposite_halfedge_handle(voh));
 			}
 		}
+
+		loop.clear();
 		loop.push_back(vid);
 		int previd = mesh->from_vertex_handle(prev[vid]).idx();
 		while (previd != vid)
