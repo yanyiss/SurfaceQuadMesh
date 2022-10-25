@@ -134,8 +134,8 @@ protected:
 public:
 	void SetCADFileName(QString &fileName);
 public:
-	void showFeature();
-	void showIsotropicMesh();
+	void showField();
+	void showLoop();
 	void showAnisotropicMesh();
 	void showDebugTest();
 private:
@@ -162,10 +162,17 @@ public:
 	bool loop_gen_init = false;
 	bool if_draw_field = false;
 	LoopGen::LoopGen* lg = nullptr;
-	std::vector<int> loop;
+	std::vector<VertexHandle> loop;
 	Eigen::Matrix3Xd crossfield;
 	double avgLen;
 	void draw_field();
+	void draw_energy();
+	double plane0[4] = { 0,0,1,0 };
+	double plane1[4] = { 0,0,1,0 };
+	double boundingXY0[4] = { 0,0,1,0 };
+	double boundingXY1[4] = { 0,0,1,0 };
+	bool if_draw_plane = false;
+	void draw_plane();
 #pragma endregion
 };
 

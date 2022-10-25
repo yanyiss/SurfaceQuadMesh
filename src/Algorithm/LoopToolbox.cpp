@@ -1,7 +1,9 @@
 #include "LoopToolbox.h"
+#include <Eigen\Cholesky>
+#include <omp.h>
 namespace LoopGen
 {
-	bool LoopGen::FieldAligned_PlanarLoop(VertexHandle v, std::vector<int>& loop, int shift)
+	bool LoopGen::FieldAligned_PlanarLoop(VertexHandle v, std::vector<VertexHandle>& loop, int shift)
 	{
 		int nv = mesh->n_vertices();
 		int vid = v.idx();
@@ -14,7 +16,6 @@ namespace LoopGen
 		{
 			int id;
 			int shift;
-			HalfedgeHandle prev;
 			double dist;
 			int count;
 			VertexPQ() {}
@@ -92,14 +93,14 @@ namespace LoopGen
 		}
 
 		loop.clear();
-		loop.push_back(vid);
-		int previd = mesh->from_vertex_handle(prev[vid]).idx();
-		while (previd != vid)
+		loop.push_back(v);
+		auto prevvert = mesh->from_vertex_handle(prev[vid]);
+		while (prevvert.idx() != vid)
 		{
-			loop.push_back(previd);
-			previd = mesh->from_vertex_handle(prev[previd]).idx();
+			loop.push_back(prevvert);
+			prevvert = mesh->from_vertex_handle(prev[prevvert.idx()]);
 		}
-		loop.push_back(vid);
+		loop.push_back(v);
 		return true;
 	}
 
@@ -198,29 +199,133 @@ namespace LoopGen
 
 	void LoopGen::InitializePQ()
 	{
-		//compute_principal_curvature(m, cur[0], cur[1], dir[0], dir[1]);
-		for (int i = 0; i < 2; ++i)
+		eov.resize(mesh->n_vertices());
+		auto start = clock();
+#pragma omp parallel for
+		for (int i = 0; i < mesh->n_vertices(); ++i)
 		{
-			//for (auto &k : cur[i])
-				//k = fabs(k);
-		}
-		for (auto v : mesh->vertices())
-		{
-			auto vid = v.idx();
-			EnergyOnVertex ev;
-			ev.v = v;
-			//if (cur[0][vid] < 1.0e-6 || cur[1][vid] < 1.0e-6)
+			std::vector<VertexHandle> loop;
+			double plane[4];
+			Eigen::VectorXd xyz[3];
+			if (!FieldAligned_PlanarLoop(mesh->vertex_handle(i), loop, 0))
 			{
-				ev.energy = DBL_MAX;
-				pq.push(ev);
-				continue;
+				eov[i] = DBL_MAX;
 			}
+			else
+			{
+				GetPositionFromLoop(loop, xyz);
+				eov[i] = EvaluatePlanarity(xyz, plane);
+			}
+			if (!FieldAligned_PlanarLoop(mesh->vertex_handle(i), loop, 1))
+			{
+				eov[i] = std::min(eov[i], DBL_MAX);
+			}
+			else
+			{
+				GetPositionFromLoop(loop, xyz);
+				eov[i] = std::min(EvaluatePlanarity(xyz, plane), eov[i]);
+			}
+			//dprint("index:", i, eov[i]);
+		}
+		dprint("time:", clock() - start);
+		std::ofstream file_writer;
+		file_writer.open("..//resource//energy//vase.energy");
+		if (file_writer.fail()) {
+			std::cout << "fail to open\n";
+		}
+		for (auto e : eov)
+			file_writer << e << "\n";
+		file_writer.close();
+	}
+
+	void LoopGen::GetPositionFromLoop(const std::vector<VertexHandle>& loop, Eigen::VectorXd xyz[3])
+	{
+		int n = loop.size() - 1;
+		xyz[0].resize(n); xyz[1].resize(n); xyz[2].resize(n);
+		for (int i = 0; i < n; ++i)
+		{
+			auto& pos = mesh->point(loop[i]);
+			xyz[0](i) = pos[0];
+			xyz[1](i) = pos[1];
+			xyz[2](i) = pos[2];
+		}
+	}
+
+	void LeastSquarePlane(Eigen::VectorXd xyz[3], double plane[4])
+	{
+		//xyz中第一个点是loop的出发点，这里加强其权重使平面能与之接近，最后再移动平面使之穿过出发点
+		int n = xyz[0].size();
+		//position.col(0) *= n;
+		auto deviation = [&](int k)
+		{
+			return (xyz[k].array() - xyz[k].sum() / n).abs().sum();
+		};
+		double dev[3] = { deviation(0),deviation(1),deviation(2) };
+		int minId = dev[0] < dev[1] ? (dev[0] < dev[2] ? 0 : 2) : (dev[1] < dev[2] ? 1 : 2);
+		auto& p0 = xyz[minId];
+		auto& p1 = xyz[(minId + 1) % 3];
+		auto& p2 = xyz[(minId + 2) % 3];
+		Eigen::Matrix3d m;
+		m.col(0) << p1.dot(p1), p1.dot(p2), p1.sum();
+		m.col(1) << m(1, 0), p2.dot(p2), p2.sum();
+		m.col(2) << m(2, 0), m(2, 1), n;
+		Eigen::Vector3d right(p0.dot(p1), p0.dot(p2), p0.sum());
+		//加强权重
+		{
+			n *= n;
+			m(0, 0) += n * p1(0) * p1(0); m(0, 1) += n * p1(0) * p2(0); m(0, 2) += n * p1(0);
+			m(1, 0) = m(0, 1); m(1, 1) += n * p2(0) * p2(0); m(1, 2) += n * p2(0);
+			m(2, 0) = m(0, 2); m(2, 1) = m(1, 2); m(2, 2) += n;
+			right(0) += n * p1(0) * p0(0); right(1) += n * p2(0) * p0(0); right(2) += n * p0(0);
+		}
+		right = m.ldlt().solve(-right);
+		double invnorm = 1.0 / sqrt(right(0) * right(0) + right(1) * right(1) + 1);
+		right *= invnorm;
+		switch (minId)
+		{
+		case 0:
+			plane[0] = invnorm; plane[1] = right(0); plane[2] = right(1);
+			break;
+		case 1:
+			plane[0] = right(1); plane[1] = invnorm; plane[2] = right(0);
+			break;
+		case 2:
+			plane[0] = right(0); plane[1] = right(1); plane[2] = invnorm;
+			break;
+		}
+		plane[3] = right(2);
+		//todo: 移动平面
+	}
+
+	double EvaluatePlanarity(Eigen::VectorXd xyz[3], double plane[4])
+	{
+		int n = xyz[0].size();
+		LeastSquarePlane(xyz, plane);
+		double sum = 0;
+		//double length = 0;
+		for (int i = 0; i < n; ++i)
+		{
+			sum += fabs(xyz[0](i) * plane[0] + xyz[1](i) * plane[1] + xyz[2](i) * plane[2] + plane[3]);
+			//length += (position.col(i) - position.col((i + 1) % n)).norm();
+		}
+		//dprint("eee:", sum / n, sum, n, length);
+		//return sum / (n * length);
+		return sum / n;
+	}
 
 
-			//FieldAligned_PlanarLoop(v, dir[cur[0][vid] >= cur[1][vid] ? 0 : 1][vid]);
-			LocalParametrization lp;
-			ev.energy = 0;
-			pq.push(ev);
+	void boundingXY(Eigen::Matrix3Xd& position, double bounding[4])
+	{
+		bounding[0] = DBL_MAX; bounding[1] = -DBL_MAX;
+		bounding[2] = DBL_MAX; bounding[3] = -DBL_MAX;
+		for (int i = 0; i < position.cols(); ++i)
+		{
+			double r = position(0, i);
+			bounding[0] = std::min(bounding[0], r);
+			bounding[1] = std::max(bounding[1], r);
+			r = position(1, i);
+			bounding[2] = std::min(bounding[2], r);
+			bounding[3] = std::max(bounding[3], r);
 		}
 	}
 }

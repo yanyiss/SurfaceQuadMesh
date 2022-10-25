@@ -152,12 +152,12 @@ protected:
 	virtual void save_screen_gui(QString fname);
 
 public:
-		void showFeature() {
-			MeshViewer->showFeature();
+		void showField() {
+			MeshViewer->showField();
 
 		}
-		void showIsotropicMesh() {
-			MeshViewer->showIsotropicMesh();
+		void showLoop() {
+			MeshViewer->showLoop();
 		}
 		void showAnisotropicMesh() {
 			MeshViewer->showAnisotropicMesh();

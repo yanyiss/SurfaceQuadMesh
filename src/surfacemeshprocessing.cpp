@@ -164,19 +164,19 @@ void SurfaceMeshProcessing::createActions()
 	moveVertexAction->setChecked(false);
 	connect(moveVertexAction, SIGNAL(triggered()), this, SLOT(moveVertex()));
 
-	showFeatureAction = new QAction(tr("&Show Feature"), this);
-	showFeatureAction->setIcon(QIcon("../resource/Images/move_vertex.png"));
-	showFeatureAction->setStatusTip(tr("Show Feature of the mesh"));
-	showFeatureAction->setCheckable(true);
-	showFeatureAction->setChecked(false);
-	connect(showFeatureAction, SIGNAL(triggered()), this, SLOT(showFeature()));
+	showFieldAction = new QAction(tr("&Show Field"), this);
+	showFieldAction->setIcon(QIcon("../resource/Images/move_vertex.png"));
+	showFieldAction->setStatusTip(tr("Show Feature of the mesh"));
+	showFieldAction->setCheckable(true);
+	showFieldAction->setChecked(false);
+	connect(showFieldAction, SIGNAL(triggered()), this, SLOT(showField()));
 
-	showIsotropicMeshAction = new QAction(tr("&Show Isotropic Mesh"), this);
-	showIsotropicMeshAction->setIcon(QIcon("../resource/Images/move_vertex.png"));
-	showIsotropicMeshAction->setStatusTip(tr("Show Isotropic Mesh"));
-	showIsotropicMeshAction->setCheckable(true);
-	showIsotropicMeshAction->setChecked(false);
-	connect(showIsotropicMeshAction, SIGNAL(triggered()), this, SLOT(showIsotropicMesh()));
+	showLoopAction = new QAction(tr("&Show Loop"), this);
+	showLoopAction->setIcon(QIcon("../resource/Images/move_vertex.png"));
+	showLoopAction->setStatusTip(tr("Show Isotropic Mesh"));
+	showLoopAction->setCheckable(true);
+	showLoopAction->setChecked(false);
+	connect(showLoopAction, SIGNAL(triggered()), this, SLOT(showLoop()));
 
 	showAnisotropicMeshAction = new QAction(tr("&Show Anisotropic Mesh"), this);
 	showAnisotropicMeshAction->setIcon(QIcon("../resource/Images/move_vertex.png"));
@@ -313,8 +313,8 @@ void SurfaceMeshProcessing::createMenus()
 	mouseMenu->addAction(EdgePickAction);
 	mouseMenu->addAction(clearSelectedAction);
 	mouseMenu->addAction(moveVertexAction);
-	mouseMenu->addAction(showFeatureAction);
-	mouseMenu->addAction(showIsotropicMeshAction);
+	mouseMenu->addAction(showFieldAction);
+	mouseMenu->addAction(showLoopAction);
 	mouseMenu->addAction(showAnisotropicMeshAction);
 	mouseMenu->addAction(showDebugTestAction);
 
@@ -364,8 +364,8 @@ void SurfaceMeshProcessing::createToolBars()
 	mouseToolBar->addAction(EdgePickAction);
 	mouseToolBar->addAction(clearSelectedAction);
 	mouseToolBar->addAction(moveVertexAction);
-	mouseToolBar->addAction(showFeatureAction);
-	mouseToolBar->addAction(showIsotropicMeshAction);
+	mouseToolBar->addAction(showFieldAction);
+	mouseToolBar->addAction(showLoopAction);
 	mouseToolBar->addAction(showAnisotropicMeshAction);
 	mouseToolBar->addAction(showDebugTestAction);
 
@@ -504,21 +504,21 @@ void SurfaceMeshProcessing::moveVertex()
 	moveVertexAction->setChecked(true);
 	viewer->setMouseMode(InteractiveViewerWidget::MOVE);
 }
-void SurfaceMeshProcessing::showFeature()
+void SurfaceMeshProcessing::showField()
 {
 	setAllViewActionChecked(false);
 	setAllMouseActionChecked(false);
-	showFeatureAction->setChecked(true);
+	showFieldAction->setChecked(true);
 	viewer->setMouseMode(InteractiveViewerWidget::FEATURE);
-	viewer->showFeature();
+	viewer->showField();
 }
-void SurfaceMeshProcessing::showIsotropicMesh()
+void SurfaceMeshProcessing::showLoop()
 {
 	setAllViewActionChecked(false);
 	setAllMouseActionChecked(false);
-	showIsotropicMeshAction->setChecked(true);
+	showLoopAction->setChecked(true);
 	viewer->setMouseMode(InteractiveViewerWidget::ISOTROPIC);
-	viewer->showIsotropicMesh();
+	viewer->showLoop();
 }
 void SurfaceMeshProcessing::showAnisotropicMesh()
 {
