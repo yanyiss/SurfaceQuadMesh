@@ -503,7 +503,8 @@ void InteractiveViewerWidget::draw_interactive_portion(int drawmode)
 	}
 	draw_field();
 	//draw_energy();
-	draw_plane();
+	//draw_plane();
+	draw_planeloop();
 	if(draw_new_mesh)
 	{
 		draw_scene_mesh(drawmode);
@@ -686,7 +687,7 @@ void InteractiveViewerWidget::showLoop()
 #if 1
 	if (selectedVertex.empty())
 		return;
-	//selectedVertex.push_back(19180);
+	//selectedVertex.push_back(28957);
 	selectedVertex = { selectedVertex.back() };
 	selectedEdge.clear();
 	Eigen::VectorXd xyz[3];
@@ -699,6 +700,8 @@ void InteractiveViewerWidget::showLoop()
 		lg->GetPositionFromLoop(loop, xyz);
 		if_draw_plane = true;
 		dprint(LoopGen::EvaluatePlanarity(xyz, plane0));
+		plane_loop[0].clear();
+		lg->RefineLoop(loop, plane_loop[0]);
 	}
 	if (lg->FieldAligned_PlanarLoop(mesh.vertex_handle(selectedVertex.back()), loop, 1))
 	{
@@ -709,6 +712,8 @@ void InteractiveViewerWidget::showLoop()
 		lg->GetPositionFromLoop(loop, xyz);
 		if_draw_plane = true;
 		dprint(LoopGen::EvaluatePlanarity(xyz, plane1));
+		plane_loop[1].clear();
+		lg->RefineLoop(loop, plane_loop[1]);
 	}
 	/*lg->FieldAligned_PlanarLoop(mesh.vertex_handle(29054), loop, 0);
 	for (int i = 0; i < loop.size() - 1; i += 2)
@@ -815,6 +820,25 @@ void InteractiveViewerWidget::draw_plane()
 		glVertex3d(2, -2, -(plane1[0] * 2 + plane1[1] * -2 + plane1[3]) / plane1[2]);
 		glEnd();
 	}
+}
+
+void InteractiveViewerWidget::draw_planeloop()
+{
+	glColor3d(0.1, 0.8, 0.3);
+	glBegin(GL_LINES);
+	for (int i = 0; i < 2; ++i)
+	{
+		if (plane_loop[i].empty())
+			continue;
+		for (int j = 0; j < plane_loop[i].size() - 1; ++j)
+		{
+			auto& pl = plane_loop[i][j];
+			auto& ps = plane_loop[i][j + 1];
+			glVertex3dv(((1 - pl.c) * mesh.point(mesh.to_vertex_handle(pl.h)) + pl.c * mesh.point(mesh.from_vertex_handle(pl.h))).data());
+			glVertex3dv(((1 - ps.c) * mesh.point(mesh.to_vertex_handle(ps.h)) + ps.c * mesh.point(mesh.from_vertex_handle(ps.h))).data());
+		}
+	}
+	glEnd();
 }
 
 

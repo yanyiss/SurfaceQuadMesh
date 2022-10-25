@@ -104,6 +104,22 @@ namespace LoopGen
 		return true;
 	}
 
+	/*void LoopGen::InitializeAABBTREE()
+	{
+		ClosestPointSearch::Triangles primitives;
+		primitives.reserve(mesh->n_faces());
+		OpenMesh::Vec3d p0, p1, p2;
+		for (auto fitr = mesh->faces_begin(); fitr != mesh->faces_end(); ++fitr)
+		{
+			auto fv_iter = mesh->cfv_begin(fitr.handle());
+			p0 = mesh->point(fv_iter.handle()); ++fv_iter;
+			p1 = mesh->point(fv_iter.handle()); ++fv_iter;
+			p2 = mesh->point(fv_iter.handle());
+			primitives.emplace_back(Vec3d(p0.data()), Vec3d(p1.data()), Vec3d(p2.data()), fitr.handle());
+		}
+		aabbtree = new ClosestPointSearch::AABBTree(primitives.begin(), primitives.end());
+	}*/
+
 	void LoopGen::InitializeField()
 	{
 #if 0
@@ -159,25 +175,14 @@ namespace LoopGen
 			else
 				s = DBL_MAX;
 			if (arc >= 0 && arc < halfPI)
-			{
 				w0 << s, DBL_MAX, DBL_MAX, c;
-				//w1 << DBL_MAX, c, s, DBL_MAX;
-			}
 			else if (arc >= halfPI && arc < PI)
-			{
 				w0 << DBL_MAX, DBL_MAX, s, c;
-				//w1 << s, c, DBL_MAX, DBL_MAX;
-			}
 			else if (arc >= _PI && arc < _halfPI)
-			{
 				w0 << DBL_MAX, c, s, DBL_MAX;
-				//w1 << s, DBL_MAX, DBL_MAX, c;
-			}
 			else
-			{
 				w0 << s, c, DBL_MAX, DBL_MAX;
-				//w1 << DBL_MAX, DBL_MAX, s, c;
-			}
+
 			switch (matching[h0.idx()])
 			{
 			case 0:
@@ -238,6 +243,90 @@ namespace LoopGen
 		file_writer.close();
 	}
 
+	bool LoopGen::RefineLoop(std::vector<VertexHandle>& loop, PlaneLoop& planar_loop)
+	{
+		Eigen::VectorXd xyz[3];
+		GetPositionFromLoop(loop, xyz);
+		double plane[4];
+		if (EvaluatePlanarity(xyz, plane) > 0.01)
+			//return false;
+			int p = 0;
+		auto dis = [&](Vec3d& pos)
+		{
+			return plane[0] * pos[0] + plane[1] * pos[1] + plane[2] * pos[2] + plane[3];
+		};
+
+		//从起始点出发，不断加入端点落在平面两侧的边
+		auto hitr = mesh->voh_begin(loop[0]);
+		auto s0 = dis(mesh->point(mesh->to_vertex_handle(mesh->next_halfedge_handle(hitr.handle()))));
+		double distance[2];
+		PointOnHalfedge poh[2]; int id = 0;
+		for (; hitr != mesh->voh_end(loop[0]); ++hitr)
+		{
+			auto s1 = dis(mesh->point(mesh->to_vertex_handle(hitr.handle())));
+			if (s0 * s1 < 0)
+			{
+				/*h[id] = mesh->prev_halfedge_handle(mesh->opposite_halfedge_handle(hitr.handle()));
+				++id;*/
+				if (s0 > 0)
+				{
+					poh[0].h = mesh->next_halfedge_handle(hitr.handle());
+					poh[0].c = s0 / (s0 - s1);
+					distance[0] = s0; distance[1] = s1;
+				}
+				else
+				{
+					poh[1].h = mesh->opposite_halfedge_handle(mesh->next_halfedge_handle(hitr.handle()));
+					poh[1].c = s1 / (s1 - s0);
+				}
+				++id;
+			}
+			s0 = s1;
+		}
+		if (id != 2)
+		{
+			dprint("error out");
+			system("pause");
+		}
+
+		planar_loop.clear();
+		planar_loop.push_back(poh[0]);
+		auto h = poh[0].h;
+		while (h.idx() != poh[1].h.idx())
+		{
+			auto s = dis(mesh->point(mesh->from_vertex_handle(mesh->prev_halfedge_handle(mesh->opposite_halfedge_handle(h)))));
+			if (s > 0)
+			{
+				h = mesh->next_halfedge_handle(mesh->opposite_halfedge_handle(h));
+				distance[0] = s;
+			}
+			else
+			{
+				h = mesh->prev_halfedge_handle(mesh->opposite_halfedge_handle(h));
+				distance[1] = s;
+			}
+			planar_loop.emplace_back(h, distance[0] / (distance[0] - distance[1]));
+			//dprint(h.idx(),h.idx()/2);
+		}
+		return true;
+#if 0
+		//首先向平面投影，再向网格投影
+		Eigen::VectorXd v(xyz[0](0), xyz[1](0), xyz[2](0));
+		Eigen::VectorXd n(plane[0], plane[1], plane[2]);
+
+		int nv = loop.size() - 1;
+		planar_loop.resize(3, nv);
+		for (int i = 0; i < nv; ++i)
+		{
+			auto& pos = mesh->point(loop[i]);
+			Eigen::VectorXd p(pos[0], pos[1], pos[2]);
+			auto plane_pos = n.dot(p - v) * n + p;
+			auto proj_pos = aabbtree->closest_point_and_face_handle(Vec3d(plane_pos(0), plane_pos(1), plane_pos(2)));
+			planar_loop.col(i) << proj_pos.first[0], proj_pos.first[1], proj_pos.first[2];
+		}
+#endif
+	}
+
 	void LoopGen::GetPositionFromLoop(const std::vector<VertexHandle>& loop, Eigen::VectorXd xyz[3])
 	{
 		int n = loop.size() - 1;
@@ -293,8 +382,9 @@ namespace LoopGen
 			plane[0] = right(0); plane[1] = right(1); plane[2] = invnorm;
 			break;
 		}
-		plane[3] = right(2);
-		//todo: 移动平面
+		//plane[3] = right(2);
+		//移动平面
+		plane[3] = -(plane[0] * xyz[0](0) + plane[1] * xyz[1](0) + plane[2] * xyz[2](0));
 	}
 
 	double EvaluatePlanarity(Eigen::VectorXd xyz[3], double plane[4])

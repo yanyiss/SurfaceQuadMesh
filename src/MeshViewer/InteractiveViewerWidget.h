@@ -173,6 +173,8 @@ public:
 	double boundingXY1[4] = { 0,0,1,0 };
 	bool if_draw_plane = false;
 	void draw_plane();
+	void draw_planeloop();
+	LoopGen::LoopGen::PlaneLoop plane_loop[2];
 #pragma endregion
 };
 
