@@ -1,6 +1,7 @@
 #include "LoopToolbox.h"
 #include <Eigen\Cholesky>
 #include <omp.h>
+#define YYSS_INFINITE 10e12
 namespace LoopGen
 {
 	bool LoopGen::FieldAligned_PlanarLoop(VertexHandle v, std::vector<VertexHandle>& loop, int shift)
@@ -8,7 +9,7 @@ namespace LoopGen
 		int nv = mesh->n_vertices();
 		int vid = v.idx();
 		std::deque<bool> visited(nv, false);
-		std::vector<double> distance(nv, DBL_MAX);
+		std::vector<double> distance(nv, YYSS_INFINITE);
 		std::vector<HalfedgeHandle> prev(nv);
 		shift %= 2;
 
@@ -171,17 +172,17 @@ namespace LoopGen
 			}*/
 
 			if (s < c)
-				c = DBL_MAX;
+				c = YYSS_INFINITE;
 			else
-				s = DBL_MAX;
+				s = YYSS_INFINITE;
 			if (arc >= 0 && arc < halfPI)
-				w0 << s, DBL_MAX, DBL_MAX, c;
+				w0 << s, YYSS_INFINITE, YYSS_INFINITE, c;
 			else if (arc >= halfPI && arc < PI)
-				w0 << DBL_MAX, DBL_MAX, s, c;
+				w0 << YYSS_INFINITE, YYSS_INFINITE, s, c;
 			else if (arc >= _PI && arc < _halfPI)
-				w0 << DBL_MAX, c, s, DBL_MAX;
+				w0 << YYSS_INFINITE, c, s, YYSS_INFINITE;
 			else
-				w0 << s, c, DBL_MAX, DBL_MAX;
+				w0 << s, c, YYSS_INFINITE, YYSS_INFINITE;
 
 			switch (matching[h0.idx()])
 			{
@@ -204,35 +205,145 @@ namespace LoopGen
 
 	void LoopGen::InitializePQ()
 	{
-		eov.resize(mesh->n_vertices());
-		auto start = clock();
+		eov.resize(mesh->n_vertices(), YYSS_INFINITE);
+		timeRecorder tr;
+		std::vector<InfoOnVertex> InfoOnMesh(mesh->n_vertices() * 2);
 #pragma omp parallel for
 		for (int i = 0; i < mesh->n_vertices(); ++i)
 		{
-			std::vector<VertexHandle> loop;
-			double plane[4];
-			Eigen::VectorXd xyz[3];
-			if (!FieldAligned_PlanarLoop(mesh->vertex_handle(i), loop, 0))
+			for (int j = 0; j < 2; ++j)
 			{
-				eov[i] = DBL_MAX;
+				InfoOnMesh[2 * i + j].v = mesh->vertex_handle(i);
+				if (FieldAligned_PlanarLoop(InfoOnMesh[2 * i + j].v, InfoOnMesh[2 * i + j].loop, j))
+				{
+					eov[i] = std::min(YYSS_INFINITE, RefineLoop(InfoOnMesh[2 * i + j].loop, InfoOnMesh[2 * i + j].pl));
+				}
+				
 			}
-			else
-			{
-				GetPositionFromLoop(loop, xyz);
-				eov[i] = EvaluatePlanarity(xyz, plane);
-			}
-			if (!FieldAligned_PlanarLoop(mesh->vertex_handle(i), loop, 1))
-			{
-				eov[i] = std::min(eov[i], DBL_MAX);
-			}
-			else
-			{
-				GetPositionFromLoop(loop, xyz);
-				eov[i] = std::min(EvaluatePlanarity(xyz, plane), eov[i]);
-			}
-			//dprint("index:", i, eov[i]);
 		}
-		dprint("time:", clock() - start);
+		tr.out("Time of Initializing Planar Loops on All Vertices:");
+
+		//
+		auto& matching = cf->getMatching();
+		for (auto eitr = mesh->edges_begin(); eitr != mesh->edges_end(); ++eitr)
+		{
+			int index = 0;
+			auto h = mesh->halfedge_handle(eitr.handle(), 0);
+			auto fromvert = mesh->from_vertex_handle(h);
+			auto tovert = mesh->to_vertex_handle(h);
+			auto ht = mesh->voh_begin(fromvert).handle();
+			while (ht.idx() != h.idx())
+			{
+				ht = mesh->opposite_halfedge_handle(mesh->prev_halfedge_handle(ht));
+				index += matching[ht.idx()];
+			}
+			h = mesh->next_halfedge_handle(h);
+			ht = mesh->voh_begin(tovert).handle();
+			while (ht.idx() != h.idx())
+			{
+				ht = mesh->opposite_halfedge_handle(mesh->prev_halfedge_handle(ht));
+				index += 4 - matching[ht.idx()];
+			}
+			index %= 4;
+
+			switch (index)
+			{
+			case 0:
+				InfoOnMesh[2 * fromvert.idx()].mark.insert(std::make_pair(&InfoOnMesh[2 * tovert.idx()], 0));
+				InfoOnMesh[2 * tovert.idx()].mark.insert(std::make_pair(&InfoOnMesh[2 * fromvert.idx()], 0));
+				InfoOnMesh[2 * fromvert.idx() + 1].mark.insert(std::make_pair(&InfoOnMesh[2 * tovert.idx() + 1], 0));
+				InfoOnMesh[2 * tovert.idx() + 1].mark.insert(std::make_pair(&InfoOnMesh[2 * fromvert.idx() + 1], 0));
+				break;
+			case 1:
+				InfoOnMesh[2 * fromvert.idx()].mark.insert(std::make_pair(&InfoOnMesh[2 * tovert.idx() + 1], 1));
+				InfoOnMesh[2 * tovert.idx()].mark.insert(std::make_pair(&InfoOnMesh[2 * fromvert.idx() + 1], 0));
+				InfoOnMesh[2 * fromvert.idx() + 1].mark.insert(std::make_pair(&InfoOnMesh[2 * tovert.idx()], 0));
+				InfoOnMesh[2 * tovert.idx() + 1].mark.insert(std::make_pair(&InfoOnMesh[2 * fromvert.idx()], 1));
+				break;
+			case 2:
+				InfoOnMesh[2 * fromvert.idx()].mark.insert(std::make_pair(&InfoOnMesh[2 * tovert.idx()], 1));
+				InfoOnMesh[2 * tovert.idx()].mark.insert(std::make_pair(&InfoOnMesh[2 * fromvert.idx()], 1));
+				InfoOnMesh[2 * fromvert.idx() + 1].mark.insert(std::make_pair(&InfoOnMesh[2 * tovert.idx() + 1], 1));
+				InfoOnMesh[2 * tovert.idx() + 1].mark.insert(std::make_pair(&InfoOnMesh[2 * fromvert.idx() + 1], 1));
+				break;
+			case 3:
+				InfoOnMesh[2 * fromvert.idx()].mark.insert(std::make_pair(&InfoOnMesh[2 * tovert.idx() + 1], 0));
+				InfoOnMesh[2 * tovert.idx()].mark.insert(std::make_pair(&InfoOnMesh[2 * fromvert.idx() + 1], 1));
+				InfoOnMesh[2 * fromvert.idx() + 1].mark.insert(std::make_pair(&InfoOnMesh[2 * tovert.idx()], 1));
+				InfoOnMesh[2 * tovert.idx() + 1].mark.insert(std::make_pair(&InfoOnMesh[2 * fromvert.idx()], 0));
+				break;
+			}
+		}
+
+		auto assembleLoop = [&](Vec3d &start, PlaneLoop &pl, bool if_forward, Eigen::Matrix3Xd & loop)
+		{
+			loop.resize(3, 1 + pl.size());
+			loop.col(0) << start[0], start[1], start[2];
+			int c = 0;
+			if (if_forward)
+			{
+				for (auto itr = pl.begin(); itr != pl.end(); ++itr)
+				{
+					auto pos = mesh->point(mesh->from_vertex_handle(itr->h)) * (1 - itr->c) + mesh->point(mesh->to_vertex_handle(itr->h)) * itr->c;
+					loop.col(++c) << pos[0], pos[1], pos[2];
+				}
+			}
+			else
+			{
+				for (auto itr = pl.rbegin(); itr != pl.rend(); ++itr)
+				{
+					auto pos = mesh->point(mesh->from_vertex_handle(itr->h)) * (1 - itr->c) + mesh->point(mesh->to_vertex_handle(itr->h)) * itr->c;
+					loop.col(++c) << pos[0], pos[1], pos[2];
+				}
+			}
+		};
+		for (auto eitr = mesh->edges_begin(); eitr != mesh->edges_end(); ++eitr)
+		{
+			auto h = mesh->halfedge_handle(eitr.handle(), 0);
+			auto fromvert = mesh->from_vertex_handle(h);
+			auto tovert = mesh->to_vertex_handle(h);
+			for (int i = 0; i < 2; ++i)
+			{
+				auto& fl = InfoOnMesh[2 * fromvert.idx() + i];
+				auto& tl = fl.mark.find(&InfoOnMesh[2 * tovert.idx() + i]) != fl.mark.end() ?
+					InfoOnMesh[2 * tovert.idx() + i] : InfoOnMesh[2 * tovert.idx() + ((i + 1) % 2)];
+				int flag = fl.mark[&tl];
+
+				Eigen::Matrix3Xd loop0, loop1;
+				assembleLoop(mesh->point(fromvert), fl.pl, true, loop0);
+				assembleLoop(mesh->point(tovert), tl.pl, !flag, loop1);
+
+				auto& proj_pos = loop0.col(0);
+				int id = -1;
+				int cols = loop1.cols();
+				double u0 = 0;
+				for (int j = 0; j < 2; ++j)
+				{
+					Eigen::Vector3d pos0 = loop1.col(j + 1) - loop1.col(j);
+					double dot0 = pos0.dot(proj_pos - loop1.col(j));
+					double dot1 = pos0.dot(proj_pos - loop1.col(j + 1));
+					if (dot0 > 0 && dot1 < 0)
+					{
+						id = j;
+						u0 = dot1 / (dot0 + dot1) * pos0.norm();
+						break;
+					}
+					pos0 = loop1.col((cols - j) % cols) - loop1.col(cols - j - 1);
+					dot0 = pos0.dot(proj_pos - loop1.col(cols - j - 1));
+					dot1 = pos0.dot(proj_pos - loop1.col((cols - j) % cols));
+					if (dot0 > 0 && dot1 < 0)
+					{
+						id = cols - j - 1;
+						u0 = dot1 / (dot0 + dot1) * pos0.norm();
+						break;
+					}
+				}
+				if (id == -1)
+					id = 0;
+				double e = EvaluateSimilarity(loop0, loop1, id, u0);
+			}
+		}
+
 		std::ofstream file_writer;
 		file_writer.open("..//resource//energy//vase.energy");
 		if (file_writer.fail()) {
@@ -243,14 +354,13 @@ namespace LoopGen
 		file_writer.close();
 	}
 
-	bool LoopGen::RefineLoop(std::vector<VertexHandle>& loop, PlaneLoop& planar_loop)
+	double LoopGen::RefineLoop(std::vector<VertexHandle>& loop, PlaneLoop& planar_loop)
 	{
 		Eigen::VectorXd xyz[3];
 		GetPositionFromLoop(loop, xyz);
 		double plane[4];
-		if (EvaluatePlanarity(xyz, plane) > 0.01)
-			//return false;
-			int p = 0;
+		LeastSquarePlane(xyz, plane);
+
 		auto dis = [&](Vec3d& pos)
 		{
 			return plane[0] * pos[0] + plane[1] * pos[1] + plane[2] * pos[2] + plane[3];
@@ -289,6 +399,33 @@ namespace LoopGen
 			system("pause");
 		}
 
+		//检查出发点到poh[0]的方向与搜索loop的方向是否相同，若不相同，则调换poh[0]和poh[1]
+		{
+			auto& matching = cf->getMatching();
+			int shift = 0;
+			auto h_end = mesh->prev_halfedge_handle(poh[0].h);
+			auto h_begin = mesh->voh_begin(mesh->from_vertex_handle(h_end)).handle();
+			while (h_begin != h_end)
+			{
+				shift += matching[h_begin.idx()];
+				h_begin = mesh->opposite_halfedge_handle(mesh->prev_halfedge_handle(h_begin));
+			}
+			auto& v0 = cf->getCrossField().col(4 * mesh->face_handle(h_end).idx() + (shift % 4));
+			auto v1 = poh[0].c * mesh->point(mesh->from_vertex_handle(poh[0].h)) + 
+				(1 - poh[0].c) * mesh->point(mesh->to_vertex_handle(poh[0].h)) - mesh->point(mesh->from_vertex_handle(h_end));
+			if (v0(0)*v1[0] + v0(1)*v1[1] + v0(2)*v1[2] < 0)
+			{
+				std::swap(poh[0], poh[1]);
+				for (int i = 0; i < 4; ++i)
+					plane[i] *= -1.0;
+				for (int i = 0; i < 2; ++i)
+				{
+					poh[i].h = mesh->opposite_halfedge_handle(poh[i].h);
+					poh[i].c = 1 - poh[i].c;
+				}
+			}
+		}
+
 		planar_loop.clear();
 		planar_loop.push_back(poh[0]);
 		auto h = poh[0].h;
@@ -308,23 +445,7 @@ namespace LoopGen
 			planar_loop.emplace_back(h, distance[0] / (distance[0] - distance[1]));
 			//dprint(h.idx(),h.idx()/2);
 		}
-		return true;
-#if 0
-		//首先向平面投影，再向网格投影
-		Eigen::VectorXd v(xyz[0](0), xyz[1](0), xyz[2](0));
-		Eigen::VectorXd n(plane[0], plane[1], plane[2]);
-
-		int nv = loop.size() - 1;
-		planar_loop.resize(3, nv);
-		for (int i = 0; i < nv; ++i)
-		{
-			auto& pos = mesh->point(loop[i]);
-			Eigen::VectorXd p(pos[0], pos[1], pos[2]);
-			auto plane_pos = n.dot(p - v) * n + p;
-			auto proj_pos = aabbtree->closest_point_and_face_handle(Vec3d(plane_pos(0), plane_pos(1), plane_pos(2)));
-			planar_loop.col(i) << proj_pos.first[0], proj_pos.first[1], proj_pos.first[2];
-		}
-#endif
+		return EvaluatePlanarity(xyz, plane);
 	}
 
 	void LoopGen::GetPositionFromLoop(const std::vector<VertexHandle>& loop, Eigen::VectorXd xyz[3])
@@ -338,6 +459,87 @@ namespace LoopGen
 			xyz[1](i) = pos[1];
 			xyz[2](i) = pos[2];
 		}
+	}
+
+	double LoopGen::ComputeAdjVertexSimilarity(InfoOnVertex& iov0, InfoOnVertex& iov1)
+	{
+		//首先确定iov0.loop[0]和iov1.loop[0], iov1.loop[1]中哪一个对应, 以及loop的行进方向
+		auto& matching = cf->getMatching();
+		int index = 0;
+		auto h = mesh->find_halfedge(iov0.v, iov1.v);
+		auto ht = mesh->voh_begin(iov0.v).handle();
+		while (ht.idx() != h.idx())
+		{
+			ht = mesh->opposite_halfedge_handle(mesh->prev_halfedge_handle(ht));
+			index += matching[ht.idx()];
+		}
+		h = mesh->next_halfedge_handle(h);
+		ht = mesh->voh_begin(iov1.v).handle();
+		while (ht.idx() != h.idx())
+		{
+			ht = mesh->opposite_halfedge_handle(mesh->prev_halfedge_handle(ht));
+			index += 4 - matching[ht.idx()];
+		}
+		index %= 4;
+		//index=
+		//0  iov0
+
+		double e0, e1;
+		for (int i = 0; i < 2; ++i)
+		{
+
+		}
+		return std::min(e0, e1);
+	}
+
+	double LoopGen::EvaluateSimilarity(Eigen::Matrix3Xd& loop0, Eigen::Matrix3Xd& loop1, double u, int begin_seg)
+	{
+		//对两个loop重新采样，对比采样点的切向，从而定义相似性
+		int n = loop0.size() + loop1.size();
+		auto loopLength = [&](Eigen::Matrix3Xd& loop, Eigen::Vector3d &seg, int mark)
+		{
+			int cols = loop.cols();
+			seg(0) = (loop.col((mark + 1) % cols) - loop.col(mark % cols)).norm();
+			for (int i = 1; i < cols; ++i)
+			{
+				seg(i % cols) = seg((i - 1) % cols) + (loop.col((mark + i + 1) % cols) - loop.col((mark + i) % cols)).norm();
+			}
+			return seg(cols - 1);
+		};
+		auto assembleFragment = [&](Eigen::Matrix3Xd& fragment, double u, int mark, Eigen::Matrix3Xd &loop)
+		{
+			int size = loop.size();
+			Eigen::Vector3d seg(size);
+			double step = loopLength(loop, seg, mark) / n;
+			Eigen::Vector3d vec = (loop.col((mark + 1) % size) - loop.col(mark % size)).normalized();
+			fragment.col(0) = vec;
+			//Eigen::Vector3d start_pos = u * vec + loop.col(mark % size);
+			int r = 0;
+			for (int i = 1; i < n; ++i)
+			{
+				u += step;
+				if (u > seg(r))
+				{
+					++r; ++mark;
+					vec = (loop.col((mark + 1) % size) - loop.col(mark % size)).normalized();
+				}
+				fragment.col(i) = vec;
+			}
+		};
+
+		Eigen::Matrix3Xd fragment0(3, n), fragment1(3, n);
+		assembleFragment(fragment0, 0, 0, loop0);
+		assembleFragment(fragment1, u, begin_seg, loop1);
+		double sum = 0;
+		for (int i = 0; i < n; ++i)
+		{
+			for (int j = i + 1; j < n; ++j)
+			{
+				double dot = fabs(fragment0.col(i).dot(fragment1.col(j)));
+				sum += dot + 1.0 / dot - 2;
+			}
+		}
+		return 2.0 * sum / (n * (n - 1));
 	}
 
 	void LeastSquarePlane(Eigen::VectorXd xyz[3], double plane[4])
@@ -390,7 +592,6 @@ namespace LoopGen
 	double EvaluatePlanarity(Eigen::VectorXd xyz[3], double plane[4])
 	{
 		int n = xyz[0].size();
-		LeastSquarePlane(xyz, plane);
 		double sum = 0;
 		//double length = 0;
 		for (int i = 0; i < n; ++i)
@@ -403,11 +604,10 @@ namespace LoopGen
 		return sum / n;
 	}
 
-
 	void boundingXY(Eigen::Matrix3Xd& position, double bounding[4])
 	{
-		bounding[0] = DBL_MAX; bounding[1] = -DBL_MAX;
-		bounding[2] = DBL_MAX; bounding[3] = -DBL_MAX;
+		bounding[0] = YYSS_INFINITE; bounding[1] = -YYSS_INFINITE;
+		bounding[2] = YYSS_INFINITE; bounding[3] = -YYSS_INFINITE;
 		for (int i = 0; i < position.cols(); ++i)
 		{
 			double r = position(0, i);

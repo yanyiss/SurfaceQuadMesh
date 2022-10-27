@@ -687,7 +687,7 @@ void InteractiveViewerWidget::showLoop()
 #if 1
 	if (selectedVertex.empty())
 		return;
-	//selectedVertex.push_back(28957);
+	//selectedVertex.push_back(32943);
 	selectedVertex = { selectedVertex.back() };
 	selectedEdge.clear();
 	Eigen::VectorXd xyz[3];
