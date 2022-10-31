@@ -44,19 +44,24 @@ namespace LoopGen
 			std::vector<VertexHandle> loop;
 			PlaneLoop pl;
 			double plane[4];
-			double energy[2];
+			double energy;
 			bool operator>(const InfoOnVertex& right) const
 			{
-				return std::min(energy[0], energy[1]) > std::min(right.energy[0], right.energy[1]);
+				return energy > right.energy;
 			}
 		};
 		std::vector<double> eov;
+		std::vector<double> simi_e;
+		std::vector<InfoOnVertex> InfoOnMesh;
 		std::priority_queue<InfoOnVertex, std::vector<InfoOnVertex>, std::greater<InfoOnVertex>> pq;
+		//Eigen::Matrix3Xd loop0, loop1;
+		//Eigen::Matrix3Xd fragment0, fragment1;
 
 		//void InitializeAABBTREE();
 		void InitializeField();
 		void InitializeGraphWeight();
 		void InitializePQ();
+		void ConstructSubMesh(Mesh &submesh);
 
 		bool FieldAligned_PlanarLoop(VertexHandle v, std::vector<VertexHandle> &loop, int shift = 0);
 		double RefineLoop(std::vector<VertexHandle>& loop, PlaneLoop& planar_loop);

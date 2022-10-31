@@ -335,7 +335,7 @@ void InteractiveViewerWidget::pick_edge(int x,int y)
 	int desiredEdge = find_edge_using_selected_point();
 	if(desiredEdge < 0) return;
 	lastestEdge = desiredEdge;
-	printf("Select Edge : %d\n", desiredEdge);
+	dprint("Select Edge : %d\n", desiredEdge, "similarity energy:", lg->simi_e[desiredEdge]);
 	std::vector<int>::iterator it;
 	if( (it = std::find(selectedEdge.begin(),selectedEdge.end(),desiredEdge)) == selectedEdge.end() )
 	{
@@ -502,7 +502,7 @@ void InteractiveViewerWidget::draw_interactive_portion(int drawmode)
 		}
 	}
 	draw_field();
-	//draw_energy();
+	draw_energy();
 	//draw_plane();
 	draw_planeloop();
 	if(draw_new_mesh)
@@ -669,9 +669,9 @@ void InteractiveViewerWidget::showLoop()
 	{
 		loop_gen_init = true;
 		lg->InitializeGraphWeight();
-		//lg->InitializePQ();
+		lg->InitializePQ();
 
-		std::ifstream file_reader;
+		/*std::ifstream file_reader;
 		file_reader.open("..//resource//energy//vase.energy", std::ios::in);
 		char line[1024] = { 0 };
 		int row = 0; lg->eov.resize(mesh.n_vertices());
@@ -681,13 +681,22 @@ void InteractiveViewerWidget::showLoop()
 			num >> lg->eov[row];
 			++row;
 }
-		file_reader.close();
+		file_reader.close();*/
 
 	}
+
+	/*if (selectedVertex.empty())
+		return;
+	selectedVertex = { selectedVertex.back() };
+	plane_loop[0] = lg->InfoOnMesh[selectedVertex.back() * 2].pl;
+	plane_loop[1] = lg->InfoOnMesh[selectedVertex.back() * 2 + 1].pl;*/
+#if 0
 #if 1
 	if (selectedVertex.empty())
 		return;
-	//selectedVertex.push_back(32943);
+#else
+	selectedVertex.push_back(25613);
+#endif
 	selectedVertex = { selectedVertex.back() };
 	selectedEdge.clear();
 	Eigen::VectorXd xyz[3];
@@ -699,9 +708,14 @@ void InteractiveViewerWidget::showLoop()
 		}
 		lg->GetPositionFromLoop(loop, xyz);
 		if_draw_plane = true;
-		dprint(LoopGen::EvaluatePlanarity(xyz, plane0));
 		plane_loop[0].clear();
-		lg->RefineLoop(loop, plane_loop[0]);
+#if 1
+		dprint(lg->RefineLoop(loop, plane_loop[0]));
+#else
+		lg->GetPositionFromLoop(loop, xyz);
+		double plane[4];
+		LoopGen::LeastSquarePlane(xyz, plane0);
+#endif
 	}
 	if (lg->FieldAligned_PlanarLoop(mesh.vertex_handle(selectedVertex.back()), loop, 1))
 	{
@@ -711,9 +725,14 @@ void InteractiveViewerWidget::showLoop()
 		}
 		lg->GetPositionFromLoop(loop, xyz);
 		if_draw_plane = true;
-		dprint(LoopGen::EvaluatePlanarity(xyz, plane1));
 		plane_loop[1].clear();
-		lg->RefineLoop(loop, plane_loop[1]);
+#if 1
+		dprint(lg->RefineLoop(loop, plane_loop[1]));
+#else
+		lg->GetPositionFromLoop(loop, xyz);
+		double plane[4];
+		LoopGen::LeastSquarePlane(xyz, plane1);
+#endif
 	}
 	/*lg->FieldAligned_PlanarLoop(mesh.vertex_handle(29054), loop, 0);
 	for (int i = 0; i < loop.size() - 1; i += 2)
@@ -721,6 +740,8 @@ void InteractiveViewerWidget::showLoop()
 		selectedEdge.push_back(mesh.find_halfedge(mesh.vertex_handle(loop[i]), mesh.vertex_handle(loop[i + 1])).idx() / 2);
 	}*/
 #endif
+
+
 	updateGL();
 }
 
@@ -736,6 +757,7 @@ void InteractiveViewerWidget::showDebugTest()
 
 void InteractiveViewerWidget::draw_energy()
 {
+#if 0
 	double ie = DBL_MAX;
 	double ae = 0;
 	static bool ff = true;
@@ -754,8 +776,8 @@ void InteractiveViewerWidget::draw_energy()
 	}
 	if (loop_gen_init)
 	{
-		ie = 0.00028217;
-		ae = 0.290677;
+		ie = 0.00030153500000000002;
+		ae = 0.22753200000000001;
 		ll = 1.0 / (ae - ie);
 		//double c = 0;
 		/*glPointSize(5);
@@ -780,9 +802,18 @@ void InteractiveViewerWidget::draw_energy()
 		for (auto f : mesh.faces())
 		{
 			double c = 0; VertexHandle v[3];
-			auto fv = mesh.fv_begin(f); c += pow((lg->eov[fv->idx()] - ie) * ll, 0.4); v[0] = fv.handle();
-			++fv; c += pow((lg->eov[fv->idx()] - ie) * ll, 0.4); v[1] = fv.handle();
-			++fv; c += pow((lg->eov[fv->idx()] - ie) * ll, 0.4); v[2] = fv.handle();
+			auto fv = mesh.fv_begin(f); /*c += pow((lg->eov[fv->idx()] - ie) * ll, 0.4);*/ v[0] = fv.handle();
+			++fv; /*c += pow((lg->eov[fv->idx()] - ie) * ll, 0.4);*/ v[1] = fv.handle();
+			++fv; /*c += pow((lg->eov[fv->idx()] - ie) * ll, 0.4);*/ v[2] = fv.handle();
+			for (int i = 0; i < 3; ++i)
+			{
+				if (lg->eov[v[i].idx()] > 10e10)
+				{
+					c = 10e11;
+					break;
+				}
+				c += pow((lg->eov[v[i].idx()] - ie) * ll, 0.4);
+			}
 			if (c > 10e10)
 			{
 				glColor3d(0, 1, 0);
@@ -799,6 +830,30 @@ void InteractiveViewerWidget::draw_energy()
 			glEnd();
 		}
 	}
+#else
+	double max_e = 1;
+	double step_e =1.0/max_e;
+	if (loop_gen_init)
+	{
+		glLineWidth(10);
+		glBegin(GL_LINES);
+		for(int i=0;i<lg->simi_e.size();++i)
+		{
+			if (lg->simi_e[i] > max_e)
+				glColor3d(0, 1, 0);
+			else
+			{
+				double c = lg->simi_e[i] * step_e;
+				glColor3d(c, 0, 1 - c);
+			}
+			auto h = mesh.halfedge_handle(2 * i);
+			glVertex3dv(mesh.point(mesh.from_vertex_handle(h)).data());
+			glVertex3dv(mesh.point(mesh.to_vertex_handle(h)).data());
+		}
+		glEnd();
+	}
+
+#endif
 }
 
 void InteractiveViewerWidget::draw_plane()
@@ -824,6 +879,7 @@ void InteractiveViewerWidget::draw_plane()
 
 void InteractiveViewerWidget::draw_planeloop()
 {
+#if 1
 	glColor3d(0.1, 0.8, 0.3);
 	glBegin(GL_LINES);
 	for (int i = 0; i < 2; ++i)
@@ -835,10 +891,65 @@ void InteractiveViewerWidget::draw_planeloop()
 			auto& pl = plane_loop[i][j];
 			auto& ps = plane_loop[i][j + 1];
 			glVertex3dv(((1 - pl.c) * mesh.point(mesh.to_vertex_handle(pl.h)) + pl.c * mesh.point(mesh.from_vertex_handle(pl.h))).data());
-			glVertex3dv(((1 - ps.c) * mesh.point(mesh.to_vertex_handle(ps.h)) + ps.c * mesh.point(mesh.from_vertex_handle(ps.h))).data());
+			(((1 - ps.c) * mesh.point(mesh.to_vertex_handle(ps.h)) + ps.c * mesh.point(mesh.from_vertex_handle(ps.h))).data());
 		}
 	}
 	glEnd();
+#else
+	if (lg)
+	{
+		glColor3d(0.1, 0.8, 0.3);
+		glBegin(GL_LINES);
+		auto h = mesh.halfedge_handle(mesh.edges_begin().handle(), 0);
+		if (lg->InfoOnMesh.empty())
+			return;
+		/*plane_loop[0] = lg->InfoOnMesh[mesh.from_vertex_handle(h).idx() * 2].pl;
+		plane_loop[1] = lg->InfoOnMesh[mesh.to_vertex_handle(h).idx() * 2].pl;
+		for (int i = 0; i < 2; ++i)
+		{
+			if (plane_loop[i].empty())
+				continue;
+			for (int j = 0; j < plane_loop[i].size() - 1; ++j)
+			{
+				auto& pl = plane_loop[i][j];
+				auto& ps = plane_loop[i][j + 1];
+				glVertex3dv(((1 - pl.c) * mesh.point(mesh.to_vertex_handle(pl.h)) + pl.c * mesh.point(mesh.from_vertex_handle(pl.h))).data());
+				glVertex3dv(((1 - ps.c) * mesh.point(mesh.to_vertex_handle(ps.h)) + ps.c * mesh.point(mesh.from_vertex_handle(ps.h))).data());
+			}
+		}*/
+		/*for (int i = 0; i < lg->loop0.cols(); ++i)
+		{
+			glVertex3dv(lg->loop0.col(i).data());
+			glVertex3dv(lg->loop0.col((i + 1) % lg->loop0.cols()).data());
+		}
+		for (int i = 0; i < lg->loop1.cols(); ++i)
+		{
+			glVertex3dv(lg->loop1.col(i).data());
+			glVertex3dv(lg->loop1.col((i + 1) % lg->loop1.cols()).data());
+		}
+		glEnd();*/
+
+		glPointSize(8);
+		glBegin(GL_POINTS);
+		/*glColor3d(0.9, 0.9, 0.9);
+		glVertex3dv(lg->fragment0.col(0).data());
+		glVertex3dv(lg->fragment1.col(0).data());
+		glColor3d(0.1, 0.1, 0.9);
+		glVertex3dv(lg->fragment0.col(1).data());
+		glVertex3dv(lg->fragment1.col(1).data());*/
+		glColor3d(0.9, 0.1, 0.1);
+		for (int i = 0; i < lg->fragment0.cols(); ++i)
+		{
+			glVertex3dv(lg->fragment0.col(i).data());
+		}
+		for (int i = 0; i < lg->fragment1.cols(); ++i)
+		{
+			glVertex3dv(lg->fragment1.col(i).data());
+		}
+		glEnd();
+	}
+#endif
+
 }
 
 

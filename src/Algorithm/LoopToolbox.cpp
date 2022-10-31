@@ -2,6 +2,7 @@
 #include <Eigen\Cholesky>
 #include <omp.h>
 #define YYSS_INFINITE 10e12
+#define YYSS_FAIRLY_SMALL 1.0e-6
 namespace LoopGen
 {
 	bool LoopGen::FieldAligned_PlanarLoop(VertexHandle v, std::vector<VertexHandle>& loop, int shift)
@@ -207,7 +208,8 @@ namespace LoopGen
 	{
 		eov.resize(mesh->n_vertices(), YYSS_INFINITE);
 		timeRecorder tr;
-		std::vector<InfoOnVertex> InfoOnMesh(mesh->n_vertices() * 2);
+		InfoOnMesh.resize(mesh->n_vertices() * 2);
+#if 0
 #pragma omp parallel for
 		for (int i = 0; i < mesh->n_vertices(); ++i)
 		{
@@ -216,13 +218,66 @@ namespace LoopGen
 				InfoOnMesh[2 * i + j].v = mesh->vertex_handle(i);
 				if (FieldAligned_PlanarLoop(InfoOnMesh[2 * i + j].v, InfoOnMesh[2 * i + j].loop, j))
 				{
-					eov[i] = std::min(YYSS_INFINITE, RefineLoop(InfoOnMesh[2 * i + j].loop, InfoOnMesh[2 * i + j].pl));
+					eov[i] = std::min(eov[i], RefineLoop(InfoOnMesh[2 * i + j].loop, InfoOnMesh[2 * i + j].pl));
 				}
 				
 			}
 		}
 		tr.out("Time of Initializing Planar Loops on All Vertices:");
+#endif
 
+		/*std::ofstream file_writer;
+		file_writer.open("..//resource//energy//vase.energy");
+		if (file_writer.fail()) {
+			std::cout << "fail to open\n";
+		}
+		for (int i = 0; i < eov.size(); ++i)
+			file_writer << eov[i] << "\n";
+		file_writer.close();*/
+		/*std::ofstream file_writer;
+		file_writer.open("..//resource//plane loop//vase.pl");
+		if (file_writer.fail()) {
+			std::cout << "fail to open\n";
+		}
+		for (int i = 0; i < mesh->n_vertices(); ++i)
+		{
+			for (int j = 0; j < 2; ++j)
+			{
+				auto& pl = InfoOnMesh[2 * i + j].pl;
+				file_writer << pl.size() << "\n";
+				for (auto& plpl : pl)
+				{
+					file_writer << plpl.h.idx() << " " << plpl.c << "\n";
+				}
+			}
+		}
+		file_writer.close();*/
+
+
+		int nedges = mesh->n_edges();
+#if 0
+		std::ifstream file_reader;
+		file_reader.open("..//resource//plane loop//vase.pl", std::ios::in);
+		char line[1024] = { 0 };
+		int nn;
+		int ii = 0;
+		while (file_reader.getline(line, sizeof(line)))
+		{
+			std::stringstream num(line);
+			num >> nn;
+			int i = 0;
+			InfoOnMesh[ii].pl.reserve(nn);
+			while (i < nn && file_reader.getline(line, sizeof(line)))
+			{
+				std::stringstream poh(line);
+				int hid; double c;
+				poh >> hid >> c;
+				InfoOnMesh[ii].pl.emplace_back(mesh->halfedge_handle(hid), c);
+				++i;
+			}
+			++ii;
+		}
+		file_reader.close();
 		//
 		auto& matching = cf->getMatching();
 		for (auto eitr = mesh->edges_begin(); eitr != mesh->edges_end(); ++eitr)
@@ -232,6 +287,7 @@ namespace LoopGen
 			auto fromvert = mesh->from_vertex_handle(h);
 			auto tovert = mesh->to_vertex_handle(h);
 			auto ht = mesh->voh_begin(fromvert).handle();
+			//逆时针搜索
 			while (ht.idx() != h.idx())
 			{
 				ht = mesh->opposite_halfedge_handle(mesh->prev_halfedge_handle(ht));
@@ -284,7 +340,7 @@ namespace LoopGen
 			{
 				for (auto itr = pl.begin(); itr != pl.end(); ++itr)
 				{
-					auto pos = mesh->point(mesh->from_vertex_handle(itr->h)) * (1 - itr->c) + mesh->point(mesh->to_vertex_handle(itr->h)) * itr->c;
+					auto pos = mesh->point(mesh->to_vertex_handle(itr->h)) * (1 - itr->c) + mesh->point(mesh->from_vertex_handle(itr->h)) * itr->c;
 					loop.col(++c) << pos[0], pos[1], pos[2];
 				}
 			}
@@ -292,21 +348,40 @@ namespace LoopGen
 			{
 				for (auto itr = pl.rbegin(); itr != pl.rend(); ++itr)
 				{
-					auto pos = mesh->point(mesh->from_vertex_handle(itr->h)) * (1 - itr->c) + mesh->point(mesh->to_vertex_handle(itr->h)) * itr->c;
+					auto pos = mesh->point(mesh->to_vertex_handle(itr->h)) * (1 - itr->c) + mesh->point(mesh->from_vertex_handle(itr->h)) * itr->c;
 					loop.col(++c) << pos[0], pos[1], pos[2];
 				}
 			}
 		};
-		for (auto eitr = mesh->edges_begin(); eitr != mesh->edges_end(); ++eitr)
+
+		//std::vector<double> simi_energy(nedges, YYSS_INFINITE);
+		simi_e.resize(nedges, YYSS_INFINITE);
+		tr.tog();
+#pragma omp parallel for
+		//for (auto eitr = mesh->edges_begin(); eitr != mesh->edges_end(); ++eitr)
+		for (int k = 0; k < nedges; ++k)
+		//int k = 39489;
 		{
-			auto h = mesh->halfedge_handle(eitr.handle(), 0);
+			if (k == 49)
+			{
+				int p = 0;
+			}
+			auto h = mesh->halfedge_handle(k * 2);
 			auto fromvert = mesh->from_vertex_handle(h);
 			auto tovert = mesh->to_vertex_handle(h);
 			for (int i = 0; i < 2; ++i)
 			{
-				auto& fl = InfoOnMesh[2 * fromvert.idx() + i];
+				auto& fl = InfoOnMesh[2 * fromvert.idx() + i]; 
+				//dprint(fl.mark.find(&InfoOnMesh[2 * tovert.idx() + i]) != fl.mark.end());
 				auto& tl = fl.mark.find(&InfoOnMesh[2 * tovert.idx() + i]) != fl.mark.end() ?
 					InfoOnMesh[2 * tovert.idx() + i] : InfoOnMesh[2 * tovert.idx() + ((i + 1) % 2)];
+				if (fl.pl.empty() || tl.pl.empty())
+				{
+					simi_e[k] = std::min(YYSS_INFINITE, simi_e[k]);
+					//dprint(k, i, "similarity energy:", YYSS_INFINITE);
+					continue;
+				}
+
 				int flag = fl.mark[&tl];
 
 				Eigen::Matrix3Xd loop0, loop1;
@@ -325,7 +400,7 @@ namespace LoopGen
 					if (dot0 > 0 && dot1 < 0)
 					{
 						id = j;
-						u0 = dot1 / (dot0 + dot1) * pos0.norm();
+						u0 = dot0 / (dot0 - dot1) * pos0.norm();
 						break;
 					}
 					pos0 = loop1.col((cols - j) % cols) - loop1.col(cols - j - 1);
@@ -334,28 +409,62 @@ namespace LoopGen
 					if (dot0 > 0 && dot1 < 0)
 					{
 						id = cols - j - 1;
-						u0 = dot1 / (dot0 + dot1) * pos0.norm();
+						u0 = dot0 / (dot0 - dot1) * pos0.norm();
 						break;
 					}
 				}
 				if (id == -1)
 					id = 0;
-				double e = EvaluateSimilarity(loop0, loop1, id, u0);
+				double e = EvaluateSimilarity(loop0, loop1, u0, id);
+				simi_e[k] = std::min(e, simi_e[k]);
+				//dprint(k, i, "similarity energy:", e);
 			}
 		}
-
+		tr.out();
 		std::ofstream file_writer;
-		file_writer.open("..//resource//energy//vase.energy");
+		file_writer.open("..//resource//energy//vase_sim.energy");
 		if (file_writer.fail()) {
 			std::cout << "fail to open\n";
 		}
-		for (auto e : eov)
+		for (auto e : simi_e)
 			file_writer << e << "\n";
 		file_writer.close();
+#else
+		simi_e.resize(nedges);
+		std::ifstream file_reader;
+		file_reader.open("..//resource//energy//vase_sim.energy", std::ios::in);
+		int ii = 0;
+		char line[1024] = { 0 };
+		while (file_reader.getline(line, sizeof(line)))
+		{
+			std::stringstream num(line);
+			num >> simi_e[ii];
+			++ii;
+		}
+		file_reader.close();
+#endif
+
+		/*for (auto& iov : InfoOnMesh)
+		{
+			iov.energy = YYSS_INFINITE;
+		}
+		for (int i = 0; i < 2 * nedges; ++i)
+		{
+			auto h = mesh->halfedge_handle(i * 2);
+			InfoOnMesh[mesh->from_vertex_handle(h).idx()].energy = std::min(simi_e[i], InfoOnMesh[mesh->from_vertex_handle(h).idx()].energy);
+			InfoOnMesh[mesh->to_vertex_handle(h).idx()].energy = std::min(simi_e[i], InfoOnMesh[mesh->to_vertex_handle(h).idx()].energy);
+		}*/
+		
+	}
+
+	void LoopGen::ConstructSubMesh(Mesh& submesh)
+	{
+
 	}
 
 	double LoopGen::RefineLoop(std::vector<VertexHandle>& loop, PlaneLoop& planar_loop)
 	{
+		planar_loop.clear();
 		Eigen::VectorXd xyz[3];
 		GetPositionFromLoop(loop, xyz);
 		double plane[4];
@@ -370,7 +479,7 @@ namespace LoopGen
 		auto hitr = mesh->voh_begin(loop[0]);
 		auto s0 = dis(mesh->point(mesh->to_vertex_handle(mesh->next_halfedge_handle(hitr.handle()))));
 		double distance[2];
-		PointOnHalfedge poh[2]; int id = 0;
+		PointOnHalfedge poh[2]; int id[2] = { 0, 0 };
 		for (; hitr != mesh->voh_end(loop[0]); ++hitr)
 		{
 			auto s1 = dis(mesh->point(mesh->to_vertex_handle(hitr.handle())));
@@ -383,20 +492,21 @@ namespace LoopGen
 					poh[0].h = mesh->next_halfedge_handle(hitr.handle());
 					poh[0].c = s0 / (s0 - s1);
 					distance[0] = s0; distance[1] = s1;
+					++id[0];
 				}
 				else
 				{
 					poh[1].h = mesh->opposite_halfedge_handle(mesh->next_halfedge_handle(hitr.handle()));
 					poh[1].c = s1 / (s1 - s0);
+					++id[1];
 				}
-				++id;
 			}
 			s0 = s1;
 		}
-		if (id != 2)
+		if (id[0] != 1|| id[1] != 1)
 		{
-			dprint("error out");
-			system("pause");
+			dprint("error in repairing loop:", loop[0].idx());
+			return YYSS_INFINITE;
 		}
 
 		//检查出发点到poh[0]的方向与搜索loop的方向是否相同，若不相同，则调换poh[0]和poh[1]
@@ -426,7 +536,6 @@ namespace LoopGen
 			}
 		}
 
-		planar_loop.clear();
 		planar_loop.push_back(poh[0]);
 		auto h = poh[0].h;
 		while (h.idx() != poh[1].h.idx())
@@ -443,7 +552,9 @@ namespace LoopGen
 				distance[1] = s;
 			}
 			planar_loop.emplace_back(h, distance[0] / (distance[0] - distance[1]));
-			//dprint(h.idx(),h.idx()/2);
+			/*dprint(h.idx(),h.idx()/2);
+			if (h.idx() == 17413)
+				break;*/
 		}
 		return EvaluatePlanarity(xyz, plane);
 	}
@@ -495,51 +606,64 @@ namespace LoopGen
 	double LoopGen::EvaluateSimilarity(Eigen::Matrix3Xd& loop0, Eigen::Matrix3Xd& loop1, double u, int begin_seg)
 	{
 		//对两个loop重新采样，对比采样点的切向，从而定义相似性
-		int n = loop0.size() + loop1.size();
-		auto loopLength = [&](Eigen::Matrix3Xd& loop, Eigen::Vector3d &seg, int mark)
+		int n = loop0.cols() + loop1.cols();
+		auto loopLength = [&](Eigen::Matrix3Xd& loop, Eigen::VectorXd &seg, int mark)
 		{
 			int cols = loop.cols();
-			seg(0) = (loop.col((mark + 1) % cols) - loop.col(mark % cols)).norm();
-			for (int i = 1; i < cols; ++i)
+			double sum = 0;
+			for (int i = 0; i < cols; ++i)
 			{
-				seg(i % cols) = seg((i - 1) % cols) + (loop.col((mark + i + 1) % cols) - loop.col((mark + i) % cols)).norm();
+				seg(i) = (loop.col((mark + i + 1) % cols) - loop.col((mark + i) % cols)).norm();
+				sum += seg(i);
 			}
-			return seg(cols - 1);
+			return sum;
 		};
-		auto assembleFragment = [&](Eigen::Matrix3Xd& fragment, double u, int mark, Eigen::Matrix3Xd &loop)
+		auto assembleFragment = [&](Eigen::Matrix3Xd& fragment, double u0, int mark, Eigen::Matrix3Xd &loop)
 		{
-			int size = loop.size();
-			Eigen::Vector3d seg(size);
+			int cols = loop.cols();
+			Eigen::VectorXd seg(cols);
 			double step = loopLength(loop, seg, mark) / n;
-			Eigen::Vector3d vec = (loop.col((mark + 1) % size) - loop.col(mark % size)).normalized();
-			fragment.col(0) = vec;
-			//Eigen::Vector3d start_pos = u * vec + loop.col(mark % size);
+			Eigen::Vector3d vec = (loop.col((mark + 1) % cols) - loop.col(mark % cols)).normalized();
+			//fragment.col(0) = vec;
+			fragment.col(0) = loop.col(mark % cols) + u0 * vec;
 			int r = 0;
+			double l = seg(0);
 			for (int i = 1; i < n; ++i)
 			{
-				u += step;
-				if (u > seg(r))
+				u0 += step;
+				if (u0 > l)
 				{
-					++r; ++mark;
-					vec = (loop.col((mark + 1) % size) - loop.col(mark % size)).normalized();
+					while (u0 > l)
+					{
+						++r; ++mark;
+						l += seg(r % cols);
+					}
+					vec = (loop.col((mark + 1) % cols) - loop.col(mark % cols)).normalized();
 				}
-				fragment.col(i) = vec;
+				//fragment.col(i) = vec;
+				fragment.col(i) = loop.col((mark + 1) % cols) + (u0 - l) * vec;
 			}
 		};
 
 		Eigen::Matrix3Xd fragment0(3, n), fragment1(3, n);
+		//fragment0.resize(3, n); fragment1.resize(3, n);
 		assembleFragment(fragment0, 0, 0, loop0);
 		assembleFragment(fragment1, u, begin_seg, loop1);
 		double sum = 0;
+		double dot = 0;
 		for (int i = 0; i < n; ++i)
 		{
 			for (int j = i + 1; j < n; ++j)
 			{
-				double dot = fabs(fragment0.col(i).dot(fragment1.col(j)));
-				sum += dot + 1.0 / dot - 2;
+				dot = fabs(fragment0.col(i).dot(fragment0.col(j)))/(fabs((fragment1.col(i).dot(fragment1.col(j)))) + YYSS_FAIRLY_SMALL);
+				sum += std::min(100.0, dot + 1.0 / (dot + YYSS_FAIRLY_SMALL) - 2);
+				//dprint(i, j, fabs(fragment0.col(i).dot(fragment0.col(j))), fabs((fragment1.col(i).dot(fragment1.col(j)))), dot, dot + 1.0 / (dot + YYSS_FAIRLY_SMALL) - 2);
+				//dot = fragment0.col(i).dot(fragment0.col(j)) - fragment1.col(i).dot(fragment1.col(j));
+				//sum += dot * dot;
 			}
 		}
 		return 2.0 * sum / (n * (n - 1));
+		//return 0;
 	}
 
 	void LeastSquarePlane(Eigen::VectorXd xyz[3], double plane[4])
