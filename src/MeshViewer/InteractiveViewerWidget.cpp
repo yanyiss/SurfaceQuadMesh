@@ -300,7 +300,8 @@ void InteractiveViewerWidget::pick_vertex(int x,int y)
 {
 	int r = find_vertex_using_selected_point();
 	lastestVertex = r;
-	printf("Select Vertex : %d\n", r);
+	//printf("Select Vertex : %d\n", r);
+	dprint("Select Vertex:", r, mesh.voh_begin(mesh.vertex_handle(r)).handle().idx() / 2);
 	std::vector<int>::iterator it;
 	if( (it = std::find(selectedVertex.begin(),selectedVertex.end(), r)) == selectedVertex.end() )
 	{
@@ -335,7 +336,10 @@ void InteractiveViewerWidget::pick_edge(int x,int y)
 	int desiredEdge = find_edge_using_selected_point();
 	if(desiredEdge < 0) return;
 	lastestEdge = desiredEdge;
-	dprint("Select Edge : %d\n", desiredEdge, "similarity energy:", lg->simi_e[desiredEdge]);
+	if(lg->simi_e.empty())
+		dprint("Select Edge :", desiredEdge);// , "similarity energy:", std::min(lg->simi_e[desiredEdge * 2], lg->simi_e[desiredEdge * 2 + 1]));
+	else
+		dprint("Select Edge :", desiredEdge, "similarity energy:", std::min(lg->simi_e[desiredEdge * 2], lg->simi_e[desiredEdge * 2 + 1]));
 	std::vector<int>::iterator it;
 	if( (it = std::find(selectedEdge.begin(),selectedEdge.end(),desiredEdge)) == selectedEdge.end() )
 	{
@@ -597,10 +601,11 @@ void InteractiveViewerWidget::draw_field()
 		glLineWidth(1);
 		glColor3d(0.9, 0.1, 0.1);
 		glBegin(GL_LINES);
-		for (int i = 0; i < crossfield.cols(); i += 2)
+		for (int i = 0; i < crossfield.cols(); i += 4)
 		{
-			glVertex3dv(crossfield.col(i).data());
-			glVertex3dv(crossfield.col(i + 1).data());
+			Eigen::Vector3d dd = (crossfield.col(i) + crossfield.col(i + 1)) * 0.5;
+			glVertex3dv(dd.data());
+			glVertex3dv(crossfield.col(i ).data());
 		}
 		glEnd();
 	}
@@ -652,7 +657,7 @@ void InteractiveViewerWidget::showField()
 			crossfield.col(i + 3) = vc + crossfield.col(i + 3) * avgLen;
 		}
 	}
-	//if_draw_field = !if_draw_field;
+	if_draw_field = !if_draw_field;
 	setDrawMode(InteractiveViewerWidget::SOLID_FLAT);
 	setMouseMode(InteractiveViewerWidget::TRANS);
 }
@@ -690,19 +695,19 @@ void InteractiveViewerWidget::showLoop()
 	selectedVertex = { selectedVertex.back() };
 	plane_loop[0] = lg->InfoOnMesh[selectedVertex.back() * 2].pl;
 	plane_loop[1] = lg->InfoOnMesh[selectedVertex.back() * 2 + 1].pl;*/
-#if 0
+#if 1
 #if 1
 	if (selectedVertex.empty())
 		return;
 #else
-	selectedVertex.push_back(25613);
+	selectedVertex.push_back(18442);
 #endif
 	selectedVertex = { selectedVertex.back() };
 	selectedEdge.clear();
 	Eigen::VectorXd xyz[3];
 	if (lg->FieldAligned_PlanarLoop(mesh.vertex_handle(selectedVertex.back()), loop, 0))
 	{
-		for (int i = 0; i < loop.size() - 1; ++i)
+		for (int i = 0; i < loop.size() - 5; ++i)
 		{
 			selectedEdge.push_back(mesh.find_halfedge(loop[i], loop[i + 1]).idx() / 2);
 		}
@@ -710,7 +715,7 @@ void InteractiveViewerWidget::showLoop()
 		if_draw_plane = true;
 		plane_loop[0].clear();
 #if 1
-		dprint(lg->RefineLoop(loop, plane_loop[0]));
+		dprint(lg->RefineLoop(loop, plane_loop[0], 0));
 #else
 		lg->GetPositionFromLoop(loop, xyz);
 		double plane[4];
@@ -719,7 +724,7 @@ void InteractiveViewerWidget::showLoop()
 	}
 	if (lg->FieldAligned_PlanarLoop(mesh.vertex_handle(selectedVertex.back()), loop, 1))
 	{
-		for (int i = 0; i < loop.size() - 1; ++i)
+		for (int i = 0; i < loop.size() - 5; ++i)
 		{
 			selectedEdge.push_back(mesh.find_halfedge(loop[i], loop[i + 1]).idx() / 2);
 		}
@@ -727,7 +732,7 @@ void InteractiveViewerWidget::showLoop()
 		if_draw_plane = true;
 		plane_loop[1].clear();
 #if 1
-		dprint(lg->RefineLoop(loop, plane_loop[1]));
+		dprint(lg->RefineLoop(loop, plane_loop[1], 1));
 #else
 		lg->GetPositionFromLoop(loop, xyz);
 		double plane[4];
@@ -831,19 +836,20 @@ void InteractiveViewerWidget::draw_energy()
 		}
 	}
 #else
-	double max_e = 1;
+	double max_e = 2;
 	double step_e =1.0/max_e;
 	if (loop_gen_init)
 	{
 		glLineWidth(10);
 		glBegin(GL_LINES);
-		for(int i=0;i<lg->simi_e.size();++i)
+		for(int i=0;i<lg->simi_e.size()/2;++i)
 		{
-			if (lg->simi_e[i] > max_e)
+			double t = std::min(lg->simi_e[2 * i], lg->simi_e[2 * i + 1]);
+			if (t > max_e)
 				glColor3d(0, 1, 0);
 			else
 			{
-				double c = lg->simi_e[i] * step_e;
+				double c = t * step_e;
 				glColor3d(c, 0, 1 - c);
 			}
 			auto h = mesh.halfedge_handle(2 * i);
@@ -891,19 +897,18 @@ void InteractiveViewerWidget::draw_planeloop()
 			auto& pl = plane_loop[i][j];
 			auto& ps = plane_loop[i][j + 1];
 			glVertex3dv(((1 - pl.c) * mesh.point(mesh.to_vertex_handle(pl.h)) + pl.c * mesh.point(mesh.from_vertex_handle(pl.h))).data());
-			(((1 - ps.c) * mesh.point(mesh.to_vertex_handle(ps.h)) + ps.c * mesh.point(mesh.from_vertex_handle(ps.h))).data());
+			glVertex3dv(((1 - ps.c) * mesh.point(mesh.to_vertex_handle(ps.h)) + ps.c * mesh.point(mesh.from_vertex_handle(ps.h))).data());
 		}
 	}
 	glEnd();
 #else
 	if (lg)
 	{
-		glColor3d(0.1, 0.8, 0.3);
-		glBegin(GL_LINES);
 		auto h = mesh.halfedge_handle(mesh.edges_begin().handle(), 0);
 		if (lg->InfoOnMesh.empty())
 			return;
-		/*plane_loop[0] = lg->InfoOnMesh[mesh.from_vertex_handle(h).idx() * 2].pl;
+		
+		plane_loop[0] = lg->InfoOnMesh[mesh.from_vertex_handle(h).idx() * 2].pl;
 		plane_loop[1] = lg->InfoOnMesh[mesh.to_vertex_handle(h).idx() * 2].pl;
 		for (int i = 0; i < 2; ++i)
 		{
@@ -916,8 +921,10 @@ void InteractiveViewerWidget::draw_planeloop()
 				glVertex3dv(((1 - pl.c) * mesh.point(mesh.to_vertex_handle(pl.h)) + pl.c * mesh.point(mesh.from_vertex_handle(pl.h))).data());
 				glVertex3dv(((1 - ps.c) * mesh.point(mesh.to_vertex_handle(ps.h)) + ps.c * mesh.point(mesh.from_vertex_handle(ps.h))).data());
 			}
-		}*/
-		/*for (int i = 0; i < lg->loop0.cols(); ++i)
+		}
+		/*glColor3d(0.1, 0.8, 0.3);
+		glBegin(GL_LINES);
+		for (int i = 0; i < lg->loop0.cols(); ++i)
 		{
 			glVertex3dv(lg->loop0.col(i).data());
 			glVertex3dv(lg->loop0.col((i + 1) % lg->loop0.cols()).data());
@@ -929,24 +936,24 @@ void InteractiveViewerWidget::draw_planeloop()
 		}
 		glEnd();*/
 
-		glPointSize(8);
+		/*glPointSize(15);
 		glBegin(GL_POINTS);
-		/*glColor3d(0.9, 0.9, 0.9);
+		glColor3d(0.9, 0.9, 0.9);
 		glVertex3dv(lg->fragment0.col(0).data());
 		glVertex3dv(lg->fragment1.col(0).data());
 		glColor3d(0.1, 0.1, 0.9);
 		glVertex3dv(lg->fragment0.col(1).data());
-		glVertex3dv(lg->fragment1.col(1).data());*/
+		glVertex3dv(lg->fragment1.col(1).data());
 		glColor3d(0.9, 0.1, 0.1);
-		for (int i = 0; i < lg->fragment0.cols(); ++i)
+		for (int i = 2; i < lg->fragment0.cols()-3; ++i)
 		{
 			glVertex3dv(lg->fragment0.col(i).data());
 		}
-		for (int i = 0; i < lg->fragment1.cols(); ++i)
+		for (int i = 2; i < lg->fragment1.cols()-3; ++i)
 		{
 			glVertex3dv(lg->fragment1.col(i).data());
 		}
-		glEnd();
+		glEnd();*/
 	}
 #endif
 

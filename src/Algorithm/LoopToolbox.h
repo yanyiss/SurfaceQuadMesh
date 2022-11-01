@@ -64,7 +64,7 @@ namespace LoopGen
 		void ConstructSubMesh(Mesh &submesh);
 
 		bool FieldAligned_PlanarLoop(VertexHandle v, std::vector<VertexHandle> &loop, int shift = 0);
-		double RefineLoop(std::vector<VertexHandle>& loop, PlaneLoop& planar_loop);
+		double RefineLoop(std::vector<VertexHandle>& loop, PlaneLoop& planar_loop, int shift);
 		double ComputeAdjVertexSimilarity(InfoOnVertex& iov0, InfoOnVertex& iov1);
 
 		void GetPositionFromLoop(const std::vector<VertexHandle>& loop, Eigen::VectorXd xyz[3]);
