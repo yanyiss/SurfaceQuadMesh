@@ -69,6 +69,14 @@ void MainViewerWidget::open_mesh_gui(QString fname)
 		LoadMeshSuccess = true;
 		MeshViewer->setDrawMode(InteractiveViewerWidget::FLAT_POINTS);
 		MeshViewer->setMouseMode(InteractiveViewerWidget::TRANS);
+		MeshViewer->file_name = fname.toLatin1().data();
+		if (MeshViewer->lg) { delete MeshViewer->lg; MeshViewer->lg = nullptr; }
+		MeshViewer->if_has_field = false;
+		MeshViewer->loop_gen_init = false;
+		MeshViewer->if_draw_field = false;
+		MeshViewer->if_draw_energy = false;
+		MeshViewer->plane_loop[0].clear();
+		MeshViewer->plane_loop[1].clear();
 		if(LoadMeshSuccess)
 		{
 			SetMeshForALL();

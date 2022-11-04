@@ -29,7 +29,7 @@ public:
 		calculateMeshFaceBase(); 
 		runPolynomial();
 	};
-	crossField(std::string filename);
+	crossField(std::string& field_file);
 	crossField(const crossField& cf) = delete;
 	~crossField() {};
 
@@ -44,7 +44,7 @@ public:
 	void setSingularity();
 	void setNormal();
 
-	void write_field();
+	void write_field(std::string &field_file);
 
 	const std::vector<int>& getConstraintFace() { return constraintId; }
 	const Eigen::Matrix3Xd& getCrossField() { return crossfield; }

@@ -1,7 +1,7 @@
 #include "LoopToolbox.h"
 #include <Eigen\Cholesky>
 #include <omp.h>
-#define YYSS_INFINITE 10e12
+#define YYSS_INFINITE 1.0e12
 #define YYSS_FAIRLY_SMALL 1.0e-6
 namespace LoopGen
 {
@@ -41,7 +41,7 @@ namespace LoopGen
 		{
 			int fid = mesh->face_handle(voh.handle()).idx();
 			plane_normal += crossfield.col(4 * fid + shift + 1);
-			if (weight(shift, voh->idx()) < 2)
+			if (weight(shift, voh->idx()) < YYSS_INFINITE)
 			{
 				int toid = mesh->to_vertex_handle(voh.handle()).idx();
 				distance[toid] = weight(shift, voh->idx());
@@ -77,13 +77,13 @@ namespace LoopGen
 			shift = vert.shift;
 			for (int i = 0; i < valence; ++i)
 			{
-				double w = weight(shift, voh.idx()); w *= w;
-				if (w < 2)
+				double w = weight(shift, voh.idx());// w *= w;
+				if (w < YYSS_INFINITE)
 				{
 					int toid = mesh->to_vertex_handle(voh).idx();
 					//double dot_ = (position.col(toid) - position.col(fromid)).normalized().dot(plane_normal); dot_ *= dot_;
 					//w = sqrt(w + dot_);
-					w = sqrt(w * 900 + 1 - w);
+					//w = sqrt(w * 900 + 1 - w);
 					if (distance[fromid] + w < distance[toid])
 					{
 						distance[toid] = distance[fromid] + w;
@@ -126,15 +126,28 @@ namespace LoopGen
 
 	void LoopGen::InitializeField()
 	{
-#if 0
-		cf = new crossField(mesh);
+#if 1
+		std::ifstream file_reader;
+		std::string field_file = "../resource//field//" + model_name + ".field";
+		file_reader.open(field_file, std::ios::in);
+		if (file_reader.good())
+		{
+			file_reader.close();
+			cf = new crossField(field_file);
+		}
+		else
+		{
+			file_reader.close();
+			cf = new crossField(mesh);
+			cf->write_field(field_file);
+		}
 #else
-		cf = new crossField("..//resource//field//vase.field");
+		cf = new crossField(mesh);
 #endif
 		dprint("Initialize Field Done!");
 	}
 
-	void LoopGen::InitializeGraphWeight()
+	void LoopGen::InitializeGraphWeight(double alpha)
 	{
 		auto& crossfield = cf->getCrossField();
 		auto& matching = cf->getMatching();
@@ -175,9 +188,15 @@ namespace LoopGen
 			}*/
 
 			if (s < c)
+			{
+				s = sqrt(alpha * s * s + 1);
 				c = YYSS_INFINITE;
+			}
 			else
+			{
 				s = YYSS_INFINITE;
+				c = sqrt(alpha * c * c + 1);
+			}
 			if (arc >= 0 && arc < halfPI)
 				w0 << s, YYSS_INFINITE, YYSS_INFINITE, c;
 			else if (arc >= halfPI && arc < PI)
@@ -215,91 +234,32 @@ namespace LoopGen
 		char line[1024] = { 0 };
 		int ii = 0;
 		InfoOnMesh.resize(mesh->n_vertices() * 2);
-#if 0
-#pragma omp parallel for
-		for (int i = 0; i < mesh->n_vertices(); ++i)
+		int nedges = mesh->n_edges();
+
+		tr.tog();
+		if (!ReadPlaneLoop(InfoOnMesh, model_name, mesh))
 		{
-			for (int j = 0; j < 2; ++j)
+#pragma omp parallel for
+			for (int i = 0; i < mesh->n_vertices(); ++i)
 			{
-				InfoOnMesh[2 * i + j].v = mesh->vertex_handle(i);
-				if (FieldAligned_PlanarLoop(InfoOnMesh[2 * i + j].v, InfoOnMesh[2 * i + j].loop, j))
+				for (int j = 0; j < 2; ++j)
 				{
-					eov[i] = std::min(eov[i], RefineLoop(InfoOnMesh[2 * i + j].loop, InfoOnMesh[2 * i + j].pl, j));
+					InfoOnMesh[2 * i + j].v = mesh->vertex_handle(i);
+					if (FieldAligned_PlanarLoop(InfoOnMesh[2 * i + j].v, InfoOnMesh[2 * i + j].loop, j))
+					{
+						eov[i] = std::min(eov[i], RefineLoop(InfoOnMesh[2 * i + j].loop, InfoOnMesh[2 * i + j].pl, j));
+					}
+
 				}
-				
 			}
+			WritePlaneLoop(InfoOnMesh, model_name, mesh);
 		}
 		tr.out("Time of Initializing Planar Loops on All Vertices:");
 
-		file_writer.open("..//resource//plane loop//vase.pl");
-		if (file_writer.fail()) {
-			std::cout << "fail to open\n";
-		}
-		for (int i = 0; i < mesh->n_vertices(); ++i)
-		{
-			for (int j = 0; j < 2; ++j)
-			{
-				auto& pl = InfoOnMesh[2 * i + j].pl;
-				file_writer << pl.size() << "\n";
-				for (auto& plpl : pl)
-				{
-					file_writer << plpl.h.idx() << " " << plpl.c << "\n";
-				}
-			}
-		}
-		file_writer.close();
-#endif
-
-		/*std::ofstream file_writer;
-		file_writer.open("..//resource//energy//vase.energy");
-		if (file_writer.fail()) {
-			std::cout << "fail to open\n";
-		}
-		for (int i = 0; i < eov.size(); ++i)
-			file_writer << eov[i] << "\n";
-		file_writer.close();*/
-		/*InfoOnMesh[2 * 27414+1].v = mesh->vertex_handle(27414);
-		if (FieldAligned_PlanarLoop(InfoOnMesh[2 * 27414 + 1].v, InfoOnMesh[2 * 27414 + 1].loop, 1))
-		{
-			RefineLoop(InfoOnMesh[2 * 27414 + 1].loop, InfoOnMesh[2 * 27414 + 1].pl, 1);
-		}
-		InfoOnMesh[2 * 19196].v = mesh->vertex_handle(19196);
-		if (FieldAligned_PlanarLoop(InfoOnMesh[2 * 19196].v, InfoOnMesh[2 * 19196].loop, 0))
-		{
-			RefineLoop(InfoOnMesh[2 * 19196].loop, InfoOnMesh[2 * 19196].pl, 0);
-		}*/
-		int nedges = mesh->n_edges();
-#if 0
-		file_reader.open("..//resource//plane loop//vase.pl", std::ios::in);
-		int nn;
-		while (file_reader.getline(line, sizeof(line)))
-		{
-			std::stringstream num(line);
-			num >> nn;
-			int i = 0;
-			InfoOnMesh[ii].pl.clear();
-			InfoOnMesh[ii].pl.reserve(nn);
-			while (i < nn)
-			{
-				file_reader.getline(line, sizeof(line));
-				std::stringstream poh(line);
-				int hid; double c;
-				poh >> hid >> c;
-				InfoOnMesh[ii].pl.emplace_back(mesh->halfedge_handle(hid), c);
-				++i;
-			}
-			++ii;
-		}
-		file_reader.close();
-		//
 		auto& matching = cf->getMatching();
 		for (auto eitr = mesh->edges_begin(); eitr != mesh->edges_end(); ++eitr)
 		{
 			int index = 0;
-			if (eitr->idx() == 11241)
-			{
-				int p = 1;
-			}
 			auto h = mesh->halfedge_handle(eitr.handle(), 0);
 			auto fromvert = mesh->from_vertex_handle(h);
 			auto tovert = mesh->to_vertex_handle(h);
@@ -347,7 +307,8 @@ namespace LoopGen
 				break;
 			}
 		}
-#endif
+		dprint("plane loop set done");
+
 		auto assembleLoop = [&](Vec3d &start, PlaneLoop &pl, bool if_forward, Eigen::Matrix3Xd & loop)
 		{
 			loop.resize(3, 1 + pl.size());
@@ -371,121 +332,224 @@ namespace LoopGen
 			}
 		};
 
-#if 0
-		//std::vector<double> simi_energy(nedges, YYSS_INFINITE);
-		simi_e.resize(2 * nedges, YYSS_INFINITE);
+		tr.tog();
+		similarity_energy.resize(2 * nedges, YYSS_INFINITE);
+		if (!ReadEnergy(similarity_energy, model_name))
+		{
+#pragma omp parallel for
+			for (int k = 0; k < nedges; ++k)
+			{
+				auto h = mesh->halfedge_handle(k * 2);
+				auto fromvert = mesh->from_vertex_handle(h);
+				auto tovert = mesh->to_vertex_handle(h);
+				for (int i = 0; i < 2; ++i)
+				{
+					auto& fl = InfoOnMesh[2 * fromvert.idx() + i];
+					//dprint(fl.mark.find(&InfoOnMesh[2 * tovert.idx() + i]) != fl.mark.end());
+					auto& tl = fl.mark.find(&InfoOnMesh[2 * tovert.idx() + i]) != fl.mark.end() ?
+						InfoOnMesh[2 * tovert.idx() + i] : InfoOnMesh[2 * tovert.idx() + ((i + 1) % 2)];
+					if (fl.pl.empty() || tl.pl.empty())
+					{
+						similarity_energy[2 * k + i] = YYSS_INFINITE;
+						continue;
+					}
+
+					int flag = fl.mark[&tl];
+					Eigen::Matrix3Xd loop0, loop1;
+					assembleLoop(mesh->point(fromvert), fl.pl, true, loop0);
+					assembleLoop(mesh->point(tovert), tl.pl, !flag, loop1);
+
+					auto& proj_pos = loop0.col(0);
+					int id = -1;
+					int cols = loop1.cols();
+					double u0 = 0;
+					for (int j = 0; j < 2; ++j)
+					{
+						Eigen::Vector3d pos0 = loop1.col(j + 1) - loop1.col(j);
+						double dot0 = pos0.dot(proj_pos - loop1.col(j));
+						double dot1 = pos0.dot(proj_pos - loop1.col(j + 1));
+						if (dot0 > 0 && dot1 < 0)
+						{
+							id = j;
+							u0 = dot0 / (dot0 - dot1) * pos0.norm();
+							break;
+						}
+						pos0 = loop1.col((cols - j) % cols) - loop1.col(cols - j - 1);
+						dot0 = pos0.dot(proj_pos - loop1.col(cols - j - 1));
+						dot1 = pos0.dot(proj_pos - loop1.col((cols - j) % cols));
+						if (dot0 > 0 && dot1 < 0)
+						{
+							id = cols - j - 1;
+							u0 = dot0 / (dot0 - dot1) * pos0.norm();
+							break;
+						}
+					}
+					if (id == -1)
+						id = 0;
+					double e = EvaluateSimilarity(loop0, loop1, u0, id);
+					similarity_energy[2 * k + i] = e;
+					//dprint(k, i, "similarity energy:", e);
+				}
+			}
+			WriteEnergy(similarity_energy, model_name);
+		}
+		tr.out("time of computing similarity energy:");
+
 		tr.tog();
 #pragma omp parallel for
-		for (int k = 0; k < nedges; ++k)
-		//int k = 31034;
+		for (int i = 0; i < InfoOnMesh.size(); ++i)
+			InfoOnMesh[i].energy = 0;
+#pragma omp parallel for
+		for (int i = 0; i < nedges; ++i)
 		{
-			//dprint(k);
-			if (k == 49)
+			auto h = mesh->halfedge_handle(i * 2);
+			int fromid2 = mesh->from_vertex_handle(h).idx() * 2;
+			int toid2 = mesh->to_vertex_handle(h).idx() * 2;
+			for (int j = 0; j < 2; ++j)
 			{
-				int p = 0;
-			}
-			auto h = mesh->halfedge_handle(k * 2);
-			auto fromvert = mesh->from_vertex_handle(h);
-			auto tovert = mesh->to_vertex_handle(h);
-			for (int i = 0; i < 2; ++i)
-			{
-				auto& fl = InfoOnMesh[2 * fromvert.idx() + i]; 
-				//dprint(fl.mark.find(&InfoOnMesh[2 * tovert.idx() + i]) != fl.mark.end());
-				auto& tl = fl.mark.find(&InfoOnMesh[2 * tovert.idx() + i]) != fl.mark.end() ?
-					InfoOnMesh[2 * tovert.idx() + i] : InfoOnMesh[2 * tovert.idx() + ((i + 1) % 2)];
-				if (fl.pl.empty() || tl.pl.empty())
-				{
-					simi_e[2 * k + i] = YYSS_INFINITE;
-					//dprint(k, i, "similarity energy:", YYSS_INFINITE);
-					continue;
-				}
-
-				int flag = fl.mark[&tl];
-				//dprint("flag", flag);
-				//dprint(fl.pl[0].h.idx()/2, fl.pl[1].h.idx()/2, fl.pl[2].h.idx()/2);
-				//dprint(tl.pl[0].h.idx()/2, tl.pl[1].h.idx()/2, tl.pl[2].h.idx()/2);
-				Eigen::Matrix3Xd loop0, loop1;
-				assembleLoop(mesh->point(fromvert), fl.pl, true, loop0);
-				assembleLoop(mesh->point(tovert), tl.pl, !flag, loop1);
-
-				auto& proj_pos = loop0.col(0);
-				int id = -1;
-				int cols = loop1.cols();
-				double u0 = 0;
-				for (int j = 0; j < 2; ++j)
-				{
-					Eigen::Vector3d pos0 = loop1.col(j + 1) - loop1.col(j);
-					double dot0 = pos0.dot(proj_pos - loop1.col(j));
-					double dot1 = pos0.dot(proj_pos - loop1.col(j + 1));
-					if (dot0 > 0 && dot1 < 0)
-					{
-						id = j;
-						u0 = dot0 / (dot0 - dot1) * pos0.norm();
-						break;
-					}
-					pos0 = loop1.col((cols - j) % cols) - loop1.col(cols - j - 1);
-					dot0 = pos0.dot(proj_pos - loop1.col(cols - j - 1));
-					dot1 = pos0.dot(proj_pos - loop1.col((cols - j) % cols));
-					if (dot0 > 0 && dot1 < 0)
-					{
-						id = cols - j - 1;
-						u0 = dot0 / (dot0 - dot1) * pos0.norm();
-						break;
-					}
-				}
-				if (id == -1)
-					id = 0;
-				double e = EvaluateSimilarity(loop0, loop1, u0, id);
-				simi_e[2 * k + i] = e;
-				//dprint(k, i, "similarity energy:", e);
+				auto& fl = InfoOnMesh[fromid2 + j];
+				auto& tl = fl.mark.find(&InfoOnMesh[toid2 + j]) != fl.mark.end() ?
+					InfoOnMesh[toid2 + j] : InfoOnMesh[toid2 + ((j + 1) % 2)];
+				fl.energy += similarity_energy[i * 2 + j];
+				tl.energy += similarity_energy[i * 2 + j];
 			}
 		}
-		tr.out();
-		file_writer.open("..//resource//energy//vase_sim.energy");
-		if (file_writer.fail()) {
-			std::cout << "fail to open\n";
-		}
-		for (auto e : simi_e)
-			file_writer << e << "\n";
-		file_writer.close();
-#else
-		simi_e.resize(nedges * 2);
-		file_reader.open("..//resource//energy//vase_sim.energy", std::ios::in);
-		while (file_reader.getline(line, sizeof(line)))
-		{
-			std::stringstream num(line);
-			num >> simi_e[ii];
-			++ii;
-		}
-		file_reader.close();
-#endif
-
-		for (auto& iov : InfoOnMesh)
-		{
-			iov.energy = 0;
-			for (auto& m : iov.mark)
-			{
-				iov.energy = std::max(iov.energy, simi_e[2 * m.first->v.idx() + 2 * m.second]);
-			}
-		}
+#pragma omp parallel for
+		for (int i = 0; i < InfoOnMesh.size(); ++i)
+			InfoOnMesh[i].energy /= mesh->valence(InfoOnMesh[i].v);
+		tr.out("time of setting vertex energy");
 	}
 
-	void LoopGen::ConstructSubMesh(Mesh& submesh)
+	void LoopGen::ConstructSubMesh()
 	{
-		double ener = YYSS_INFINITE;
-		/*VertexHandle v;
-		for (auto& iov : InfoOnMesh)
+		InfoOnVertex* iov = InfoOnMesh[33233 * 2].energy < InfoOnMesh[33233 * 2 + 1].energy ? &InfoOnMesh[33233 * 2] : &InfoOnMesh[33233 * 2 + 1];
+		iov->v = mesh->vertex_handle(33233);
+		auto& pl = iov->pl;
+
+		//advancing_front[0].emplace_back(iov);
+		//advancing_front[1].emplace_back(iov);
+		std::vector<InfoOnVertex*> IOV; 
+		IOV.push_back(iov);
+		advancing_front[0].push_back(IOV);
+		advancing_front[1].push_back(IOV);
+		std::vector<InfoOnVertex*> hierarchy_vertex[2];
+		hierarchy_vertex[0].reserve(pl.size() + 3); //hierarchy_vertex[0].push_back(&iov);
+		hierarchy_vertex[1].reserve(pl.size() + 3); //hierarchy_vertex[1].push_back(&iov);
+		auto fromid = mesh->from_vertex_handle(pl.front().h).idx();
+		auto toid = fromid;
+		for (auto vv : iov->mark)
 		{
-			if (iov.energy < ener)
+			if (vv.first->v.idx() == fromid)
 			{
-				ener = iov.energy;
-				v = iov.v;
+				hierarchy_vertex[1].push_back(vv.first);
+				break;
 			}
 		}
-		v = mesh->vertex_handle(33233);*/
-		InfoOnVertex iov = InfoOnMesh[33233 * 2].energy < InfoOnMesh[33233 * 2 + 1].energy ? InfoOnMesh[33233 * 2] : InfoOnMesh[33233 * 2 + 1];
-		auto& pl = iov.pl;
+		//将plane loop上的点加入hierarchy_vertex中
+		for (auto pl_b = pl.begin(); pl_b != pl.end(); ++pl_b)
+		{
+			auto he = pl_b->h;
+			if (mesh->from_vertex_handle(he).idx() == hierarchy_vertex[1].back()->v.idx())
+			{
+				//hierarchy_vertex[0].push_back(&InfoOnMesh[2*mesh->to_vertex_handle(he).idx()+])
+				toid = 2 * mesh->to_vertex_handle(he).idx();
+				const auto& mark = hierarchy_vertex[1].back()->mark;
+				hierarchy_vertex[0].push_back(mark.find(&InfoOnMesh[toid]) != mark.end() ? &InfoOnMesh[toid] : &InfoOnMesh[toid + 1]);
+			}
+			else
+			{
+				fromid = 2 * mesh->from_vertex_handle(he).idx();
+				const auto& mark = hierarchy_vertex[0].back()->mark;
+				hierarchy_vertex[1].push_back(mark.find(&InfoOnMesh[fromid]) != mark.end() ? &InfoOnMesh[fromid] : &InfoOnMesh[fromid + 1]);
+			}
+		}
+		//将出发点的1邻域加入hierarchy_vertex中
+		auto h_b = mesh->next_halfedge_handle(mesh->find_halfedge(hierarchy_vertex[0].back()->v, iov->v));
+		auto h_e_idx = mesh->find_halfedge(iov->v, hierarchy_vertex[0].front()->v).idx();
+		for (; h_b.idx() != h_e_idx; h_b = mesh->next_halfedge_handle(mesh->opposite_halfedge_handle(h_b)))
+		{
+			toid = 2 * mesh->to_vertex_handle(h_b).idx();
+			hierarchy_vertex[0].push_back(iov->mark.find(&InfoOnMesh[toid]) != iov->mark.end() ? &InfoOnMesh[toid] : &InfoOnMesh[toid + 1]);
+		}
+		h_b = mesh->opposite_halfedge_handle(mesh->prev_halfedge_handle(mesh->find_halfedge(iov->v, hierarchy_vertex[1].back()->v)));
+		h_e_idx = mesh->find_halfedge(iov->v, hierarchy_vertex[1].front()->v).idx();
+		for (; h_b.idx() != h_e_idx; h_b = mesh->opposite_halfedge_handle(mesh->prev_halfedge_handle(h_b)))
+		{
+			toid = 2 * mesh->to_vertex_handle(h_b).idx();
+			hierarchy_vertex[1].push_back(iov->mark.find(&InfoOnMesh[toid]) != iov->mark.end() ? &InfoOnMesh[toid] : &InfoOnMesh[toid + 1]);
+		}
+		hierarchy_vertex[0].shrink_to_fit(); advancing_front[0].push_back(std::move(hierarchy_vertex[0]));
+		hierarchy_vertex[1].shrink_to_fit(); advancing_front[1].push_back(std::move(hierarchy_vertex[1]));
 
+		double energy_threshold = 2.0;
+		std::deque<bool> visited(mesh->n_vertices(), false);
+
+		visited[iov->v.idx()] = true;
+		for (auto caf : advancing_front[0].back())
+			visited[caf->v.idx()] = true;
+		for (auto caf : advancing_front[1].back())
+			visited[caf->v.idx()] = true;
+
+		while (true)
+		{
+			const auto& current_af = advancing_front[0].back();
+			std::vector<InfoOnVertex*> hierarchy;
+			hierarchy.reserve(current_af.capacity());
+			for (auto caf : current_af)
+			{
+				const auto& mark = caf->mark;
+				for (auto vitr = mesh->vv_begin(caf->v); vitr != mesh->vv_end(caf->v); ++vitr)
+				{
+					toid = vitr->idx();
+					if (visited[toid])
+						continue;
+					visited[toid] = true;
+					toid *= 2;
+					hierarchy.push_back(mark.find(&InfoOnMesh[toid]) != mark.end() ? &InfoOnMesh[toid] : &InfoOnMesh[toid + 1]);
+					if (hierarchy.back()->energy > energy_threshold)
+						goto target0;
+				}
+			}
+			advancing_front[0].push_back(std::move(hierarchy));
+		}
+	target0:;
+		while (true)
+		{
+			const auto& current_af = advancing_front[1].back();
+			std::vector<InfoOnVertex*> hierarchy;
+			hierarchy.reserve(current_af.capacity());
+			for (auto caf : current_af)
+			{
+				const auto& mark = caf->mark;
+				for (auto vitr = mesh->vv_begin(caf->v); vitr != mesh->vv_end(caf->v); ++vitr)
+				{
+					toid = vitr->idx();
+					if (visited[toid])
+						continue;
+					visited[toid] = true;
+					toid *= 2;
+					hierarchy.push_back(mark.find(&InfoOnMesh[toid]) != mark.end() ? &InfoOnMesh[toid] : &InfoOnMesh[toid + 1]);
+					if (hierarchy.back()->energy > energy_threshold)
+						goto target1;
+				}
+			}
+			advancing_front[1].push_back(std::move(hierarchy));
+		}
+	target1:;
+
+		///for (auto& ss : advancing_front[0].back())
+			//sub_vertex.push_back(ss->v);
+
+		for (auto& ss : advancing_front)
+		{
+			for (auto& tt : ss)
+			{
+				for (auto& rr : tt)
+				{
+					sub_vertex.push_back(rr->v);
+				}
+			}
+		}
 	}
 
 	double LoopGen::RefineLoop(std::vector<VertexHandle>& loop, PlaneLoop& planar_loop, int shift)

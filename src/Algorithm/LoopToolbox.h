@@ -21,7 +21,9 @@ namespace LoopGen
 	{
 	public:
 		LoopGen(Mesh& mesh_) :mesh(&mesh_) { /*InitializeAABBTREE();*/ };
-		~LoopGen(){};
+		~LoopGen() {
+			if (cf) { delete cf; cf = nullptr; }
+		};
 	public:
 
 
@@ -51,17 +53,21 @@ namespace LoopGen
 			}
 		};
 		std::vector<double> eov;
-		std::vector<double> simi_e;
+		std::vector<double> similarity_energy;
 		std::vector<InfoOnVertex> InfoOnMesh;
+		std::vector<VertexHandle> sub_vertex;
+		std::vector<std::vector<InfoOnVertex*>> advancing_front[2];
 		std::priority_queue<InfoOnVertex, std::vector<InfoOnVertex>, std::greater<InfoOnVertex>> pq;
 		//Eigen::Matrix3Xd loop0, loop1;
 		//Eigen::Matrix3Xd fragment0, fragment1;
+		std::string model_name;
+		void SetModelName(std::string& name) { model_name = name; truncateFileName(model_name); }
 
 		//void InitializeAABBTREE();
 		void InitializeField();
-		void InitializeGraphWeight();
+		void InitializeGraphWeight(double alpha = 899);
 		void InitializePQ();
-		void ConstructSubMesh(Mesh &submesh);
+		void ConstructSubMesh();
 
 		bool FieldAligned_PlanarLoop(VertexHandle v, std::vector<VertexHandle> &loop, int shift = 0);
 		double RefineLoop(std::vector<VertexHandle>& loop, PlaneLoop& planar_loop, int shift);

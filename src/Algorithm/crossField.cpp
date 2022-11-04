@@ -431,6 +431,7 @@ void crossField::setCurvatureConstraint()
 	//OpenMesh::FPropHandleT<OpenMesh::Vec3d> f0;
 	OpenMesh::FPropHandleT<Eigen::Vector3d> f0;
 	mesh->add_property(f0);
+
 	for (auto f_h : mesh->faces())
 	{
 		int f_id = f_h.idx();
@@ -449,10 +450,9 @@ void crossField::setCurvatureConstraint()
 		//f0[f_h] = eigen_vectors(0, max_k) * e0[f_h] + eigen_vectors(1, max_k) * e1[f_h];
 		//mesh->property(f0, f_h) = eigen_vectors(0, max_k)*faceBase[f_id * 2] + eigen_vectors(1, max_k)*faceBase[f_id * 2 + 1];
 		mesh->property(f0, f_h) = eigen_vectors(0, max_k)*faceBase.col(f_id * 2) + eigen_vectors(1, max_k)*faceBase.col(f_id * 2 + 1);
-		if(k0 > 1.0e-2 && k1 > 1.0e-2)
+		if(k0 > 1.0e-2 || k1 > 1.0e-2)
 			max_cur.update(f_h.idx(), std::abs(k0 * k1));
 	}
-
 	std::cout << "#Constraints " << max_cur.size() << std::endl;
 
 	auto id = max_cur.get_ids();
@@ -571,7 +571,7 @@ void crossField::setMatching()
 	 }
 }
 
- crossField::crossField(std::string filename)
+ crossField::crossField(std::string& filename)
  {
 	 std::ifstream file_reader;
 	 file_reader.open(filename, std::ios::in);
@@ -614,10 +614,10 @@ void crossField::setMatching()
 	 file_reader.close();
  }
 
- void crossField::write_field()
+ void crossField::write_field(std::string& field_file)
  {
 	 std::ofstream file_writer;
-	 file_writer.open("..//resource//field//vase.field");
+	 file_writer.open(field_file);
 	 if (file_writer.fail()) {
 		 std::cout << "fail to open\n";
 	 }

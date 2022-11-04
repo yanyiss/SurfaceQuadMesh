@@ -336,10 +336,10 @@ void InteractiveViewerWidget::pick_edge(int x,int y)
 	int desiredEdge = find_edge_using_selected_point();
 	if(desiredEdge < 0) return;
 	lastestEdge = desiredEdge;
-	if(lg->simi_e.empty())
-		dprint("Select Edge :", desiredEdge);// , "similarity energy:", std::min(lg->simi_e[desiredEdge * 2], lg->simi_e[desiredEdge * 2 + 1]));
+	if(lg->similarity_energy.empty())
+		dprint("Select Edge :", desiredEdge);// , "similarity energy:", std::min(lg->similarity_energy[desiredEdge * 2], lg->similarity_energy[desiredEdge * 2 + 1]));
 	else
-		dprint("Select Edge :", desiredEdge, "similarity energy:", std::min(lg->simi_e[desiredEdge * 2], lg->simi_e[desiredEdge * 2 + 1]));
+		dprint("Select Edge :", desiredEdge, "similarity energy:", std::min(lg->similarity_energy[desiredEdge * 2], lg->similarity_energy[desiredEdge * 2 + 1]));
 	std::vector<int>::iterator it;
 	if( (it = std::find(selectedEdge.begin(),selectedEdge.end(),desiredEdge)) == selectedEdge.end() )
 	{
@@ -506,7 +506,7 @@ void InteractiveViewerWidget::draw_interactive_portion(int drawmode)
 		}
 	}
 	draw_field();
-	draw_energy();
+	if (if_draw_energy) draw_energy();
 	//draw_plane();
 	draw_planeloop();
 	if(draw_new_mesh)
@@ -601,11 +601,13 @@ void InteractiveViewerWidget::draw_field()
 		glLineWidth(1);
 		glColor3d(0.9, 0.1, 0.1);
 		glBegin(GL_LINES);
-		for (int i = 0; i < crossfield.cols(); i += 4)
+		for (int i = 0; i < crossfield.cols(); i += 2)
 		{
-			Eigen::Vector3d dd = (crossfield.col(i) + crossfield.col(i + 1)) * 0.5;
+			/*Eigen::Vector3d dd = (crossfield.col(i) + crossfield.col(i + 1)) * 0.5;
 			glVertex3dv(dd.data());
-			glVertex3dv(crossfield.col(i ).data());
+			glVertex3dv(crossfield.col(i ).data());*/
+			glVertex3dv(crossfield.col(i).data());
+			glVertex3dv(crossfield.col(i + 1).data());
 		}
 		glEnd();
 	}
@@ -642,6 +644,7 @@ void InteractiveViewerWidget::showField()
 	{
 		if_has_field = true;
 		lg = new LoopGen::LoopGen(mesh);
+		lg->SetModelName(file_name);
 		lg->InitializeField();
 		crossfield = lg->cf->getCrossField();
 		avgLen = 0.2 * calc_mesh_ave_edge_length(&mesh);
@@ -675,7 +678,7 @@ void InteractiveViewerWidget::showLoop()
 		loop_gen_init = true;
 		lg->InitializeGraphWeight();
 		lg->InitializePQ();
-
+		//lg->ConstructSubMesh();
 		/*std::ifstream file_reader;
 		file_reader.open("..//resource//energy//vase.energy", std::ios::in);
 		char line[1024] = { 0 };
@@ -707,7 +710,7 @@ void InteractiveViewerWidget::showLoop()
 	Eigen::VectorXd xyz[3];
 	if (lg->FieldAligned_PlanarLoop(mesh.vertex_handle(selectedVertex.back()), loop, 0))
 	{
-		for (int i = 0; i < loop.size() - 5; ++i)
+		for (int i = 0; i < loop.size() - 1; ++i)
 		{
 			selectedEdge.push_back(mesh.find_halfedge(loop[i], loop[i + 1]).idx() / 2);
 		}
@@ -724,7 +727,7 @@ void InteractiveViewerWidget::showLoop()
 	}
 	if (lg->FieldAligned_PlanarLoop(mesh.vertex_handle(selectedVertex.back()), loop, 1))
 	{
-		for (int i = 0; i < loop.size() - 5; ++i)
+		for (int i = 0; i < loop.size() - 1; ++i)
 		{
 			selectedEdge.push_back(mesh.find_halfedge(loop[i], loop[i + 1]).idx() / 2);
 		}
@@ -752,6 +755,9 @@ void InteractiveViewerWidget::showLoop()
 
 void InteractiveViewerWidget::showAnisotropicMesh()
 {
+	if_draw_energy = !if_draw_energy;
+	setDrawMode(InteractiveViewerWidget::SOLID_FLAT);
+	setMouseMode(InteractiveViewerWidget::TRANS);
 }
 
 #include "..\src\Toolbox\filesOperator.h"
@@ -763,78 +769,114 @@ void InteractiveViewerWidget::showDebugTest()
 void InteractiveViewerWidget::draw_energy()
 {
 #if 0
-	double ie = DBL_MAX;
-	double ae = 0;
-	static bool ff = true;
-	static double ll = 0;
-	if (loop_gen_init && ff)
-	{
-		ff = false;
-		for (auto e : lg->eov)
-		{
-			if (e > 10e10)
-				continue;
-			ie = std::min(ie, e);
-			ae = std::max(ae, e);
-		}
-		ll = 1.0 / (ae - ie);
-	}
+	//double ie = DBL_MAX;
+	//double ae = 0;
+	//static bool ff = true;
+	//static double ll = 0;
+	//if (loop_gen_init && ff)
+	//{
+	//	ff = false;
+	//	for (auto e : lg->eov)
+	//	{
+	//		if (e > 10e10)
+	//			continue;
+	//		ie = std::min(ie, e);
+	//		ae = std::max(ae, e);
+	//	}
+	//	ll = 1.0 / (ae - ie);
+	//}
+	//if (loop_gen_init)
+	//{
+	//	ie = 0.00030153500000000002;
+	//	ae = 0.22753200000000001;
+	//	ll = 1.0 / (ae - ie);
+	//	//double c = 0;
+	//	/*glPointSize(5);
+	//	for (auto v : mesh.vertices())
+	//	{
+	//		if (lg->eov[v.idx()] > 10e10)
+	//		{
+	//			glColor3d(0, 1, 0);
+	//			glBegin(GL_POINTS);
+	//			glVertex3dv(mesh.point(v).data());
+	//			glEnd();
+	//		}
+	//		else
+	//		{
+	//			c = pow((lg->eov[v.idx()] - ie) * ll, 0.4);
+	//			glColor3d(c, 0, 1 - c);
+	//			glBegin(GL_POINTS);
+	//			glVertex3dv(mesh.point(v).data());
+	//			glEnd();
+	//		}
+	//	}*/
+	//	for (auto f : mesh.faces())
+	//	{
+	//		double c = 0; VertexHandle v[3];
+	//		auto fv = mesh.fv_begin(f); /*c += pow((lg->eov[fv->idx()] - ie) * ll, 0.4);*/ v[0] = fv.handle();
+	//		++fv; /*c += pow((lg->eov[fv->idx()] - ie) * ll, 0.4);*/ v[1] = fv.handle();
+	//		++fv; /*c += pow((lg->eov[fv->idx()] - ie) * ll, 0.4);*/ v[2] = fv.handle();
+	//		for (int i = 0; i < 3; ++i)
+	//		{
+	//			if (lg->eov[v[i].idx()] > 10e10)
+	//			{
+	//				c = 10e11;
+	//				break;
+	//			}
+	//			c += pow((lg->eov[v[i].idx()] - ie) * ll, 0.4);
+	//		}
+	//		if (c > 10e10)
+	//		{
+	//			glColor3d(0, 1, 0);
+	//		}
+	//		else
+	//		{
+	//			c *= 0.33333333333333333333;
+	//			glColor3d(c, 0.2, 1 - c);
+	//		}
+	//		glBegin(GL_TRIANGLES);
+	//		glVertex3dv(mesh.point(v[0]).data());
+	//		glVertex3dv(mesh.point(v[2]).data());
+	//		glVertex3dv(mesh.point(v[1]).data());
+	//		glEnd();
+	//	}
+	//}
 	if (loop_gen_init)
 	{
-		ie = 0.00030153500000000002;
-		ae = 0.22753200000000001;
-		ll = 1.0 / (ae - ie);
-		//double c = 0;
-		/*glPointSize(5);
-		for (auto v : mesh.vertices())
+		glPointSize(10);
+		glColor3d(0.9, 0.1, 0.1);
+		glBegin(GL_POINTS);
+		for (auto v : lg->sub_vertex)
 		{
-			if (lg->eov[v.idx()] > 10e10)
-			{
-				glColor3d(0, 1, 0);
-				glBegin(GL_POINTS);
-				glVertex3dv(mesh.point(v).data());
-				glEnd();
-			}
-			else
-			{
-				c = pow((lg->eov[v.idx()] - ie) * ll, 0.4);
-				glColor3d(c, 0, 1 - c);
-				glBegin(GL_POINTS);
-				glVertex3dv(mesh.point(v).data());
-				glEnd();
-			}
-		}*/
-		for (auto f : mesh.faces())
-		{
-			double c = 0; VertexHandle v[3];
-			auto fv = mesh.fv_begin(f); /*c += pow((lg->eov[fv->idx()] - ie) * ll, 0.4);*/ v[0] = fv.handle();
-			++fv; /*c += pow((lg->eov[fv->idx()] - ie) * ll, 0.4);*/ v[1] = fv.handle();
-			++fv; /*c += pow((lg->eov[fv->idx()] - ie) * ll, 0.4);*/ v[2] = fv.handle();
-			for (int i = 0; i < 3; ++i)
-			{
-				if (lg->eov[v[i].idx()] > 10e10)
-				{
-					c = 10e11;
-					break;
-				}
-				c += pow((lg->eov[v[i].idx()] - ie) * ll, 0.4);
-			}
-			if (c > 10e10)
-			{
-				glColor3d(0, 1, 0);
-			}
-			else
-			{
-				c *= 0.33333333333333333333;
-				glColor3d(c, 0.2, 1 - c);
-			}
-			glBegin(GL_TRIANGLES);
-			glVertex3dv(mesh.point(v[0]).data());
-			glVertex3dv(mesh.point(v[2]).data());
-			glVertex3dv(mesh.point(v[1]).data());
-			glEnd();
+			glVertex3dv(mesh.point(v).data());
 		}
+		glEnd();
+		/*int count = 0;
+		glBegin(GL_LINES);
+		glColor3d(0.1, 0.9, 0.1);
+		for (auto& ss : lg->advancing_front)
+		{
+			for (auto& tt : ss)
+			{
+				for (auto& rr : tt)
+				{
+					if (++count % 25 != 0)
+						continue;
+					auto& pos = mesh.point(rr->v);
+					glVertex3dv(pos.data());
+					for (auto& pp : rr->pl)
+					{
+						auto poin = (1 - pp.c) * mesh.point(mesh.to_vertex_handle(pp.h)) + pp.c * mesh.point(mesh.from_vertex_handle(pp.h));
+						glVertex3dv(poin.data());
+						glVertex3dv(poin.data());
+					}
+					glVertex3dv(pos.data());
+				}
+			}
+		}
+		glEnd();*/
 	}
+
 #else
 	double max_e = 2;
 	double step_e =1.0/max_e;
@@ -842,9 +884,9 @@ void InteractiveViewerWidget::draw_energy()
 	{
 		glLineWidth(10);
 		glBegin(GL_LINES);
-		for(int i=0;i<lg->simi_e.size()/2;++i)
+		for(int i=0;i<lg->similarity_energy.size()/2;++i)
 		{
-			double t = std::min(lg->simi_e[2 * i], lg->simi_e[2 * i + 1]);
+			double t = std::min(lg->similarity_energy[2 * i], lg->similarity_energy[2 * i + 1]);
 			if (t > max_e)
 				glColor3d(0, 1, 0);
 			else

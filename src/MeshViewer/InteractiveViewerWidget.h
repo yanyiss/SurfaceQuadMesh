@@ -132,7 +132,6 @@ protected:
 	void dropEvent(QDropEvent *event);
 
 public:
-	void SetCADFileName(QString &fileName);
 public:
 	void showField();
 	void showLoop();
@@ -158,9 +157,11 @@ public:
 
 
 #pragma region
+	std::string file_name;
 	bool if_has_field = false;
 	bool loop_gen_init = false;
 	bool if_draw_field = false;
+	bool if_draw_energy = false;
 	LoopGen::LoopGen* lg = nullptr;
 	std::vector<VertexHandle> loop;
 	Eigen::Matrix3Xd crossfield;
