@@ -162,12 +162,14 @@ public:
 	bool loop_gen_init = false;
 	bool if_draw_field = false;
 	bool if_draw_energy = false;
+	bool if_draw_submesh = false;
 	LoopGen::LoopGen* lg = nullptr;
 	std::vector<VertexHandle> loop;
 	Eigen::Matrix3Xd crossfield;
 	double avgLen;
 	void draw_field();
 	void draw_energy();
+	void draw_submesh();
 	double plane0[4] = { 0,0,1,0 };
 	double plane1[4] = { 0,0,1,0 };
 	double boundingXY0[4] = { 0,0,1,0 };

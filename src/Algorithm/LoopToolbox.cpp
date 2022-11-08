@@ -3,8 +3,38 @@
 #include <omp.h>
 #define YYSS_INFINITE 1.0e12
 #define YYSS_FAIRLY_SMALL 1.0e-6
+#define COMPUTE_NEW_PLANELOOP 0
+#define COMPUTE_NEW_ENERGY 0
 namespace LoopGen
 {
+	void LocalParametrization::run(VertexHandle v, int shift)
+	{
+		const auto& matching = cf->getMatching();
+		std::vector<int> ff_id(mesh->n_faces());
+		{
+			std::queue<FaceHandle> face_tree;
+			face_tree.push(mesh->voh_begin(v).handle().face());
+			std::deque<bool> visited_f(mesh->n_faces(), false);
+			visited_f[face_tree.front().idx()] = true;
+			ff_id[face_tree.front().idx()] = shift;
+			while (!face_tree.empty())
+			{
+				auto f = face_tree.front();
+				face_tree.pop();
+				for (auto fh = mesh->fh_begin(f); fh != mesh->fh_end(f); ++fh)
+				{
+					auto oppo_f = mesh->face_handle(mesh->opposite_halfedge_handle(fh)).idx();
+					if (visited_f[oppo_f])
+						continue;
+					visited_f[oppo_f] = true;
+					ff_id[oppo_f] = (ff_id[f.idx()] + matching[fh->idx()]) % 4;
+					face_tree.push(mesh->face_handle(oppo_f));
+				}
+			}
+		}
+
+	}
+
 	bool LoopGen::FieldAligned_PlanarLoop(VertexHandle v, std::vector<VertexHandle>& loop, int shift)
 	{
 		//从顶点第0个半边左侧面的第0个crossfield的相反方向找路径，最后得到与场方向相同的loop
@@ -65,7 +95,7 @@ namespace LoopGen
 				pq.pop();
 			} while (vert.count != count[vert.id]);
 
-			//loop.push_back(vert.id); loop.push_back(mesh->from_vertex_handle(prev[vert.id]).idx());
+			//loop.push_back(vert.idmap); loop.push_back(mesh->from_vertex_handle(prev[vert.idmap]).idx());
 			int fromid = vert.id;
 			visited[fromid] = true;
 			if (fromid == vid)
@@ -229,15 +259,11 @@ namespace LoopGen
 	{
 		eov.resize(mesh->n_vertices(), YYSS_INFINITE);
 		timeRecorder tr;
-		std::ofstream file_writer;
-		std::ifstream file_reader;
-		char line[1024] = { 0 };
-		int ii = 0;
 		InfoOnMesh.resize(mesh->n_vertices() * 2);
 		int nedges = mesh->n_edges();
 
 		tr.tog();
-		if (!ReadPlaneLoop(InfoOnMesh, model_name, mesh))
+		if (COMPUTE_NEW_PLANELOOP || !ReadPlaneLoop(InfoOnMesh, model_name, mesh))
 		{
 #pragma omp parallel for
 			for (int i = 0; i < mesh->n_vertices(); ++i)
@@ -334,7 +360,7 @@ namespace LoopGen
 
 		tr.tog();
 		similarity_energy.resize(2 * nedges, YYSS_INFINITE);
-		if (!ReadEnergy(similarity_energy, model_name))
+		if (COMPUTE_NEW_ENERGY || !ReadEnergy(similarity_energy, model_name))
 		{
 #pragma omp parallel for
 			for (int k = 0; k < nedges; ++k)
@@ -420,18 +446,13 @@ namespace LoopGen
 		tr.out("time of setting vertex energy");
 	}
 
-	void LoopGen::ConstructSubMesh()
+	void LoopGen::ConstructSubRegion(InfoOnVertex* iov, std::vector<std::vector<InfoOnVertex*>> advancing_front[2], std::deque<bool>& visited_v)
 	{
-		InfoOnVertex* iov = InfoOnMesh[33233 * 2].energy < InfoOnMesh[33233 * 2 + 1].energy ? &InfoOnMesh[33233 * 2] : &InfoOnMesh[33233 * 2 + 1];
-		iov->v = mesh->vertex_handle(33233);
 		auto& pl = iov->pl;
-
-		//advancing_front[0].emplace_back(iov);
-		//advancing_front[1].emplace_back(iov);
 		std::vector<InfoOnVertex*> IOV; 
 		IOV.push_back(iov);
 		advancing_front[0].push_back(IOV);
-		advancing_front[1].push_back(IOV);
+		//advancing_front[1].push_back(IOV);
 		std::vector<InfoOnVertex*> hierarchy_vertex[2];
 		hierarchy_vertex[0].reserve(pl.size() + 3); //hierarchy_vertex[0].push_back(&iov);
 		hierarchy_vertex[1].reserve(pl.size() + 3); //hierarchy_vertex[1].push_back(&iov);
@@ -482,13 +503,13 @@ namespace LoopGen
 		hierarchy_vertex[1].shrink_to_fit(); advancing_front[1].push_back(std::move(hierarchy_vertex[1]));
 
 		double energy_threshold = 2.0;
-		std::deque<bool> visited(mesh->n_vertices(), false);
+		visited_v.resize(mesh->n_vertices(), false);
 
-		visited[iov->v.idx()] = true;
+		visited_v[iov->v.idx()] = true;
 		for (auto caf : advancing_front[0].back())
-			visited[caf->v.idx()] = true;
+			visited_v[caf->v.idx()] = true;
 		for (auto caf : advancing_front[1].back())
-			visited[caf->v.idx()] = true;
+			visited_v[caf->v.idx()] = true;
 
 		while (true)
 		{
@@ -501,9 +522,9 @@ namespace LoopGen
 				for (auto vitr = mesh->vv_begin(caf->v); vitr != mesh->vv_end(caf->v); ++vitr)
 				{
 					toid = vitr->idx();
-					if (visited[toid])
+					if (visited_v[toid])
 						continue;
-					visited[toid] = true;
+					visited_v[toid] = true;
 					toid *= 2;
 					hierarchy.push_back(mark.find(&InfoOnMesh[toid]) != mark.end() ? &InfoOnMesh[toid] : &InfoOnMesh[toid + 1]);
 					if (hierarchy.back()->energy > energy_threshold)
@@ -524,9 +545,9 @@ namespace LoopGen
 				for (auto vitr = mesh->vv_begin(caf->v); vitr != mesh->vv_end(caf->v); ++vitr)
 				{
 					toid = vitr->idx();
-					if (visited[toid])
+					if (visited_v[toid])
 						continue;
-					visited[toid] = true;
+					visited_v[toid] = true;
 					toid *= 2;
 					hierarchy.push_back(mark.find(&InfoOnMesh[toid]) != mark.end() ? &InfoOnMesh[toid] : &InfoOnMesh[toid + 1]);
 					if (hierarchy.back()->energy > energy_threshold)
@@ -536,20 +557,80 @@ namespace LoopGen
 			advancing_front[1].push_back(std::move(hierarchy));
 		}
 	target1:;
+	}
 
-		///for (auto& ss : advancing_front[0].back())
-			//sub_vertex.push_back(ss->v);
+	void LoopGen::ConstructRegionCut(VertexHandle v, int shift, std::deque<bool>& visited, std::vector<VertexHandle>& cut)
+	{
+		cut.clear();
+		cut.push_back(v);
+		HalfedgeHandle prevhe; prevhe.invalidate();
+		const auto& matching = cf->getMatching();
 
+		for (int s = shift; s < 4; shift += 2, s = shift)
+		{
+			int smark = s;
+			HalfedgeHandle hb = mesh->voh_begin(v);
+			int hb_idx = hb.idx();
+			while (true)
+			{
+				double w = YYSS_INFINITE;
+				do
+				{
+					if (weight(s, hb.idx()) < w)
+					{
+						w = weight(s, hb.idx());
+						prevhe = hb;
+						smark = s;
+					}
+					s += matching[hb.idx()]; s %= 4;
+					hb = mesh->next_halfedge_handle(mesh->opposite_halfedge_handle(hb));
+				} while (hb.idx() != hb_idx);
+				if (!visited[mesh->to_vertex_handle(prevhe).idx()])
+					break;
+				cut.push_back(mesh->to_vertex_handle(prevhe));
+				//hb = mesh->opposite_halfedge_handle(prevhe);
+				hb_idx = mesh->opposite_halfedge_handle(prevhe).idx();
+				s = smark;
+				hb = mesh->next_halfedge_handle(prevhe);
+			}
+		}
+	}
+
+	void LoopGen::OptimizeLoop()
+	{
+		InfoOnVertex* iov = InfoOnMesh[33233 * 2].energy < InfoOnMesh[33233 * 2 + 1].energy ? &InfoOnMesh[33233 * 2] : &InfoOnMesh[33233 * 2 + 1];
+		std::vector<std::vector<InfoOnVertex*>> advancing_front[2];
+		std::deque<bool> visited_v;
+		ConstructSubRegion(iov, advancing_front, visited_v);
+
+		std::deque<bool> visited_f(mesh->n_faces(), false);
+		LocalParametrization lp(*mesh, *cf);
+		auto& subvertex = lp.GetVertex(); subvertex.clear();
+		auto& subface = lp.GetFace(); subface.clear();
 		for (auto& ss : advancing_front)
 		{
 			for (auto& tt : ss)
 			{
 				for (auto& rr : tt)
 				{
-					sub_vertex.push_back(rr->v);
+					subvertex.push_back(rr->v);
+					for (auto vf = mesh->vf_begin(rr->v); vf != mesh->vf_end(rr->v); ++vf)
+					{
+						if (visited_f[vf->idx()])
+							continue;
+						visited_f[vf->idx()] = true;
+						subface.push_back(vf.handle());
+					}
 				}
 			}
 		}
+		ConstructRegionCut(iov->v, iov != &InfoOnMesh[iov->v.idx() * 2] ? 0 : 1, visited_v, lp.GetCut());
+
+		sub_vertex = lp.GetVertex();
+		sub_face = lp.GetFace();
+		sub_cut = lp.GetCut();
+
+		lp.run(iov->v, iov == &InfoOnMesh[iov->v.idx() * 2] ? 0 : 1);
 	}
 
 	double LoopGen::RefineLoop(std::vector<VertexHandle>& loop, PlaneLoop& planar_loop, int shift)
@@ -575,8 +656,8 @@ namespace LoopGen
 			auto s1 = dis(mesh->point(mesh->to_vertex_handle(hitr.handle())));
 			if (s0 * s1 < 0)
 			{
-				/*h[id] = mesh->prev_halfedge_handle(mesh->opposite_halfedge_handle(hitr.handle()));
-				++id;*/
+				/*h[idmap] = mesh->prev_halfedge_handle(mesh->opposite_halfedge_handle(hitr.handle()));
+				++idmap;*/
 				if (s0 > 0)
 				{
 					poh[0].h = mesh->next_halfedge_handle(hitr.handle());

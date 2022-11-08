@@ -507,6 +507,7 @@ void InteractiveViewerWidget::draw_interactive_portion(int drawmode)
 	}
 	draw_field();
 	if (if_draw_energy) draw_energy();
+	if (if_draw_submesh) draw_submesh();
 	//draw_plane();
 	draw_planeloop();
 	if(draw_new_mesh)
@@ -610,6 +611,16 @@ void InteractiveViewerWidget::draw_field()
 			glVertex3dv(crossfield.col(i + 1).data());
 		}
 		glEnd();
+
+		auto& sing = lg->cf->getSingularity();
+		glPointSize(6);
+		glColor3d(0.1, 0.1, 0.1);
+		glBegin(GL_POINTS);
+		for (auto& s : sing)
+		{
+			glVertex3dv(mesh.point(mesh.vertex_handle(s)).data());
+		}
+		glEnd();
 	}
 }
 
@@ -678,7 +689,7 @@ void InteractiveViewerWidget::showLoop()
 		loop_gen_init = true;
 		lg->InitializeGraphWeight();
 		lg->InitializePQ();
-		//lg->ConstructSubMesh();
+		lg->OptimizeLoop();
 		/*std::ifstream file_reader;
 		file_reader.open("..//resource//energy//vase.energy", std::ios::in);
 		char line[1024] = { 0 };
@@ -763,7 +774,9 @@ void InteractiveViewerWidget::showAnisotropicMesh()
 #include "..\src\Toolbox\filesOperator.h"
 void InteractiveViewerWidget::showDebugTest()
 {
-
+	if_draw_submesh = !if_draw_submesh;
+	setDrawMode(InteractiveViewerWidget::SOLID_FLAT);
+	setMouseMode(InteractiveViewerWidget::TRANS);
 }
 
 void InteractiveViewerWidget::draw_energy()
@@ -841,41 +854,7 @@ void InteractiveViewerWidget::draw_energy()
 	//		glEnd();
 	//	}
 	//}
-	if (loop_gen_init)
-	{
-		glPointSize(10);
-		glColor3d(0.9, 0.1, 0.1);
-		glBegin(GL_POINTS);
-		for (auto v : lg->sub_vertex)
-		{
-			glVertex3dv(mesh.point(v).data());
-		}
-		glEnd();
-		/*int count = 0;
-		glBegin(GL_LINES);
-		glColor3d(0.1, 0.9, 0.1);
-		for (auto& ss : lg->advancing_front)
-		{
-			for (auto& tt : ss)
-			{
-				for (auto& rr : tt)
-				{
-					if (++count % 25 != 0)
-						continue;
-					auto& pos = mesh.point(rr->v);
-					glVertex3dv(pos.data());
-					for (auto& pp : rr->pl)
-					{
-						auto poin = (1 - pp.c) * mesh.point(mesh.to_vertex_handle(pp.h)) + pp.c * mesh.point(mesh.from_vertex_handle(pp.h));
-						glVertex3dv(poin.data());
-						glVertex3dv(poin.data());
-					}
-					glVertex3dv(pos.data());
-				}
-			}
-		}
-		glEnd();*/
-	}
+	
 
 #else
 	double max_e = 2;
@@ -902,6 +881,61 @@ void InteractiveViewerWidget::draw_energy()
 	}
 
 #endif
+}
+
+void InteractiveViewerWidget::draw_submesh()
+{
+	if (loop_gen_init)
+	{
+		glPointSize(10);
+		glColor3d(0.9, 0.1, 0.1);
+		glBegin(GL_POINTS);
+		for (auto v : lg->sub_vertex)
+		{
+			glVertex3dv(mesh.point(v).data());
+		}
+		glEnd();
+
+		glColor3d(0.9, 0.9, 0.1);
+		glBegin(GL_TRIANGLES);
+		for (auto f : lg->sub_face)
+		{
+			for (auto fv : mesh.fv_range(f))
+				glVertex3dv(mesh.point(fv).data());
+		}
+		glEnd();
+
+		glPointSize(15);
+		glColor3d(0.1, 0.9, 0.9);
+		glBegin(GL_POINTS);
+		for (auto v : lg->sub_cut)
+			glVertex3dv(mesh.point(v).data());
+		glEnd();
+		/*int count = 0;
+		glBegin(GL_LINES);
+		glColor3d(0.1, 0.9, 0.1);
+		for (auto& ss : lg->advancing_front)
+		{
+			for (auto& tt : ss)
+			{
+				for (auto& rr : tt)
+				{
+					if (++count % 25 != 0)
+						continue;
+					auto& pos = mesh.point(rr->v);
+					glVertex3dv(pos.data());
+					for (auto& pp : rr->pl)
+					{
+						auto poin = (1 - pp.c) * mesh.point(mesh.to_vertex_handle(pp.h)) + pp.c * mesh.point(mesh.from_vertex_handle(pp.h));
+						glVertex3dv(poin.data());
+						glVertex3dv(poin.data());
+					}
+					glVertex3dv(pos.data());
+				}
+			}
+		}
+		glEnd();*/
+	}
 }
 
 void InteractiveViewerWidget::draw_plane()

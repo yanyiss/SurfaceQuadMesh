@@ -8,12 +8,22 @@ namespace LoopGen
 	class LocalParametrization
 	{
 	public:
-		LocalParametrization(){};
+		LocalParametrization(Mesh &mesh_, crossField &cf_) : mesh(&mesh_), cf(&cf_) { };
 		~LocalParametrization(){};
 	public:
+		std::vector<VertexHandle>& GetVertex() { return vertex; }
+		std::vector<FaceHandle>& GetFace() { return face; }
+		std::vector<VertexHandle>& GetCut() { return cut; }
+		
 
-	private:
+	//private:
+		Mesh* mesh;
+		std::vector<VertexHandle> vertex;
+		std::vector<FaceHandle> face;
+		std::vector<VertexHandle> cut;
+		crossField* cf;
 
+		void run(VertexHandle v, int shift);
 	};
 
 
@@ -55,9 +65,9 @@ namespace LoopGen
 		std::vector<double> eov;
 		std::vector<double> similarity_energy;
 		std::vector<InfoOnVertex> InfoOnMesh;
-		std::vector<VertexHandle> sub_vertex;
-		std::vector<std::vector<InfoOnVertex*>> advancing_front[2];
+		//std::vector<std::vector<InfoOnVertex*>> advancing_front[2];
 		std::priority_queue<InfoOnVertex, std::vector<InfoOnVertex>, std::greater<InfoOnVertex>> pq;
+		std::vector<VertexHandle> sub_vertex; std::vector<FaceHandle> sub_face; std::vector<VertexHandle> sub_cut;
 		//Eigen::Matrix3Xd loop0, loop1;
 		//Eigen::Matrix3Xd fragment0, fragment1;
 		std::string model_name;
@@ -67,7 +77,9 @@ namespace LoopGen
 		void InitializeField();
 		void InitializeGraphWeight(double alpha = 899);
 		void InitializePQ();
-		void ConstructSubMesh();
+		void ConstructSubRegion(InfoOnVertex* iov, std::vector<std::vector<InfoOnVertex*>> advancing_front[2], std::deque<bool> &visited_v);
+		void ConstructRegionCut(VertexHandle v, int shift, std::deque<bool>& visited, std::vector<VertexHandle> &cut);
+		void OptimizeLoop();
 
 		bool FieldAligned_PlanarLoop(VertexHandle v, std::vector<VertexHandle> &loop, int shift = 0);
 		double RefineLoop(std::vector<VertexHandle>& loop, PlaneLoop& planar_loop, int shift);
