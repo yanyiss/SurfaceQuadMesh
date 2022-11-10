@@ -14,16 +14,20 @@ namespace LoopGen
 		std::vector<VertexHandle>& GetVertex() { return vertex; }
 		std::vector<FaceHandle>& GetFace() { return face; }
 		std::vector<VertexHandle>& GetCut() { return cut; }
-		
+		std::deque<bool>& GetFFlag() { return f_flag; }
+		std::deque<bool>& GetVFalg() { return v_flag; }
 
 	//private:
 		Mesh* mesh;
 		std::vector<VertexHandle> vertex;
 		std::vector<FaceHandle> face;
 		std::vector<VertexHandle> cut;
+		std::deque<bool> f_flag;
+		std::deque<bool> v_flag;
 		crossField* cf;
 
-		void run(VertexHandle v, int shift);
+		void InitializeInfo();
+		void run(VertexHandle v, int shift, Eigen::VectorXd uv[2]);
 	};
 
 
@@ -65,6 +69,7 @@ namespace LoopGen
 		std::vector<double> eov;
 		std::vector<double> similarity_energy;
 		std::vector<InfoOnVertex> InfoOnMesh;
+		Eigen::VectorXd uv_para[2];
 		//std::vector<std::vector<InfoOnVertex*>> advancing_front[2];
 		std::priority_queue<InfoOnVertex, std::vector<InfoOnVertex>, std::greater<InfoOnVertex>> pq;
 		std::vector<VertexHandle> sub_vertex; std::vector<FaceHandle> sub_face; std::vector<VertexHandle> sub_cut;
@@ -77,7 +82,7 @@ namespace LoopGen
 		void InitializeField();
 		void InitializeGraphWeight(double alpha = 899);
 		void InitializePQ();
-		void ConstructSubRegion(InfoOnVertex* iov, std::vector<std::vector<InfoOnVertex*>> advancing_front[2], std::deque<bool> &visited_v);
+		void ConstructSubRegion(InfoOnVertex* iov, std::vector<std::vector<InfoOnVertex*>> advancing_front[2]);
 		void ConstructRegionCut(VertexHandle v, int shift, std::deque<bool>& visited, std::vector<VertexHandle> &cut);
 		void OptimizeLoop();
 

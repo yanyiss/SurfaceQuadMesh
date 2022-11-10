@@ -1,5 +1,4 @@
 #include "LoopToolbox.h"
-#include <Eigen\Cholesky>
 #include <omp.h>
 #define YYSS_INFINITE 1.0e12
 #define YYSS_FAIRLY_SMALL 1.0e-6
@@ -7,32 +6,197 @@
 #define COMPUTE_NEW_ENERGY 0
 namespace LoopGen
 {
-	void LocalParametrization::run(VertexHandle v, int shift)
+	void LocalParametrization::InitializeInfo()
+	{
+		
+	}
+
+	void LocalParametrization::run(VertexHandle v, int shift, Eigen::VectorXd uv[2])
 	{
 		const auto& matching = cf->getMatching();
-		std::vector<int> ff_id(mesh->n_faces());
+		int nf = mesh->n_faces();
+		//计算每个面上的场的shift
+		std::vector<int> ff_id(nf, -1);
 		{
 			std::queue<FaceHandle> face_tree;
-			face_tree.push(mesh->voh_begin(v).handle().face());
-			std::deque<bool> visited_f(mesh->n_faces(), false);
-			visited_f[face_tree.front().idx()] = true;
+			for (auto vf : mesh->vf_range(v))
+			{
+				if (f_flag[vf.idx()])
+				{
+					face_tree.push(vf);
+					break;
+				}
+			}
+			std::deque<bool> search_f(nf, false);
+			search_f[face_tree.front().idx()] = true;
 			ff_id[face_tree.front().idx()] = shift;
 			while (!face_tree.empty())
 			{
-				auto f = face_tree.front();
+				auto fc = face_tree.front();
 				face_tree.pop();
-				for (auto fh = mesh->fh_begin(f); fh != mesh->fh_end(f); ++fh)
+				for (auto fh = mesh->fh_begin(fc); fh != mesh->fh_end(fc); ++fh)
 				{
 					auto oppo_f = mesh->face_handle(mesh->opposite_halfedge_handle(fh)).idx();
-					if (visited_f[oppo_f])
+					if (search_f[oppo_f] || !f_flag[oppo_f])
 						continue;
-					visited_f[oppo_f] = true;
-					ff_id[oppo_f] = (ff_id[f.idx()] + matching[fh->idx()]) % 4;
+					search_f[oppo_f] = true;
+					ff_id[oppo_f] = (ff_id[fc.idx()] + matching[fh->idx()]) % 4;
 					face_tree.push(mesh->face_handle(oppo_f));
 				}
 			}
 		}
 
+		//标记与cut相关的顶点和面，计算装配矩阵需要的数据
+		int nv = mesh->n_vertices();
+		std::deque<bool> cutv_flag(nv, false);
+		std::deque<bool> cutf_flag(nf, false);
+		std::vector<std::map<VertexHandle, std::pair<bool, Eigen::Vector3d>>> info(nf);
+		{
+			for (auto c : cut)
+				cutv_flag[c.idx()] = true;
+
+			const auto& normal = cf->getNormal();
+			HalfedgeHandle he = mesh->find_halfedge(cut[0], cut[1]);
+			FaceHandle f = mesh->face_handle(he);
+			int fid = f.idx();
+			auto calc_vector = [&](bool flag)
+			{
+				double inv_area = 1.0 / (2 * mesh->calc_face_area(f));
+				auto vi = mesh->to_vertex_handle(he);
+				auto ev = mesh->calc_edge_vector(mesh->prev_halfedge_handle(he));
+				info[fid].insert(std::make_pair(vi, std::make_pair(flag && cutv_flag[vi.idx()], inv_area * normal.col(fid).cross(Eigen::Vector3d(ev[0], ev[1], ev[2])))));
+				vi = mesh->to_vertex_handle(mesh->next_halfedge_handle(he));
+				ev = mesh->calc_edge_vector(he);
+				info[fid].insert(std::make_pair(vi, std::make_pair(flag && cutv_flag[vi.idx()], inv_area * normal.col(fid).cross(Eigen::Vector3d(ev[0], ev[1], ev[2])))));
+				vi = mesh->from_vertex_handle(he);
+				ev = mesh->calc_edge_vector(mesh->next_halfedge_handle(he));
+				info[fid].insert(std::make_pair(vi, std::make_pair(flag && cutv_flag[vi.idx()], inv_area * normal.col(fid).cross(Eigen::Vector3d(ev[0], ev[1], ev[2])))));
+			};
+
+			while (f_flag[fid])
+			{
+				cutf_flag[fid] = true;
+				calc_vector(true);
+				he = mesh->opposite_halfedge_handle(mesh->prev_halfedge_handle(he));
+				f = mesh->face_handle(he);
+				fid = f.idx();
+			}
+			for (int i = 1; i < cut.size() - 1; ++i)
+			{
+				he = mesh->find_halfedge(cut[i], cut[i + 1]);
+				f = mesh->face_handle(he);
+				fid = f.idx();
+				do
+				{
+					if (info[fid].empty())
+					{
+						cutf_flag[fid] = true;
+						calc_vector(true);
+					}
+					he = mesh->opposite_halfedge_handle(mesh->prev_halfedge_handle(he));
+					f = mesh->face_handle(he);
+					fid = f.idx();
+				} while (mesh->to_vertex_handle(he).idx() != cut[i - 1].idx());
+			}
+			he = mesh->next_halfedge_handle(mesh->find_halfedge(cut[cut.size() - 2], cut.back()));
+			f = mesh->face_handle(he);
+			fid = f.idx();
+			while (f_flag[fid])
+			{
+				if (info[fid].empty())
+				{
+					cutf_flag[fid] = true;
+					calc_vector(true);
+				}
+				he = mesh->next_halfedge_handle(mesh->opposite_halfedge_handle(he));
+				f = mesh->face_handle(he);
+				fid = f.idx();
+			}
+
+			for (auto fa : face)
+			{
+				if (cutf_flag[fa.idx()])
+					continue;
+				he = mesh->fh_begin(fa).handle();
+				f = fa;
+				fid = f.idx();
+				calc_vector(false);
+			}
+		}
+
+
+		//计算idmap
+		std::vector<int> vidmap(nv);
+		{
+			int count = 0;
+			for (auto vv : vertex)
+				vidmap[vv.idx()] = count++;
+			/*for (auto c : cut)
+				vidmap[c.idx()] = count++;
+			for (auto vv : vertex)
+			{
+				if (cutv_flag[vv.idx()])
+					continue;
+				vidmap[vv.idx()] = count++;
+			}*/
+		}
+
+		int v_size = vertex.size();
+		int f_size = face.size();
+		std::vector<Eigen::Triplet<double>> triple;
+		std::vector<double> w(nv, 0);
+		std::vector<double> size_ratio(nf, 1.0);
+		uv[0].resize(v_size); uv[0].setZero();
+		uv[1].resize(v_size); uv[1].setZero();
+		const auto& crossfield = cf->getCrossField();
+		int vertex_front_id = vertex.front().idx();
+
+		for (auto vv : vertex)
+		{
+			//dprint(vv.idx());
+			int vvid = vv.idx();
+			if (vvid == vertex_front_id)
+				continue;
+			int vvidmap = vidmap[vvid];
+			for (auto vf = mesh->vf_begin(vv); vf != mesh->vf_end(vv); ++vf)
+			{
+				int vf_id = vf->idx();
+				if (!f_flag[vf_id])
+					continue;
+				Eigen::Vector3d& R0 = info[vf->idx()][vv].second;
+				for (const auto& f_info : info[vf_id])
+				{
+					double dot_ = R0.dot(f_info.second.second);
+					w[f_info.first.idx()] += dot_;
+					//triple.emplace_back(vvidmap, fidmap[vf_id], -R0.dot(crossfield.col(4 * vf_id + ff_id[vf_id])));
+					if (f_info.second.first)
+					{
+						uv[0](vvidmap) -= dot_;
+					}
+				}
+				uv[0](vvidmap) += size_ratio[vf_id] * R0.dot(crossfield.col(4 * vf_id + ff_id[vf_id]));
+				uv[1](vvidmap) += size_ratio[vf_id] * R0.dot(crossfield.col(4 * vf_id + (ff_id[vf_id] + 1) % 4));
+			}
+
+			/*if (vvid == vertex.front().idx())
+				w[vvid] += 1.0;*/
+			triple.emplace_back(vvidmap - 1, vvidmap - 1, w[vvid]);
+			w[vvid] = 0;
+			for (auto vvv : mesh->vv_range(vv))
+			{
+				int vvvid = vvv.idx();
+				if (vvvid == vertex_front_id || !v_flag[vvvid])
+					continue;
+				triple.emplace_back(vvidmap - 1, vidmap[vvvid] - 1, w[vvvid]);
+				w[vvvid] = 0;
+			}
+		}
+		Eigen::SparseMatrix<double> A(v_size - 1, v_size - 1);
+		A.setFromTriplets(triple.begin(), triple.end());
+		Eigen::SparseLU<Eigen::SparseMatrix<double>> solver;
+		solver.compute(A);
+		uv[0].tail(v_size - 1) = solver.solve(uv[0].tail(v_size - 1));
+		uv[1].tail(v_size - 1) = solver.solve(uv[1].tail(v_size - 1));
 	}
 
 	bool LoopGen::FieldAligned_PlanarLoop(VertexHandle v, std::vector<VertexHandle>& loop, int shift)
@@ -95,7 +259,7 @@ namespace LoopGen
 				pq.pop();
 			} while (vert.count != count[vert.id]);
 
-			//loop.push_back(vert.idmap); loop.push_back(mesh->from_vertex_handle(prev[vert.idmap]).idx());
+			//loop.push_back(vert.vidmap); loop.push_back(mesh->from_vertex_handle(prev[vert.vidmap]).idx());
 			int fromid = vert.id;
 			visited[fromid] = true;
 			if (fromid == vid)
@@ -446,7 +610,7 @@ namespace LoopGen
 		tr.out("time of setting vertex energy");
 	}
 
-	void LoopGen::ConstructSubRegion(InfoOnVertex* iov, std::vector<std::vector<InfoOnVertex*>> advancing_front[2], std::deque<bool>& visited_v)
+	void LoopGen::ConstructSubRegion(InfoOnVertex* iov, std::vector<std::vector<InfoOnVertex*>> advancing_front[2])
 	{
 		auto& pl = iov->pl;
 		std::vector<InfoOnVertex*> IOV; 
@@ -503,7 +667,7 @@ namespace LoopGen
 		hierarchy_vertex[1].shrink_to_fit(); advancing_front[1].push_back(std::move(hierarchy_vertex[1]));
 
 		double energy_threshold = 2.0;
-		visited_v.resize(mesh->n_vertices(), false);
+		std::deque<bool> visited_v(mesh->n_vertices(), false);
 
 		visited_v[iov->v.idx()] = true;
 		for (auto caf : advancing_front[0].back())
@@ -593,6 +757,7 @@ namespace LoopGen
 				s = smark;
 				hb = mesh->next_halfedge_handle(prevhe);
 			}
+			std::reverse(cut.begin(), cut.end());
 		}
 	}
 
@@ -600,13 +765,13 @@ namespace LoopGen
 	{
 		InfoOnVertex* iov = InfoOnMesh[33233 * 2].energy < InfoOnMesh[33233 * 2 + 1].energy ? &InfoOnMesh[33233 * 2] : &InfoOnMesh[33233 * 2 + 1];
 		std::vector<std::vector<InfoOnVertex*>> advancing_front[2];
-		std::deque<bool> visited_v;
-		ConstructSubRegion(iov, advancing_front, visited_v);
+		ConstructSubRegion(iov, advancing_front);
 
-		std::deque<bool> visited_f(mesh->n_faces(), false);
 		LocalParametrization lp(*mesh, *cf);
 		auto& subvertex = lp.GetVertex(); subvertex.clear();
 		auto& subface = lp.GetFace(); subface.clear();
+		auto& visited_f = lp.GetFFlag(); visited_f.resize(mesh->n_faces(), false);
+		auto& visited_v = lp.GetVFalg(); visited_v.resize(mesh->n_vertices(), false);
 		for (auto& ss : advancing_front)
 		{
 			for (auto& tt : ss)
@@ -614,12 +779,28 @@ namespace LoopGen
 				for (auto& rr : tt)
 				{
 					subvertex.push_back(rr->v);
+					visited_v[rr->v.idx()] = true;
+				}
+			}
+		}
+		for (auto& ss : advancing_front)
+		{
+			for (auto& tt : ss)
+			{
+				for (auto& rr : tt)
+				{
 					for (auto vf = mesh->vf_begin(rr->v); vf != mesh->vf_end(rr->v); ++vf)
 					{
 						if (visited_f[vf->idx()])
 							continue;
+						for (auto vfv = mesh->fv_begin(vf.handle()); vfv != mesh->fv_end(vf.handle()); ++vfv)
+						{
+							if (!visited_v[vfv->idx()])
+								goto target;
+						}
 						visited_f[vf->idx()] = true;
 						subface.push_back(vf.handle());
+					target:;
 					}
 				}
 			}
@@ -629,8 +810,8 @@ namespace LoopGen
 		sub_vertex = lp.GetVertex();
 		sub_face = lp.GetFace();
 		sub_cut = lp.GetCut();
-
-		lp.run(iov->v, iov == &InfoOnMesh[iov->v.idx() * 2] ? 0 : 1);
+		
+		lp.run(iov->v, iov == &InfoOnMesh[iov->v.idx() * 2] ? 0 : 1, uv_para);
 	}
 
 	double LoopGen::RefineLoop(std::vector<VertexHandle>& loop, PlaneLoop& planar_loop, int shift)
@@ -656,8 +837,8 @@ namespace LoopGen
 			auto s1 = dis(mesh->point(mesh->to_vertex_handle(hitr.handle())));
 			if (s0 * s1 < 0)
 			{
-				/*h[idmap] = mesh->prev_halfedge_handle(mesh->opposite_halfedge_handle(hitr.handle()));
-				++idmap;*/
+				/*h[vidmap] = mesh->prev_halfedge_handle(mesh->opposite_halfedge_handle(hitr.handle()));
+				++vidmap;*/
 				if (s0 > 0)
 				{
 					poh[0].h = mesh->next_halfedge_handle(hitr.handle());
@@ -922,3 +1103,108 @@ namespace LoopGen
 		}
 	}
 }
+
+////割缝处shift的行
+			//double mu = 0;
+			//for (auto f : face)
+			//{
+			//	int fid = f.idx();
+			//	if (!cutf_flag[fid])
+			//		continue;
+			//	Eigen::Vector3d R0(0, 0, 0);
+			//	for (const auto& f_info : info[fid])
+			//	{
+			//		if (f_info.second.first)
+			//			R0 += f_info.second.second;
+			//	}
+			//	mu += R0.squaredNorm();
+			//	for (const auto& f_info : info[fid])
+			//	{
+			//		w[f_info.first.idx()] += R0.dot(f_info.second.second);
+			//	}
+			//	uv[0](v_size) += R0.dot(crossfield.col(4 * fid + ff_id[fid]));
+			//}
+			//triple.emplace_back(v_size, v_size, mu);
+			//for (int i = 0; i < nv; ++i)
+			//{
+			//	if (std::fabs(w[i]) < YYSS_FAIRLY_SMALL)
+			//		continue;
+			//	triple.emplace_back(v_size, vidmap[i], w[i]);
+			//}
+
+			////面上比例系数的行
+			//for (auto ff : face)
+			//{
+			//	int ffid = ff.idx();
+			//	int ffidmap = fidmap[ffid];
+			//	auto& F0 = crossfield.col(4 * ffid + ff_id[ffid]);
+			//	triple.emplace_back(ffidmap, ffidmap, F0.dot(F0));
+			//	for (const auto& f_info : info[ffid])
+			//	{
+			//		double dot_ = F0.dot(f_info.second.second);
+			//		triple.emplace_back(ffidmap, vidmap[f_info.first.idx()], -dot_);
+			//		if (f_info.second.first)
+			//		{
+			//			uv[0](ffidmap) += dot_;
+			//		}
+			//	}
+			//}
+
+//int v_size = vertex.size();
+//int f_size = face.size();
+//std::vector<Eigen::Triplet<double>> triple;
+//std::vector<double> w(nv, 0);
+//std::vector<double> size_ratio(nf, 1.0);
+//uv[0].resize(v_size);
+//uv[0].setZero();
+//const auto& crossfield = cf->getCrossField();
+//int vertex_front_id = vertex.front().idx();
+//for (int itertimes = 0; itertimes < 1; ++itertimes)
+//{
+//	//跟顶点相关的行
+//	for (auto vv : vertex)
+//	{
+//		//dprint(vv.idx());
+//		int vvid = vv.idx();
+//		if (vvid == vertex_front_id)
+//			continue;
+//		int vvidmap = vidmap[vvid];
+//		for (auto vf = mesh->vf_begin(vv); vf != mesh->vf_end(vv); ++vf)
+//		{
+//			int vf_id = vf->idx();
+//			if (!f_flag[vf_id])
+//				continue;
+//			Eigen::Vector3d& R0 = info[vf->idx()][vv].second;
+//			for (const auto& f_info : info[vf_id])
+//			{
+//				double dot_ = R0.dot(f_info.second.second);
+//				w[f_info.first.idx()] += dot_;
+//				//triple.emplace_back(vvidmap, fidmap[vf_id], -R0.dot(crossfield.col(4 * vf_id + ff_id[vf_id])));
+//				if (f_info.second.first)
+//				{
+//					uv[0](vvidmap) -= 10*dot_;
+//				}
+//			}
+//			uv[0](vvidmap) += size_ratio[vf_id] * R0.dot(crossfield.col(4 * vf_id + ff_id[vf_id]));
+//		}
+
+//		/*if (vvid == vertex.front().idx())
+//			w[vvid] += 1.0;*/
+//		triple.emplace_back(vvidmap - 1, vvidmap - 1, w[vvid]);
+//		w[vvid] = 0;
+//		for (auto vvv : mesh->vv_range(vv))
+//		{
+//			int vvvid = vvv.idx();
+//			if (vvvid == vertex_front_id || !v_flag[vvvid])
+//				continue;
+//			triple.emplace_back(vvidmap - 1, vidmap[vvvid] - 1, w[vvvid]);
+//			w[vvvid] = 0;
+//		}
+//	}
+//	
+//	Eigen::SparseMatrix<double> A(v_size - 1, v_size - 1);
+//	A.setFromTriplets(triple.begin(), triple.end());
+//	Eigen::SparseLU<Eigen::SparseMatrix<double>> solver;
+//	solver.compute(A);
+//	uv[0].tail(v_size - 1) = solver.solve(uv[0].tail(v_size - 1));
+//}
