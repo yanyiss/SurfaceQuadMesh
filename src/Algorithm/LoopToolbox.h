@@ -11,11 +11,16 @@ namespace LoopGen
 		LocalParametrization(Mesh &mesh_, crossField &cf_) : mesh(&mesh_), cf(&cf_) { };
 		~LocalParametrization(){};
 	public:
-		std::vector<VertexHandle>& GetVertex() { return vertex; }
-		std::vector<FaceHandle>& GetFace() { return face; }
-		std::vector<VertexHandle>& GetCut() { return cut; }
-		std::deque<bool>& GetFFlag() { return f_flag; }
-		std::deque<bool>& GetVFalg() { return v_flag; }
+		inline std::vector<VertexHandle>& GetVertex() { return vertex; }
+		inline std::vector<FaceHandle>& GetFace() { return face; }
+		inline std::vector<VertexHandle>& GetCut() { return cut; }
+		inline std::deque<bool>& GetFFlag() { return f_flag; }
+		inline std::deque<bool>& GetVFalg() { return v_flag; }
+		inline std::deque<bool>& GetCutV_Flag() { return cutv_flag; }
+		inline std::deque<bool>& GetCutF_Flag() { return cutf_flag; }
+		//int GetVidMap(int vid) { return vidmap[vid]; }
+		inline double GetU(int vid) { return uv[0](vidmap[vid]); }
+		inline double GetV(int vid) { return uv[1](vidmap[vid]); }
 
 	//private:
 		Mesh* mesh;
@@ -24,10 +29,13 @@ namespace LoopGen
 		std::vector<VertexHandle> cut;
 		std::deque<bool> f_flag;
 		std::deque<bool> v_flag;
+		std::deque<bool> cutv_flag;
+		std::deque<bool> cutf_flag;
 		crossField* cf;
+		std::vector<int> vidmap;
+		Eigen::VectorXd uv[2];
 
-		void InitializeInfo();
-		void run(VertexHandle v, int shift, Eigen::VectorXd uv[2]);
+		void run(VertexHandle v, int shift);
 	};
 
 
@@ -56,7 +64,7 @@ namespace LoopGen
 		typedef std::vector<PointOnHalfedge> PlaneLoop;
 		struct InfoOnVertex {
 			VertexHandle v;
-			std::map<InfoOnVertex*, int> mark;
+			std::map<InfoOnVertex*, int> mark;//这里的int记录了平行loop的朝向关系，0表示同向，1表示反向
 			std::vector<VertexHandle> loop;
 			PlaneLoop pl;
 			double plane[4];
@@ -67,9 +75,10 @@ namespace LoopGen
 			}
 		};
 		std::vector<double> eov;
+		std::vector<std::vector<InfoOnVertex*>> advancing_front[2];
+		Eigen::VectorXd uv_para[2];
 		std::vector<double> similarity_energy;
 		std::vector<InfoOnVertex> InfoOnMesh;
-		Eigen::VectorXd uv_para[2];
 		//std::vector<std::vector<InfoOnVertex*>> advancing_front[2];
 		std::priority_queue<InfoOnVertex, std::vector<InfoOnVertex>, std::greater<InfoOnVertex>> pq;
 		std::vector<VertexHandle> sub_vertex; std::vector<FaceHandle> sub_face; std::vector<VertexHandle> sub_cut;
@@ -87,7 +96,9 @@ namespace LoopGen
 		void OptimizeLoop();
 
 		bool FieldAligned_PlanarLoop(VertexHandle v, std::vector<VertexHandle> &loop, int shift = 0);
-		double RefineLoop(std::vector<VertexHandle>& loop, PlaneLoop& planar_loop, int shift);
+		double RefineLoopByPlanarity(std::vector<VertexHandle>& loop, PlaneLoop& planar_loop, int shift);
+		void RefineLoopByParametrization(InfoOnVertex &iov, LocalParametrization& lp);
+
 		double ComputeAdjVertexSimilarity(InfoOnVertex& iov0, InfoOnVertex& iov1);
 
 		void GetPositionFromLoop(const std::vector<VertexHandle>& loop, Eigen::VectorXd xyz[3]);

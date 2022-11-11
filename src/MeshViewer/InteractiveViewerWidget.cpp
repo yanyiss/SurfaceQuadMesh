@@ -675,7 +675,7 @@ void InteractiveViewerWidget::showField()
 			int i = tf.idx() * 4;
 			Eigen::Vector3d vc(c[0], c[1], c[2]);
 			Eigen::Vector3d temp = crossfield.col(i + 1);
-#if 0
+#if 1
 			crossfield.col(i) = vc + crossfield.col(i) * avgLen;
 			crossfield.col(i + 1) = vc + crossfield.col(i + 2) * avgLen;
 			crossfield.col(i + 2) = vc + temp * avgLen;
@@ -731,7 +731,7 @@ void InteractiveViewerWidget::showLoop()
 	if (selectedVertex.empty())
 		return;
 #else
-	selectedVertex.push_back(18442);
+	selectedVertex.push_back(9018);
 #endif
 	selectedVertex = { selectedVertex.back() };
 	selectedEdge.clear();
@@ -746,7 +746,7 @@ void InteractiveViewerWidget::showLoop()
 		if_draw_plane = true;
 		plane_loop[0].clear();
 #if 1
-		dprint(lg->RefineLoop(loop, plane_loop[0], 0));
+		dprint(lg->RefineLoopByPlanarity(loop, plane_loop[0], 0));
 #else
 		lg->GetPositionFromLoop(loop, xyz);
 		double plane[4];
@@ -763,7 +763,7 @@ void InteractiveViewerWidget::showLoop()
 		if_draw_plane = true;
 		plane_loop[1].clear();
 #if 1
-		dprint(lg->RefineLoop(loop, plane_loop[1], 1));
+		dprint(lg->RefineLoopByPlanarity(loop, plane_loop[1], 1));
 #else
 		lg->GetPositionFromLoop(loop, xyz);
 		double plane[4];
@@ -958,7 +958,10 @@ void InteractiveViewerWidget::draw_submesh()
 		
 #else
 		
-		Eigen::VectorXd* uv = lg->uv_para;
+		
+		
+#endif
+		/*Eigen::VectorXd* uv = lg->uv_para;
 		double uvmax = -100; double uvmin = 100;
 		int j = 1;
 		for (int i = 0; i < uv[j].size(); ++i)
@@ -975,19 +978,18 @@ void InteractiveViewerWidget::draw_submesh()
 			glColor3d(c, c, c);
 			glVertex3dv(mesh.point(lg->sub_vertex[i]).data());
 		}
-		glEnd();
-		
-#endif
-		/*int count = 0;
+		glEnd();*/
+
+		int count = 0;
 		glBegin(GL_LINES);
-		glColor3d(0.1, 0.9, 0.1);
+		glColor3d(0.8, 0.2, 0.1);
 		for (auto& ss : lg->advancing_front)
 		{
 			for (auto& tt : ss)
 			{
 				for (auto& rr : tt)
 				{
-					if (++count % 25 != 0)
+					if (++count % 10 != 0)
 						continue;
 					auto& pos = mesh.point(rr->v);
 					glVertex3dv(pos.data());
@@ -1001,7 +1003,7 @@ void InteractiveViewerWidget::draw_submesh()
 				}
 			}
 		}
-		glEnd();*/
+		glEnd();
 	}
 }
 

@@ -6,12 +6,7 @@
 #define COMPUTE_NEW_ENERGY 0
 namespace LoopGen
 {
-	void LocalParametrization::InitializeInfo()
-	{
-		
-	}
-
-	void LocalParametrization::run(VertexHandle v, int shift, Eigen::VectorXd uv[2])
+	void LocalParametrization::run(VertexHandle v, int shift)
 	{
 		const auto& matching = cf->getMatching();
 		int nf = mesh->n_faces();
@@ -48,8 +43,8 @@ namespace LoopGen
 
 		//标记与cut相关的顶点和面，计算装配矩阵需要的数据
 		int nv = mesh->n_vertices();
-		std::deque<bool> cutv_flag(nv, false);
-		std::deque<bool> cutf_flag(nf, false);
+		cutv_flag.resize(nv, false);
+		cutf_flag.resize(nf, false);
 		std::vector<std::map<VertexHandle, std::pair<bool, Eigen::Vector3d>>> info(nf);
 		{
 			for (auto c : cut)
@@ -126,7 +121,7 @@ namespace LoopGen
 
 
 		//计算idmap
-		std::vector<int> vidmap(nv);
+		vidmap.resize(nv);
 		{
 			int count = 0;
 			for (auto vv : vertex)
@@ -437,7 +432,7 @@ namespace LoopGen
 					InfoOnMesh[2 * i + j].v = mesh->vertex_handle(i);
 					if (FieldAligned_PlanarLoop(InfoOnMesh[2 * i + j].v, InfoOnMesh[2 * i + j].loop, j))
 					{
-						eov[i] = std::min(eov[i], RefineLoop(InfoOnMesh[2 * i + j].loop, InfoOnMesh[2 * i + j].pl, j));
+						eov[i] = std::min(eov[i], RefineLoopByPlanarity(InfoOnMesh[2 * i + j].loop, InfoOnMesh[2 * i + j].pl, j));
 					}
 
 				}
@@ -764,7 +759,6 @@ namespace LoopGen
 	void LoopGen::OptimizeLoop()
 	{
 		InfoOnVertex* iov = InfoOnMesh[33233 * 2].energy < InfoOnMesh[33233 * 2 + 1].energy ? &InfoOnMesh[33233 * 2] : &InfoOnMesh[33233 * 2 + 1];
-		std::vector<std::vector<InfoOnVertex*>> advancing_front[2];
 		ConstructSubRegion(iov, advancing_front);
 
 		LocalParametrization lp(*mesh, *cf);
@@ -811,10 +805,34 @@ namespace LoopGen
 		sub_face = lp.GetFace();
 		sub_cut = lp.GetCut();
 		
-		lp.run(iov->v, iov == &InfoOnMesh[iov->v.idx() * 2] ? 0 : 1, uv_para);
+		lp.run(iov->v, iov == &InfoOnMesh[iov->v.idx() * 2] ? 0 : 1);
+
+
+		uv_para[0] = lp.uv[0];
+		uv_para[1] = lp.uv[1];
+
+		std::deque<bool> update_mark(mesh->n_vertices(), false);
+		std::queue<InfoOnVertex*> iov_tree;
+		iov_tree.push(iov);
+		update_mark[iov->v.idx()] = true;
+		while (!iov_tree.empty())
+		{
+			InfoOnVertex* iov_front = iov_tree.front();
+			iov_tree.pop();
+			RefineLoopByParametrization(*iov_front, lp);
+			for (const auto& one_ring : iov_front->mark)
+			{
+				int orfvid = one_ring.first->v.idx();
+				if (update_mark[orfvid] || !visited_v[orfvid])
+					continue;
+				update_mark[orfvid] = true;
+				iov_tree.push(one_ring.first);
+			}
+		}
+
 	}
 
-	double LoopGen::RefineLoop(std::vector<VertexHandle>& loop, PlaneLoop& planar_loop, int shift)
+	double LoopGen::RefineLoopByPlanarity(std::vector<VertexHandle>& loop, PlaneLoop& planar_loop, int shift)
 	{
 		planar_loop.clear();
 		Eigen::VectorXd xyz[3];
@@ -911,6 +929,91 @@ namespace LoopGen
 				break;*/
 		}
 		return EvaluatePlanarity(xyz, plane);
+	}
+
+	void LoopGen::RefineLoopByParametrization(InfoOnVertex& iov, LocalParametrization& lp)
+	{
+		iov.pl.clear();
+		double v_para = lp.GetV(iov.v.idx());
+		auto hitr = mesh->voh_begin(iov.v);
+		double s0 = v_para - lp.GetV(mesh->to_vertex_handle(mesh->next_halfedge_handle(hitr.handle())).idx());
+		double distance[2];
+		PointOnHalfedge poh[2];
+		int id[2] = { 0,0 };
+		for (; hitr != mesh->voh_end(iov.v); ++hitr)
+		{
+			if (!lp.GetFFlag()[hitr.handle().face().idx()])
+				continue;
+			double s1 = v_para - lp.GetV(mesh->to_vertex_handle(hitr.handle()).idx());
+			if (s0 * s1 < 0)
+			{
+				if (s0 > 0)
+				{
+					poh[0].h = mesh->next_halfedge_handle(hitr.handle());
+					poh[0].c = s0 / (s0 - s1);
+					distance[0] = s0; distance[1] = s1;
+					++id[0];
+				}
+				else
+				{
+					poh[1].h = mesh->opposite_halfedge_handle(mesh->next_halfedge_handle(hitr.handle()));
+					poh[1].c = s1 / (s1 - s0);
+					++id[1];
+				}
+			}
+			s0 = s1;
+		}
+		if (id[0] != 1 || id[1] != 1)
+			return;
+
+		////检查出发点到poh[0]的方向与u参数增加的方向是否相同，若不相同，则调换poh[0]和poh[1]
+		//auto hb = poh[0].h;
+		//const auto& nor = cf->getNormal().col(mesh->face_handle(hb).idx());
+		//OpenMesh::Vec3d normal_ = Vec3d(nor(0), nor(1), nor(2));
+		//OpenMesh::Vec3d v0(0, 0, 0);
+		//for (int i = 0; i < 3; ++i)
+		//{
+		//	int vid = mesh->to_vertex_handle(mesh->next_halfedge_handle(hb)).idx();
+		//	v0 += (lp.GetU(vid) + (lp.GetCutV_Flag()[vid] && lp.GetCutF_Flag()[mesh->face_handle(hb).idx()] ? 1.0 : 0.0))
+		//		* normal_.cross(mesh->calc_edge_vector(hb));
+		//}
+		//auto v1 = poh[0].c * mesh->point(mesh->from_vertex_handle(poh[0].h)) +
+		//	(1 - poh[0].c) * mesh->point(mesh->to_vertex_handle(poh[0].h)) - mesh->point(iov.v);
+		//if (v0.dot(v1) < 0)
+		//{
+		//	std::swap(poh[0], poh[1]);
+		//	for (int i = 0; i < 2; ++i)
+		//	{
+		//		poh[i].h = mesh->opposite_halfedge_handle(poh[i].h);
+		//		poh[i].c = 1 - poh[i].c;
+		//	}
+		//	distance[0] = v_para - lp.GetV(mesh->to_vertex_handle(poh[0].h).idx());
+		//	distance[1] = v_para - lp.GetV(mesh->from_vertex_handle(poh[0].h).idx());
+		//}
+
+		PlaneLoop planar_loop;
+		planar_loop.push_back(poh[0]);
+		auto h = poh[0].h;
+		while (h.idx() != poh[1].h.idx())
+		{
+			int vid = mesh->from_vertex_handle(mesh->prev_halfedge_handle(mesh->opposite_halfedge_handle(h))).idx();
+			if (!lp.v_flag[vid])
+				//return;
+				break;
+			double s = v_para - lp.GetV(vid);
+			if (s > 0)
+			{
+				h = mesh->next_halfedge_handle(mesh->opposite_halfedge_handle(h));
+				distance[0] = s;
+			}
+			else
+			{
+				h = mesh->prev_halfedge_handle(mesh->opposite_halfedge_handle(h));
+				distance[1] = s;
+			}
+			planar_loop.emplace_back(h, distance[0] / (distance[0] - distance[1]));
+		}
+		iov.pl = std::move(planar_loop);
 	}
 
 	void LoopGen::GetPositionFromLoop(const std::vector<VertexHandle>& loop, Eigen::VectorXd xyz[3])
