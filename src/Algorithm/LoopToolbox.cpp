@@ -192,6 +192,9 @@ namespace LoopGen
 		solver.compute(A);
 		uv[0].tail(v_size - 1) = solver.solve(uv[0].tail(v_size - 1));
 		uv[1].tail(v_size - 1) = solver.solve(uv[1].tail(v_size - 1));
+
+		for (auto& u : uv[0])
+			u = u - std::floor(u);
 	}
 
 	bool LoopGen::FieldAligned_PlanarLoop(VertexHandle v, std::vector<VertexHandle>& loop, int shift)
@@ -718,6 +721,200 @@ namespace LoopGen
 	target1:;
 	}
 
+	bool LoopGen::SpreadSubRegion(std::vector<std::vector<InfoOnVertex*>> advancing_front[2], LocalParametrization& lp)
+	{
+		InfoOnVertex* iov = advancing_front[0][0][0];
+		auto& visited_v = lp.GetVFalg();
+
+
+		std::deque<bool> update_mark(mesh->n_vertices(), false);
+		std::queue<InfoOnVertex*> iov_tree;
+		iov_tree.push(iov);
+		update_mark[iov->v.idx()] = true;
+		std::vector<InfoOnVertex*> af;
+		while (!iov_tree.empty())
+		{
+			InfoOnVertex* iov_front = iov_tree.front();
+			iov_tree.pop();
+			if (RefineLoopByParametrization(*iov_front, lp))
+				af.push_back(iov_front);
+			for (const auto& one_ring : iov_front->mark)
+			{
+				int orfvid = one_ring.first->v.idx();
+				if (update_mark[orfvid] || !visited_v[orfvid])
+					continue;
+				update_mark[orfvid] = true;
+				iov_tree.push(one_ring.first);
+			}
+		}
+		if (!IsGood(af, update_mark, lp))
+			return false;
+
+		int af_size = af.size();
+		std::vector<InfoOnVertex*> new_af[4];
+		for (int i = 1; i < af_size; ++i)
+		{
+			InfoOnVertex* af_iov = af[i];
+			if (lp.GetV(af_iov->v.idx()) >= 0)
+			{
+				for (auto vv = mesh->vv_begin(af_iov->v); vv != mesh->vv_end(af_iov->v); ++vv)
+				{
+					if (!update_mark[vv->idx()])
+					{
+						new_af[1].push_back(af_iov);
+						goto target;
+					}
+				}
+				new_af[0].push_back(af_iov);
+			}
+			else
+			{
+				for (auto vv = mesh->vv_begin(af_iov->v); vv != mesh->vv_end(af_iov->v); ++vv)
+				{
+					if (!update_mark[vv->idx()])
+					{
+						new_af[3].push_back(af_iov);
+						goto target;
+					}
+				}
+				new_af[2].push_back(af_iov);
+			}
+		target:;
+		}
+
+
+		advancing_front[0].clear(); advancing_front[0].resize(1); advancing_front[0][0].push_back(iov);
+		advancing_front[0].push_back(std::move(new_af[0]));
+		advancing_front[0].push_back(std::move(new_af[1]));
+		advancing_front[1].clear();
+		advancing_front[1].push_back(std::move(new_af[2]));
+		advancing_front[1].push_back(std::move(new_af[3]));
+
+		return false;
+	}
+
+	bool LoopGen::IsGood(std::vector<InfoOnVertex*>& af, std::deque<bool>& update_mark, LocalParametrization& lp, double threshold)
+	{
+		auto SetData = [&](int u0, int u1, int n, OpenMesh::Vec3d &ev, Eigen::Matrix3Xd& fragment)
+		{
+			if (u0 > u1)
+			{
+				for (int i = u0 + 1; i < n; ++i)
+				{
+					fragment.col(i) << ev[0], ev[1], ev[2];
+				}
+				for (int i = 0; i <= u1; ++i)
+				{
+					fragment.col(i) << ev[0], ev[1], ev[2];
+				}
+			}
+			else if (u0 < u1)
+			{
+				for (int i = u0 + 1; i <= u1; ++i)
+				{
+					fragment.col(i) << ev[0], ev[1], ev[2];
+				}
+			}
+		};
+		auto IsSimilar = [&](InfoOnVertex* iov0, InfoOnVertex* iov1)
+		{
+			const auto& pl0 = iov0->pl;
+			const auto& pl1 = iov1->pl;
+			int n = pl0.size() + pl1.size();
+			double step = 1.0 / n;
+			Eigen::Matrix3Xd fragment0(3, n), fragment1(3, n);
+			auto from_pos = mesh->point(iov0->v);
+			Vec3d to_pos, ev;
+
+			int u0 = std::floor(lp.GetU(iov0->v.idx()) * step);
+			int u1 = 0;
+			for (auto& pl : pl0)
+			{
+				double t0 = lp.GetU(mesh->from_vertex_handle(pl.h).idx());
+				double t1 = lp.GetU(mesh->to_vertex_handle(pl.h).idx());
+				if (fabs(t0 - t1) > 0.5)
+				{
+					if (t0 < t1)
+						u1 = std::floor((pl.c * (t0 + 1) + (1 - pl.c) * t1) * step);
+					else
+						u1 = std::floor((pl.c * t0 + (1 - pl.c) * (t1 + 1)) * step);
+				}
+				else
+					u1 = std::floor((pl.c * t0 + pl.c * t1) * step);
+				//u1 = std::floor((pl.c * lp.GetU(mesh->from_vertex_handle(pl.h).idx()) + (1 - pl.c) * lp.GetU(mesh->to_vertex_handle(pl.h).idx())) * step);
+				if (u0 == u1)
+					continue;
+				to_pos = pl.c * mesh->point(mesh->from_vertex_handle(pl.h)) + (1 - pl.c) * mesh->point(mesh->to_vertex_handle(pl.h));
+				ev = (to_pos - from_pos).normalized();
+				SetData(u0, u1, n, ev, fragment0);
+				u0 = u1;
+				from_pos = to_pos;
+			}
+			u1 = std::floor(lp.GetU(iov0->v.idx()) * step);
+			if (u0 != u1)
+			{
+				ev = (mesh->point(iov0->v) - from_pos).normalized();
+				SetData(u0, u1, n, ev, fragment0);
+			}
+
+			u0 = std::floor(lp.GetU(iov1->v.idx()) * step);
+			for (auto& pl : pl1)
+			{
+				double t0 = lp.GetU(mesh->from_vertex_handle(pl.h).idx());
+				double t1 = lp.GetU(mesh->to_vertex_handle(pl.h).idx());
+				if (fabs(t0 - t1) > 0.5)
+				{
+					if (t0 < t1)
+						u1 = std::floor((pl.c * (t0 + 1) + (1 - pl.c) * t1) * step);
+					else
+						u1 = std::floor((pl.c * t0 + (1 - pl.c) * (t1 + 1)) * step);
+				}
+				else
+					u1 = std::floor((pl.c * t0 + pl.c * t1) * step);
+				if (u0 == u1)
+					continue;
+				to_pos = pl.c * mesh->point(mesh->from_vertex_handle(pl.h)) + (1 - pl.c) * mesh->point(mesh->to_vertex_handle(pl.h));
+				ev = (to_pos - from_pos).normalized();
+				SetData(u0, u1, n, ev, fragment1);
+				u0 = u1;
+				from_pos = to_pos;
+			}
+			u1 = std::floor(lp.GetU(iov1->v.idx()) * step);
+			if (u0 != u1)
+			{
+				ev = (mesh->point(iov1->v) - from_pos).normalized();
+				SetData(u0, u1, n, ev, fragment1);
+			}
+			double sum = 0;
+			double dot = 0;
+			for (int i = 0; i < n; ++i)
+			{
+				for (int j = i + 1; j < n; ++j)
+				{
+					dot = fabs(fragment0.col(i).dot(fragment0.col(j))) / (fabs((fragment1.col(i).dot(fragment1.col(j)))) + YYSS_FAIRLY_SMALL);
+					sum += std::min(100.0, dot + 1.0 / (dot + YYSS_FAIRLY_SMALL) - 2);
+				}
+			}
+			if (2.0 * sum < n * (n - 1) * threshold)
+				return true;
+			else
+				return false;
+		};
+		for (auto iov : af)
+		{
+			int vid = iov->v.idx();
+			for (const auto& iov_nei : iov->mark)
+			{
+				int vvid = iov_nei.first->v.idx();
+				if (vid < vvid)
+					continue;
+				if (!IsSimilar(iov, iov_nei.first))
+					return false;
+			}
+		}
+		return true;
+	}
+
 	void LoopGen::ConstructRegionCut(VertexHandle v, int shift, std::deque<bool>& visited, std::vector<VertexHandle>& cut)
 	{
 		cut.clear();
@@ -762,73 +959,61 @@ namespace LoopGen
 		ConstructSubRegion(iov, advancing_front);
 
 		LocalParametrization lp(*mesh, *cf);
-		auto& subvertex = lp.GetVertex(); subvertex.clear();
-		auto& subface = lp.GetFace(); subface.clear();
-		auto& visited_f = lp.GetFFlag(); visited_f.resize(mesh->n_faces(), false);
-		auto& visited_v = lp.GetVFalg(); visited_v.resize(mesh->n_vertices(), false);
-		for (auto& ss : advancing_front)
+
+		do
 		{
-			for (auto& tt : ss)
+			auto& subvertex = lp.GetVertex(); subvertex.clear();
+			auto& subface = lp.GetFace(); subface.clear();
+			auto& visited_f = lp.GetFFlag(); visited_f.resize(mesh->n_faces(), false);
+			auto& visited_v = lp.GetVFalg(); visited_v.resize(mesh->n_vertices(), false);
+			for (auto& ss : advancing_front)
 			{
-				for (auto& rr : tt)
+				for (auto& tt : ss)
 				{
-					subvertex.push_back(rr->v);
-					visited_v[rr->v.idx()] = true;
-				}
-			}
-		}
-		for (auto& ss : advancing_front)
-		{
-			for (auto& tt : ss)
-			{
-				for (auto& rr : tt)
-				{
-					for (auto vf = mesh->vf_begin(rr->v); vf != mesh->vf_end(rr->v); ++vf)
+					for (auto& rr : tt)
 					{
-						if (visited_f[vf->idx()])
-							continue;
-						for (auto vfv = mesh->fv_begin(vf.handle()); vfv != mesh->fv_end(vf.handle()); ++vfv)
-						{
-							if (!visited_v[vfv->idx()])
-								goto target;
-						}
-						visited_f[vf->idx()] = true;
-						subface.push_back(vf.handle());
-					target:;
+						subvertex.push_back(rr->v);
+						visited_v[rr->v.idx()] = true;
 					}
 				}
 			}
-		}
-		ConstructRegionCut(iov->v, iov != &InfoOnMesh[iov->v.idx() * 2] ? 0 : 1, visited_v, lp.GetCut());
-
-		sub_vertex = lp.GetVertex();
-		sub_face = lp.GetFace();
-		sub_cut = lp.GetCut();
-		
-		lp.run(iov->v, iov == &InfoOnMesh[iov->v.idx() * 2] ? 0 : 1);
-
-
-		uv_para[0] = lp.uv[0];
-		uv_para[1] = lp.uv[1];
-
-		std::deque<bool> update_mark(mesh->n_vertices(), false);
-		std::queue<InfoOnVertex*> iov_tree;
-		iov_tree.push(iov);
-		update_mark[iov->v.idx()] = true;
-		while (!iov_tree.empty())
-		{
-			InfoOnVertex* iov_front = iov_tree.front();
-			iov_tree.pop();
-			RefineLoopByParametrization(*iov_front, lp);
-			for (const auto& one_ring : iov_front->mark)
+			for (auto& ss : advancing_front)
 			{
-				int orfvid = one_ring.first->v.idx();
-				if (update_mark[orfvid] || !visited_v[orfvid])
-					continue;
-				update_mark[orfvid] = true;
-				iov_tree.push(one_ring.first);
+				for (auto& tt : ss)
+				{
+					for (auto& rr : tt)
+					{
+						for (auto vf = mesh->vf_begin(rr->v); vf != mesh->vf_end(rr->v); ++vf)
+						{
+							if (visited_f[vf->idx()])
+								continue;
+							for (auto vfv = mesh->fv_begin(vf.handle()); vfv != mesh->fv_end(vf.handle()); ++vfv)
+							{
+								if (!visited_v[vfv->idx()])
+									goto target;
+							}
+							visited_f[vf->idx()] = true;
+							subface.push_back(vf.handle());
+						target:;
+						}
+					}
+				}
 			}
-		}
+			ConstructRegionCut(iov->v, iov != &InfoOnMesh[iov->v.idx() * 2] ? 0 : 1, visited_v, lp.GetCut());
+
+			sub_vertex = lp.GetVertex();
+			sub_face = lp.GetFace();
+			sub_cut = lp.GetCut();
+
+			lp.run(iov->v, iov == &InfoOnMesh[iov->v.idx() * 2] ? 0 : 1);
+
+		} while (SpreadSubRegion(advancing_front, lp));
+
+
+
+		uv_para[0] = std::move(lp.uv[0]);
+		uv_para[1] = std::move(lp.uv[1]);
+
 
 	}
 
@@ -931,7 +1116,7 @@ namespace LoopGen
 		return EvaluatePlanarity(xyz, plane);
 	}
 
-	void LoopGen::RefineLoopByParametrization(InfoOnVertex& iov, LocalParametrization& lp)
+	bool LoopGen::RefineLoopByParametrization(InfoOnVertex& iov, LocalParametrization& lp)
 	{
 		iov.pl.clear();
 		double v_para = lp.GetV(iov.v.idx());
@@ -964,7 +1149,7 @@ namespace LoopGen
 			s0 = s1;
 		}
 		if (id[0] != 1 || id[1] != 1)
-			return;
+			return false;
 
 		////检查出发点到poh[0]的方向与u参数增加的方向是否相同，若不相同，则调换poh[0]和poh[1]
 		//auto hb = poh[0].h;
@@ -998,8 +1183,7 @@ namespace LoopGen
 		{
 			int vid = mesh->from_vertex_handle(mesh->prev_halfedge_handle(mesh->opposite_halfedge_handle(h))).idx();
 			if (!lp.v_flag[vid])
-				//return;
-				break;
+				return false;
 			double s = v_para - lp.GetV(vid);
 			if (s > 0)
 			{
@@ -1014,6 +1198,7 @@ namespace LoopGen
 			planar_loop.emplace_back(h, distance[0] / (distance[0] - distance[1]));
 		}
 		iov.pl = std::move(planar_loop);
+		return true;
 	}
 
 	void LoopGen::GetPositionFromLoop(const std::vector<VertexHandle>& loop, Eigen::VectorXd xyz[3])
@@ -1029,36 +1214,6 @@ namespace LoopGen
 		}
 	}
 
-	double LoopGen::ComputeAdjVertexSimilarity(InfoOnVertex& iov0, InfoOnVertex& iov1)
-	{
-		//首先确定iov0.loop[0]和iov1.loop[0], iov1.loop[1]中哪一个对应, 以及loop的行进方向
-		auto& matching = cf->getMatching();
-		int index = 0;
-		auto h = mesh->find_halfedge(iov0.v, iov1.v);
-		auto ht = mesh->voh_begin(iov0.v).handle();
-		while (ht.idx() != h.idx())
-		{
-			ht = mesh->opposite_halfedge_handle(mesh->prev_halfedge_handle(ht));
-			index += matching[ht.idx()];
-		}
-		h = mesh->next_halfedge_handle(h);
-		ht = mesh->voh_begin(iov1.v).handle();
-		while (ht.idx() != h.idx())
-		{
-			ht = mesh->opposite_halfedge_handle(mesh->prev_halfedge_handle(ht));
-			index += 4 - matching[ht.idx()];
-		}
-		index %= 4;
-		//index=
-		//0  iov0
-
-		double e0, e1;
-		for (int i = 0; i < 2; ++i)
-		{
-
-		}
-		return std::min(e0, e1);
-	}
 
 	double LoopGen::EvaluateSimilarity(Eigen::Matrix3Xd& loop0, Eigen::Matrix3Xd& loop1, double u, int begin_seg)
 	{

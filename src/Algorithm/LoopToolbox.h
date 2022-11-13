@@ -92,15 +92,14 @@ namespace LoopGen
 		void InitializeGraphWeight(double alpha = 899);
 		void InitializePQ();
 		void ConstructSubRegion(InfoOnVertex* iov, std::vector<std::vector<InfoOnVertex*>> advancing_front[2]);
+		bool SpreadSubRegion(std::vector<std::vector<InfoOnVertex*>> advancing_front[2], LocalParametrization& lp);
 		void ConstructRegionCut(VertexHandle v, int shift, std::deque<bool>& visited, std::vector<VertexHandle> &cut);
 		void OptimizeLoop();
+		bool IsGood(std::vector<InfoOnVertex*>& af, std::deque<bool> &update_mark, LocalParametrization &lp, double threshold = 2.0);
 
 		bool FieldAligned_PlanarLoop(VertexHandle v, std::vector<VertexHandle> &loop, int shift = 0);
 		double RefineLoopByPlanarity(std::vector<VertexHandle>& loop, PlaneLoop& planar_loop, int shift);
-		void RefineLoopByParametrization(InfoOnVertex &iov, LocalParametrization& lp);
-
-		double ComputeAdjVertexSimilarity(InfoOnVertex& iov0, InfoOnVertex& iov1);
-
+		bool RefineLoopByParametrization(InfoOnVertex &iov, LocalParametrization& lp);
 		void GetPositionFromLoop(const std::vector<VertexHandle>& loop, Eigen::VectorXd xyz[3]);
 		double EvaluateSimilarity(Eigen::Matrix3Xd &loop0, Eigen::Matrix3Xd &loop1, double u, int begin_seg);
 	};

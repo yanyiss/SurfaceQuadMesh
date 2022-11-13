@@ -993,6 +993,7 @@ void InteractiveViewerWidget::draw_submesh()
 						continue;
 					auto& pos = mesh.point(rr->v);
 					glVertex3dv(pos.data());
+					//auto rst = rr == &lg->InfoOnMesh[2 * rr->v.idx()] ? &lg->InfoOnMesh[2 * rr->v.idx() + 1] : &lg->InfoOnMesh[2 * rr->v.idx()];
 					for (auto& pp : rr->pl)
 					{
 						auto poin = (1 - pp.c) * mesh.point(mesh.to_vertex_handle(pp.h)) + pp.c * mesh.point(mesh.from_vertex_handle(pp.h));
