@@ -47,10 +47,11 @@ public:
 	void write_field(std::string &field_file);
 
 	const std::vector<int>& getConstraintFace() { return constraintId; }
-	const Eigen::Matrix3Xd& getCrossField() { return crossfield; }
+	Eigen::Matrix3Xd& getCrossField() { return crossfield; }
 	const Eigen::Matrix3Xd& getPosition() { return position; }
 	const Eigen::Matrix3Xd& getNormal() { return normal; }
-	const std::vector<int>& getMatching() { return matching; }
+	const Eigen::Matrix3Xd& getFaceBase() { return faceBase; }
+	std::vector<int>& getMatching() { return matching; }
 	const std::vector<int>& getSingularity() { return singularity; }
 	
 

@@ -946,13 +946,13 @@ void InteractiveViewerWidget::draw_submesh()
 		glEnd();
 		glColor3d(0.9, 0.1, 0.1);
 		glBegin(GL_LINES);
-		for (int i = 0; i < lg->ff_id.size(); ++i)
+		for (int i = 0; i < lg->face_field_shift.size(); ++i)
 		{
-			if (lg->ff_id[i] < 0)
+			if (lg->face_field_shift[i] < 0)
 				continue;
 			Eigen::Vector3d p = 0.5 * (crossfield.col(4 * i) + crossfield.col(4 * i + 2));
 			glVertex3dv(p.data());
-			glVertex3dv(crossfield.col(4 * i + lg->ff_id[i]).data());
+			glVertex3dv(crossfield.col(4 * i + lg->face_field_shift[i]).data());
 		}
 		glEnd();
 		
@@ -980,31 +980,31 @@ void InteractiveViewerWidget::draw_submesh()
 		}
 		glEnd();*/
 
-		int count = 0;
-		glBegin(GL_LINES);
-		glColor3d(0.8, 0.2, 0.1);
-		for (auto& ss : lg->advancing_front)
-		{
-			for (auto& tt : ss)
-			{
-				for (auto& rr : tt)
-				{
-					if (++count % 10 != 0)
-						continue;
-					auto& pos = mesh.point(rr->v);
-					glVertex3dv(pos.data());
-					//auto rst = rr == &lg->InfoOnMesh[2 * rr->v.idx()] ? &lg->InfoOnMesh[2 * rr->v.idx() + 1] : &lg->InfoOnMesh[2 * rr->v.idx()];
-					for (auto& pp : rr->pl)
-					{
-						auto poin = (1 - pp.c) * mesh.point(mesh.to_vertex_handle(pp.h)) + pp.c * mesh.point(mesh.from_vertex_handle(pp.h));
-						glVertex3dv(poin.data());
-						glVertex3dv(poin.data());
-					}
-					glVertex3dv(pos.data());
-				}
-			}
-		}
-		glEnd();
+		//int count = 0;
+		//glBegin(GL_LINES);
+		//glColor3d(0.8, 0.2, 0.1);
+		//for (auto& ss : lg->advancing_front)
+		//{
+		//	for (auto& tt : ss)
+		//	{
+		//		for (auto& rr : tt)
+		//		{
+		//			if (++count % 10 != 0)
+		//				continue;
+		//			auto& pos = mesh.point(rr->v);
+		//			glVertex3dv(pos.data());
+		//			//auto rst = rr == &lg->InfoOnMesh[2 * rr->v.idx()] ? &lg->InfoOnMesh[2 * rr->v.idx() + 1] : &lg->InfoOnMesh[2 * rr->v.idx()];
+		//			for (auto& pp : rr->pl)
+		//			{
+		//				auto poin = (1 - pp.c) * mesh.point(mesh.to_vertex_handle(pp.h)) + pp.c * mesh.point(mesh.from_vertex_handle(pp.h));
+		//				glVertex3dv(poin.data());
+		//				glVertex3dv(poin.data());
+		//			}
+		//			glVertex3dv(pos.data());
+		//		}
+		//	}
+		//}
+		//glEnd();
 	}
 }
 
