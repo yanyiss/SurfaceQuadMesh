@@ -1194,7 +1194,7 @@ namespace LoopGen
 			ConstructRegionCut(iov->v, shift, visited_v, lp.GetCut());
 			dprint("º∆À„cut");
 			lp.run();
-			if (rr == 8)
+			if (rr == 10)
 				break;
 			++rr;
 		} while (SpreadSubRegion(lp, grow_flag));

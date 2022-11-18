@@ -218,8 +218,8 @@ void crossField::runLocalOpt(std::vector<FaceHandle>& opt_face, std::deque<bool>
 			auto ev = (position.col(fh.handle().to().idx()) - position.col(fh.handle().from().idx())).normalized();
 			COMPLEX e_f = COMPLEX(ev.dot(faceBase.col(fid * 2)), -ev.dot(faceBase.col(fid * 2 + 1)));
 			COMPLEX e_g = COMPLEX(ev.dot(faceBase.col(gid * 2)), -ev.dot(faceBase.col(gid * 2 + 1)));
-			e_f *= e_f; e_f *= e_f;
-			e_g *= e_g; e_g *= e_g;
+			//e_f *= e_f; e_f *= e_f;
+			//e_g *= e_g; e_g *= e_g;
 			if (opt_flag[fid])
 			{
 				triple.emplace_back(count, idmap[fid], e_f);
@@ -227,7 +227,7 @@ void crossField::runLocalOpt(std::vector<FaceHandle>& opt_face, std::deque<bool>
 			else
 			{
 				COMPLEX dir = COMPLEX(crossfield.col(fid * 4).dot(faceBase.col(2 * fid)), crossfield.col(fid * 4).dot(faceBase.col(2 * fid + 1)));
-				dir *= dir; dir *= dir;
+				//dir *= dir; dir *= dir;
 				b(count) -= e_f * dir;
 			}
 			if (opt_flag[gid])
@@ -237,7 +237,7 @@ void crossField::runLocalOpt(std::vector<FaceHandle>& opt_face, std::deque<bool>
 			else
 			{
 				COMPLEX dir = COMPLEX(crossfield.col(gid * 4).dot(faceBase.col(2 * gid)), crossfield.col(gid * 4).dot(faceBase.col(2 * gid + 1)));
-				dir *= dir; dir *= dir;
+				//dir *= dir; dir *= dir;
 				b(count) = +e_g * dir;
 			}
 			++count;
@@ -255,7 +255,7 @@ void crossField::runLocalOpt(std::vector<FaceHandle>& opt_face, std::deque<bool>
 	for (auto f : opt_face)
 	{
 		int fid = f.idx();
-		double theta = std::arg(b(idmap[fid])) * 0.25;
+		double theta = std::arg(b(idmap[fid]));// *0.25;
 		//dprint(b(idmap[fid]), theta);
 		for (int i = 0; i < 4; ++i)
 		{

@@ -1002,7 +1002,7 @@ void InteractiveViewerWidget::draw_submesh()
 		}
 		glEnd();*/
 
-		glBegin(GL_TRIANGLES);
+		/*glBegin(GL_TRIANGLES);
 		glColor3d(0.2, 0.3, 0.9);
 		for (auto f : lg->sub_face)
 		{
@@ -1011,7 +1011,7 @@ void InteractiveViewerWidget::draw_submesh()
 				glVertex3dv(mesh.point(fv).data());
 			}
 		}
-		glEnd();
+		glEnd();*/
 
 #if 1
 		//»­loop
