@@ -19,14 +19,8 @@ should satisfy the following properties
 class crossField
 {
 public:
-	crossField(Mesh *m) : mesh(m) {
-		position.resize(3, m->n_vertices());
-		for (auto &tv : m->vertices())
-		{
-			auto &p = mesh->point(tv);
-			position.col(tv.idx()) << p[0], p[1], p[2];
-		}
-		calculateMeshFaceBase(); 
+	crossField(Mesh *m) {
+		init(m);
 		runPolynomial();
 	};
 	crossField(std::string& field_file);
@@ -36,7 +30,19 @@ public:
 private:
 	void calculateMeshFaceBase();
 public:
+	void init(Mesh *m) 
+	{
+		mesh = m;
+		position.resize(3, m->n_vertices());
+		for (auto& tv : m->vertices())
+		{
+			auto& p = mesh->point(tv);
+			position.col(tv.idx()) << p[0], p[1], p[2];
+		}
+		calculateMeshFaceBase();
+	}
 	void runPolynomial();
+	void runLocalOpt(std::vector<FaceHandle>& opt_face, std::deque<bool> &grow_dir, std::deque<bool>& opt_flag, std::deque<bool>& constraint_flag);
 	//void runIteration(std::vector<OpenMesh::Vec3d>& crossfield);
 
 	void setCurvatureConstraint();
@@ -55,9 +61,9 @@ public:
 	const std::vector<int>& getSingularity() { return singularity; }
 	
 
-private:
+//private:
 	typedef std::complex<double> COMPLEX;
-	Mesh* mesh;
+	Mesh* mesh = nullptr;
 	//std::vector<OpenMesh::Vec3d> faceBase;
 	//std::vector<int> constraintId;
 	//std::vector<OpenMesh::Vec3d> constraintVector;

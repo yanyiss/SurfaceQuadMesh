@@ -192,6 +192,164 @@ void crossField::runPolynomial()
 	setSingularity();
 }
 
+void crossField::runLocalOpt(std::vector<FaceHandle>& opt_face, std::deque<bool>& grow_dir, std::deque<bool>& opt_flag, std::deque<bool>& constraint_flag)
+{
+	std::vector<Eigen::Triplet<COMPLEX>> triple;
+	int count = 0;
+	std::vector<int> idmap(mesh->n_faces());
+	for (auto f : opt_face)
+	{
+		idmap[f.idx()] = count++;
+	}
+	Eigen::VectorXcd b(3 * opt_face.size()); b.setZero();
+	count = 0;
+	for (auto f : opt_face)
+	{
+		int fid = f.idx();
+		for (auto fh = mesh->fh_begin(f); fh != mesh->fh_end(f); ++fh)
+		{
+			if (fh.handle().edge().is_boundary())
+				continue;
+			auto gid = fh.handle().opp().face().idx();
+			//if (fid < gid || !(opt_flag[gid] || constraint_flag[gid]))
+				//continue;
+			if (!(opt_flag[gid] || constraint_flag[gid]) || (opt_flag[gid] && fid < gid))
+				continue;
+			auto ev = (position.col(fh.handle().to().idx()) - position.col(fh.handle().from().idx())).normalized();
+			COMPLEX e_f = COMPLEX(ev.dot(faceBase.col(fid * 2)), -ev.dot(faceBase.col(fid * 2 + 1)));
+			COMPLEX e_g = COMPLEX(ev.dot(faceBase.col(gid * 2)), -ev.dot(faceBase.col(gid * 2 + 1)));
+			e_f *= e_f; e_f *= e_f;
+			e_g *= e_g; e_g *= e_g;
+			if (opt_flag[fid])
+			{
+				triple.emplace_back(count, idmap[fid], e_f);
+			}
+			else
+			{
+				COMPLEX dir = COMPLEX(crossfield.col(fid * 4).dot(faceBase.col(2 * fid)), crossfield.col(fid * 4).dot(faceBase.col(2 * fid + 1)));
+				dir *= dir; dir *= dir;
+				b(count) -= e_f * dir;
+			}
+			if (opt_flag[gid])
+			{
+				triple.emplace_back(count, idmap[gid], -e_g);
+			}
+			else
+			{
+				COMPLEX dir = COMPLEX(crossfield.col(gid * 4).dot(faceBase.col(2 * gid)), crossfield.col(gid * 4).dot(faceBase.col(2 * gid + 1)));
+				dir *= dir; dir *= dir;
+				b(count) = +e_g * dir;
+			}
+			++count;
+		}
+	}
+
+	Eigen::SimplicialLDLT<Eigen::SparseMatrix<COMPLEX>> slu;
+	Eigen::SparseMatrix<COMPLEX> A(count, opt_face.size());
+	A.setFromTriplets(triple.begin(), triple.end());
+	Eigen::SparseMatrix<COMPLEX> AT = A.adjoint();
+	Eigen::SimplicialLDLT<Eigen::SparseMatrix<COMPLEX>> solver;
+	solver.compute(AT * A);
+	b = solver.solve(AT * b.head(count));
+
+	for (auto f : opt_face)
+	{
+		int fid = f.idx();
+		double theta = std::arg(b(idmap[fid])) * 0.25;
+		//dprint(b(idmap[fid]), theta);
+		for (int i = 0; i < 4; ++i)
+		{
+			crossfield.col(fid * 4 + i) = faceBase.col(fid * 2) * cos(theta + i * PI * 0.5) + faceBase.col(fid * 2 + 1) * sin(theta + i * PI * 0.5);
+		}
+	}
+	double invHalfPI = 2.0 / PI;
+	std::vector<int> mat_temp(mesh->n_halfedges(), -1);
+	for (auto f : opt_face)
+	{
+		int fid = f.idx();
+		for (auto fh = mesh->fh_begin(f); fh != mesh->fh_end(f); ++fh)
+		{
+			if (fh.handle().edge().is_boundary())
+				continue;
+			int gid = fh.handle().opp().face().idx();
+			if (fid < gid && opt_flag[gid])
+				continue;
+			Eigen::Vector3d ev = position.col(fh.handle().to().idx()) - position.col(fh.handle().from().idx());
+			auto fec = COMPLEX(faceBase.col(fid * 2).dot(ev), faceBase.col(fid * 2 + 1).dot(ev));
+			auto gec = COMPLEX(faceBase.col(gid * 2).dot(ev), faceBase.col(gid * 2 + 1).dot(ev));
+			auto fc = COMPLEX(crossfield.col(fid * 4).dot(faceBase.col(fid * 2)), crossfield.col(fid * 4).dot(faceBase.col(fid * 2 + 1)));
+			auto gc = COMPLEX(crossfield.col(gid * 4).dot(faceBase.col(gid * 2)), crossfield.col(gid * 4).dot(faceBase.col(gid * 2 + 1)));
+			int m = std::floor((std::arg(fc * gec / (gc * fec)) + PI * 0.25) * invHalfPI);
+			mat_temp[fh.handle().idx()] = (m + 4) % 4;
+			mat_temp[fh.handle().opp().idx()] = (4 - m) % 4;
+		}
+	}
+
+	bool grow_flag[2] = { false, false };
+	std::queue<FaceHandle> face_tree;
+	std::vector<int> ff_id(mesh->n_faces(), -1);
+	std::deque<bool> searched(mesh->n_faces(), false);
+	for (auto f : opt_face)
+	{
+		for (auto ff = mesh->ff_begin(f); ff != mesh->ff_end(f); ++ff)
+		{
+			if (constraint_flag[ff->idx()])
+			{
+				face_tree.push(ff.handle());
+				ff_id[ff->idx()] = 0;
+				searched[ff->idx()] = true;
+				grow_flag[grow_dir[mesh->fv_begin(f)->idx()]] = true;
+				if (grow_flag[0] && grow_flag[1])
+					goto target;
+			}
+		}
+	}
+target:;
+	Eigen::Vector3d temp;
+	while (!face_tree.empty())
+	{
+		auto ft = face_tree.front();
+		int ftid = ft.idx();
+		switch (ff_id[ftid])
+		{
+		case 0:
+			break;
+		case 1:
+			temp = crossfield.col(ftid * 4);
+			crossfield.col(ftid * 4) = crossfield.col(ftid * 4 + 1);
+			crossfield.col(ftid * 4 + 1) = crossfield.col(ftid * 4 + 2);
+			crossfield.col(ftid * 4 + 2) = crossfield.col(ftid * 4 + 3);
+			crossfield.col(ftid * 4 + 3) = temp;
+			break;
+		case 2:
+			temp = crossfield.col(ftid * 4);
+			crossfield.col(ftid * 4) = crossfield.col(ftid * 4 + 2);
+			crossfield.col(ftid * 4 + 2) = temp;
+			temp = crossfield.col(ftid * 4 + 1);
+			crossfield.col(ftid * 4 + 1) = crossfield.col(ftid * 4 + 3);
+			crossfield.col(ftid * 4 + 3) = temp;
+			break;
+		case 3:
+			temp = crossfield.col(ftid * 4 + 3);
+			crossfield.col(ftid * 4 + 3) = crossfield.col(ftid * 4 + 2);
+			crossfield.col(ftid * 4 + 2) = crossfield.col(ftid * 4 + 1);
+			crossfield.col(ftid * 4 + 1) = crossfield.col(ftid * 4);
+			crossfield.col(ftid * 4) = temp;
+			break;
+		}
+		face_tree.pop();
+		for (auto fh = mesh->fh_begin(ft); fh != mesh->fh_end(ft); ++fh)
+		{
+			auto oppo_f = mesh->face_handle(mesh->opposite_halfedge_handle(fh)).idx();
+			if (searched[oppo_f] || !opt_flag[oppo_f])
+				continue;
+			searched[oppo_f] = true;
+			ff_id[oppo_f] = (ff_id[ft.idx()] + mat_temp[fh->idx()]) % 4;
+			face_tree.push(mesh->face_handle(oppo_f));
+		}
+	}
+}
+
 //void crossField::runIteration(std::vector<OpenMesh::Vec3d>& crossfield)
 //{
 //	using namespace std;

@@ -11,29 +11,6 @@ namespace LoopGen
 		const auto& matching = cf->getMatching();
 		int nf = mesh->n_faces();
 
-		//计算每个面上的场shift
-		std::queue<FaceHandle> face_tree;
-		{
-			for (auto sp : region_border_face)
-				face_tree.push(sp);
-			std::deque<bool> search_face(nf, false);
-			while (!face_tree.empty())
-			{
-				auto fc = face_tree.front();
-				face_tree.pop();
-				for (auto fh = mesh->fh_begin(fc); fh != mesh->fh_end(fc); ++fh)
-				{
-					auto oppo_f = mesh->face_handle(mesh->opposite_halfedge_handle(fh)).idx();
-					if (search_face[oppo_f] || !new_f_flag[oppo_f])
-						continue;
-					search_face[oppo_f] = true;
-					face_field_shift[oppo_f] = (face_field_shift[fc.idx()] + matching[fh->idx()]) % 4;
-					face_tree.push(mesh->face_handle(oppo_f));
-				}
-			}
-		}
-		dprint("计算每个面上的场shift");
-
 		//标记与cut相关的顶点和面，计算装配矩阵需要的数据
 		int nv = mesh->n_vertices();
 		cutv_flag.resize(nv, false);
@@ -155,8 +132,8 @@ namespace LoopGen
 					else
 						w[fvid] += dot_;
 				}
-				uv[0](vm) += crossfield.col(4 * vf_id + face_field_shift[vf_id]).dot(R) * size_ratio[vf_id];
-				uv[1](vm) += crossfield.col(4 * vf_id + (face_field_shift[vf_id] + 1) % 4).dot(R) * size_ratio[vf_id];
+				uv[0](vm) += crossfield.col(4 * vf_id).dot(R) * size_ratio[vf_id];
+				uv[1](vm) += crossfield.col(4 * vf_id + 1).dot(R) * size_ratio[vf_id];
 			}
 			triple.emplace_back(vm - region_vertex_size, vm - region_vertex_size, w[vid]);
 			w[vid] = 0;
@@ -403,6 +380,14 @@ namespace LoopGen
 		eov.resize(mesh->n_vertices(), YYSS_INFINITE);
 		timeRecorder tr;
 		InfoOnMesh.resize(mesh->n_vertices() * 2);
+		for (int i = 0; i < mesh->n_vertices(); ++i)
+		{
+			for (int j = 0; j < 2; ++j)
+			{
+				InfoOnMesh[2 * i + j].v = mesh->vertex_handle(i);
+			}
+		}
+		dprint(mesh->n_vertices(), InfoOnMesh.size());
 		int nedges = mesh->n_edges();
 
 		tr.tog();
@@ -413,7 +398,6 @@ namespace LoopGen
 			{
 				for (int j = 0; j < 2; ++j)
 				{
-					InfoOnMesh[2 * i + j].v = mesh->vertex_handle(i);
 					if (FieldAligned_PlanarLoop(InfoOnMesh[2 * i + j].v, InfoOnMesh[2 * i + j].loop, j))
 					{
 						eov[i] = std::min(eov[i], RefineLoopByPlanarity(InfoOnMesh[2 * i + j].loop, InfoOnMesh[2 * i + j].pl, j));
@@ -589,11 +573,15 @@ namespace LoopGen
 		tr.out("time of setting vertex energy");
 	}
 
-	void LoopGen::ConstructSubRegion(InfoOnVertex* iov, std::vector<std::vector<InfoOnVertex*>> advancing_front[2])
+	void LoopGen::ConstructInitialRegion(InfoOnVertex* iov, LocalParametrization &lp)
 	{
+		int nv = mesh->n_vertices();
+		int nf = mesh->n_faces();
+
 		auto& pl = iov->pl;
 		std::vector<InfoOnVertex*> IOV; 
 		IOV.push_back(iov);
+		std::vector<std::vector<InfoOnVertex*>> advancing_front[2];
 		advancing_front[0].push_back(IOV);
 		//advancing_front[1].push_back(IOV);
 		std::vector<InfoOnVertex*> hierarchy_vertex[2];
@@ -642,212 +630,233 @@ namespace LoopGen
 			toid = 2 * mesh->to_vertex_handle(h_b).idx();
 			hierarchy_vertex[1].push_back(iov->mark.find(&InfoOnMesh[toid]) != iov->mark.end() ? &InfoOnMesh[toid] : &InfoOnMesh[toid + 1]);
 		}
-		advancing_front[0].push_back(std::move(hierarchy_vertex[0]));
+		//advancing_front[0].push_back(std::move(hierarchy_vertex[0]));
+		advancing_front[0][0] = std::move(hierarchy_vertex[0]);
 		advancing_front[1].push_back(std::move(hierarchy_vertex[1]));
 
 		double energy_threshold = 2.0;
-		std::deque<bool> visited_v(mesh->n_vertices(), false);
 
+		std::deque<bool> visited_v(mesh->n_vertices(), false);
 		visited_v[iov->v.idx()] = true;
 		for (auto caf : advancing_front[0].back())
 			visited_v[caf->v.idx()] = true;
 		for (auto caf : advancing_front[1].back())
 			visited_v[caf->v.idx()] = true;
 
-		int begin_id = 0;
-		int end_id = advancing_front[0][1].size();
 		while (true)
 		{
-			for (int i = begin_id; i < end_id; ++i)
-			{
-				const auto& caf = advancing_front[0][1][i];
-				const auto& mark = caf->mark;
-				for (auto vitr = mesh->vv_begin(caf->v); vitr != mesh->vv_end(caf->v); ++vitr)
-				{
-					toid = vitr->idx();
-					if (visited_v[toid])
-						continue;
-					visited_v[toid] = true;
-					toid *= 2;
-					advancing_front[0][1].push_back(mark.find(&InfoOnMesh[toid]) != mark.end() ? &InfoOnMesh[toid] : &InfoOnMesh[toid + 1]);
-					if (advancing_front[0][1].back()->energy > energy_threshold)
-						goto target0;
-				}
-				begin_id = end_id + 1;
-				end_id = advancing_front[0][1].size();
-			}
-			//const auto& current_af = advancing_front[0].back();
-			/*std::vector<InfoOnVertex*> hierarchy;
-			hierarchy.reserve(current_af.capacity());
+			const auto& current_af = advancing_front[0].back();
+			std::vector<InfoOnVertex*> hierarchy;
 			for (auto caf : current_af)
 			{
-				const auto& mark = caf->mark;
-				for (auto vitr = mesh->vv_begin(caf->v); vitr != mesh->vv_end(caf->v); ++vitr)
+				for (const auto& iov_nei : caf->mark)
 				{
-					toid = vitr->idx();
-					if (visited_v[toid])
+					int inid = iov_nei.first->v.idx();
+					if (visited_v[inid])
 						continue;
-					visited_v[toid] = true;
-					toid *= 2;
-					hierarchy.push_back(mark.find(&InfoOnMesh[toid]) != mark.end() ? &InfoOnMesh[toid] : &InfoOnMesh[toid + 1]);
-					if (hierarchy.back()->energy > energy_threshold)
+					if (iov_nei.first->energy > energy_threshold)
 						goto target0;
+					visited_v[inid] = true;
+					hierarchy.push_back(iov_nei.first);
 				}
 			}
-			advancing_front[0].push_back(std::move(hierarchy));*/
+			advancing_front[0].push_back(std::move(hierarchy));
 		}
 	target0:;
-		begin_id = 0;
-		end_id = advancing_front[1][0].size();
 		while (true)
 		{
-			for (int i = begin_id; i < end_id; ++i)
-			{
-				const auto& caf = advancing_front[1][0][i];
-				const auto& mark = caf->mark;
-				for (auto vitr = mesh->vv_begin(caf->v); vitr != mesh->vv_end(caf->v); ++vitr)
-				{
-					toid = vitr->idx();
-					if (visited_v[toid])
-						continue;
-					visited_v[toid] = true;
-					toid *= 2;
-					advancing_front[1][0].push_back(mark.find(&InfoOnMesh[toid]) != mark.end() ? &InfoOnMesh[toid] : &InfoOnMesh[toid + 1]);
-					if (advancing_front[1][0].back()->energy > energy_threshold)
-						goto target1;
-				}
-				begin_id = end_id + 1;
-				end_id = advancing_front[1][0].size();
-			}
-			/*const auto& current_af = advancing_front[1].back();
+			const auto& current_af = advancing_front[1].back();
 			std::vector<InfoOnVertex*> hierarchy;
-			hierarchy.reserve(current_af.capacity());
 			for (auto caf : current_af)
 			{
-				const auto& mark = caf->mark;
-				for (auto vitr = mesh->vv_begin(caf->v); vitr != mesh->vv_end(caf->v); ++vitr)
+				for (const auto& iov_nei : caf->mark)
 				{
-					toid = vitr->idx();
-					if (visited_v[toid])
+					int inid = iov_nei.first->v.idx();
+					if (visited_v[inid])
 						continue;
-					visited_v[toid] = true;
-					toid *= 2;
-					hierarchy.push_back(mark.find(&InfoOnMesh[toid]) != mark.end() ? &InfoOnMesh[toid] : &InfoOnMesh[toid + 1]);
-					if (hierarchy.back()->energy > energy_threshold)
+					if (iov_nei.first->energy > energy_threshold)
 						goto target1;
+					visited_v[inid] = true;
+					hierarchy.push_back(iov_nei.first);
 				}
 			}
-			advancing_front[1].push_back(std::move(hierarchy));*/
+			advancing_front[1].push_back(std::move(hierarchy));
 		}
 	target1:;
 
-		//提取有完整loop的区域
-		/*std::vector<InfoOnVertex*> hv[2];
-		for (auto caf : advancing_front[0][1])
+		auto& new_vertex = lp.GetNewVertex();
+		auto& new_face = lp.GetNewFace();
+		auto& newv_flag = lp.GetNewVFlag(); newv_flag.resize(nv, false);
+		auto& newf_flag = lp.GetNewFFlag(); newf_flag.resize(nf, false);
+		auto& regionv_flag = lp.GetRegionVFlag();
+		auto& regionf_flag = lp.GetRegionFFlag();
+		auto& grow_dir = lp.GetGrowDir();
+		for (int i = 0; i < 2; ++i)
 		{
-			for (auto& pl : caf->pl)
+			for (auto& ss : advancing_front[i])
 			{
-				if (!visited_v[mesh->from_vertex_handle(pl.h).idx()] || !visited_v[mesh->to_vertex_handle(pl.h).idx()])
-					goto target00;
+				for (auto& tt : ss)
+				{
+					new_vertex.push_back(tt->v);
+					grow_dir[tt->v.idx()] = i;
+					newv_flag[tt->v.idx()] = true;
+				}
 			}
-			hv[0].push_back(caf);
-		target00:;
 		}
-		advancing_front[0][1] = std::move(hv[0]);
-		for (auto caf : advancing_front[1][0])
+
+		for (auto new_v : new_vertex)
 		{
-			for (auto& pl : caf->pl)
+			for (auto vf = mesh->vf_begin(new_v); vf != mesh->vf_end(new_v); ++vf)
 			{
-				if (!visited_v[mesh->from_vertex_handle(pl.h).idx()] || !visited_v[mesh->to_vertex_handle(pl.h).idx()])
-					goto target11;
+				int vf_id = vf->idx();
+				if (regionf_flag[vf_id] || newf_flag[vf_id])
+					continue;
+				for (auto vfv = mesh->fv_begin(vf.handle()); vfv != mesh->fv_end(vf.handle()); ++vfv)
+				{
+					if (!(regionv_flag[vfv->idx()] || newv_flag[vfv->idx()]))
+						goto target2;
+				}
+				new_face.push_back(vf.handle());
+				newf_flag[vf_id] = true;
+			target2:;
 			}
-			hv[1].push_back(caf);
-		target11:;
 		}
-		advancing_front[1][0] = std::move(hv[1]);*/
+
+		std::queue<FaceHandle> face_tree;
+		face_tree.push(mesh->vf_begin(iov->v).handle());
+		std::vector<int> ff_id(nf, -1);
+		ff_id[face_tree.front().idx()] = iov == &InfoOnMesh[iov->v.idx() * 2] ? 0 : 1;
+		auto& matching = cf->getMatching();
+		auto& crossfield = cf->getCrossField();
+		std::deque<bool> searched(nf, false);
+		searched[face_tree.front().idx()] = true;
+		Eigen::Vector3d temp;
+		while (!face_tree.empty())
+		{
+			auto ft = face_tree.front();
+			int ftid = ft.idx();
+			switch (ff_id[ftid])
+			{
+			case 0:
+				break;
+			case 1:
+				temp = crossfield.col(ftid * 4);
+				crossfield.col(ftid * 4) = crossfield.col(ftid * 4 + 1);
+				crossfield.col(ftid * 4 + 1) = crossfield.col(ftid * 4 + 2);
+				crossfield.col(ftid * 4 + 2) = crossfield.col(ftid * 4 + 3);
+				crossfield.col(ftid * 4 + 3) = temp;
+				break;
+			case 2:
+				temp = crossfield.col(ftid * 4);
+				crossfield.col(ftid * 4) = crossfield.col(ftid * 4 + 2);
+				crossfield.col(ftid * 4 + 2) = temp;
+				temp = crossfield.col(ftid * 4 + 1);
+				crossfield.col(ftid * 4 + 1) = crossfield.col(ftid * 4 + 3);
+				crossfield.col(ftid * 4 + 3) = temp;
+				break;
+			case 3:
+				temp = crossfield.col(ftid * 4 + 3);
+				crossfield.col(ftid * 4 + 3) = crossfield.col(ftid * 4 + 2);
+				crossfield.col(ftid * 4 + 2) = crossfield.col(ftid * 4 + 1);
+				crossfield.col(ftid * 4 + 1) = crossfield.col(ftid * 4);
+				crossfield.col(ftid * 4) = temp;
+				break;
+			}
+			face_tree.pop();
+			for (auto fh = mesh->fh_begin(ft); fh != mesh->fh_end(ft); ++fh)
+			{
+				auto oppo_f = mesh->face_handle(mesh->opposite_halfedge_handle(fh)).idx();
+				if (searched[oppo_f] || !newf_flag[oppo_f])
+					continue;
+				searched[oppo_f] = true;
+				ff_id[oppo_f] = (ff_id[ft.idx()] + matching[fh->idx()]) % 4;
+				face_tree.push(mesh->face_handle(oppo_f));
+			}
+		}
 	}
 
-	bool LoopGen::SpreadSubRegion(std::vector<std::vector<InfoOnVertex*>> advancing_front[2], LocalParametrization& lp, bool grow_flag[2])
+	bool LoopGen::SpreadSubRegion(LocalParametrization& lp, bool grow_flag[2])
 	{
 		auto& newv_flag = lp.GetNewVFlag();
 		auto& newf_flag = lp.GetNewFFlag();
 		auto& new_vertex = lp.GetNewVertex();
 		auto& new_face = lp.GetNewFace();
+		std::deque<bool> visited_v = lp.GetRegionVFlag();
+		std::deque<bool> visited_f = lp.GetRegionFFlag();
 
 		for (auto new_v : new_vertex)
+		{
+			visited_v[new_v.idx()] = true;
 			newv_flag[new_v.idx()] = false;
+		}
 		for (auto new_f : new_face)
+		{
+			visited_f[new_f.idx()] = true;
 			newf_flag[new_f.idx()] = false;
+		}
 
 		//提取含有完整loop的区域
-		std::vector<InfoOnVertex*> to_add_vertex[2];
-		//std::deque<bool> to_add_flag(mesh->n_vertices(), false);
-		for (int i = 0; i < 2; ++i)
+		std::vector<VertexHandle> vertex_cache;
+		for (auto new_v : new_vertex)
 		{
-			if (grow_flag[i])
+			////////////////////////注意！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
+			//这里取得InfoOnVertex是随意取的，后续需要更改
+			int newid = new_v.idx();
+			if (RefineLoopByParametrization(InfoOnMesh[2 * newid], lp, visited_v, visited_f))
 			{
-				for (auto add_v : advancing_front[i].back())
-				{
-					int vid = add_v->v.idx();
-					if (RefineLoopByParametrization(*add_v, lp))
-					{
-						newv_flag[vid] = true;
-						to_add_vertex[i].push_back(add_v);
-					}
-				}
-				if (to_add_vertex[i].empty())
-					grow_flag[i] = false;
-				else
-					advancing_front[i].back() = std::move(to_add_vertex[i]);
+				//newv_flag[newid] = true;
+				vertex_cache.push_back(new_v);
 			}
 		}
 		dprint("提取含有完整loop的区域");
+		if (vertex_cache.empty())
+			return false;
 
 		auto& regionv_flag = lp.GetRegionVFlag();
 		auto& regionf_flag = lp.GetRegionFFlag();
+		auto& grow_dir = lp.GetGrowDir();
+#if 0
 		//检测将要加入区域的to_add_vertex的相似性
-		for (int i = 0; i < 2; ++i)
+		for (auto new_v : vertex_cache)
 		{
-			if (grow_flag[i])
+			int new_id = new_v.idx();
+			int grow_id = grow_dir[new_id] ? 1 : 0;
+			if (!grow_flag[grow_id])
+				continue;
+			InfoOnVertex* iov0 = &InfoOnMesh[new_id * 2];
+			for (auto vv = mesh->vv_begin(new_v); vv != mesh->vv_end(new_v); ++vv)
 			{
-				for (auto tav : to_add_vertex[i])
-				{
-					int tav_id = tav->v.idx();
-					for (const auto& tav_nei : tav->mark)
-					{
-						int tav_neid = tav_nei.first->v.idx();
-						if (tav_id > tav_neid || (!regionv_flag[tav_neid] && !newv_flag[tav_neid]))
-							continue;
-						grow_flag[i] = IsGood(tav, tav_nei.first, lp);
-						if (!grow_flag[i])
-							goto target0;
-					}
-				}
+				InfoOnVertex* iov1 = &InfoOnMesh[vv->idx() * 2];
+				if (new_id > vv->idx() || !visited_v[vv->idx()])
+					continue;
+				//grow_flag[grow_id] = IsGood(iov0, iov1, lp);
 			}
-		target0:;
 		}
 		dprint("检测将要加入区域的to_add_vertex的相似性");
 
 		//如果没有增长区域，则返回false
 		if (!grow_flag[0] && !grow_flag[1])
 			return false;
+#endif
 
 		//更新新区域
 		int count = lp.GetRegionVertex().size();
+		int begin_ = count;
 		auto& u_para = lp.GetU();
 		auto& v_para = lp.GetV();
 		auto& region_vertex = lp.GetRegionVertex();
 		auto& region_face = lp.GetRegionFace();
-		for (int i = 0; i < 2; ++i)
+		auto& vidmap = lp.GetVidMap();
+		for (auto new_v : vertex_cache)
 		{
-			for (auto tav : to_add_vertex[i])
+			if (grow_flag[grow_dir[new_v.idx()]])
 			{
-				region_vertex.push_back(tav->v);
-				int tavid = tav->v.idx();
-				regionv_flag[tavid] = true;
-				u_para(count) = lp.GetU(tavid);
-				v_para(count) = lp.GetV(tavid);
-				lp.GetVidMap()[tavid] = count++;
+				region_vertex.push_back(new_v);
+				int newid = new_v.idx();
+				regionv_flag[newid] = true;
+				u_para(count) = lp.GetU(newid);
+				v_para(count) = lp.GetV(newid);
+				vidmap[newid] = count++;
 			}
 		}
 		u_para.conservativeResize(count);
@@ -864,117 +873,87 @@ namespace LoopGen
 		target1:;
 		}
 		dprint("更新新区域");
-
-		//设置region_border_face
-		auto& rbf = lp.GetRBF();
-		rbf.clear();
-		for (int i = 0; i < 2; ++i)
-		{
-			if (grow_flag[i])
-			{
-				for (auto iov : advancing_front[i].back())
-				{
-					for (auto voh = mesh->voh_begin(iov->v); voh != mesh->voh_end(iov->v); ++voh)
-					{
-						if (regionf_flag[voh.handle().face().idx()] != regionf_flag[voh.handle().opp().face().idx()])
-						{
-							if (regionf_flag[voh.handle().face().idx()])
-								rbf.push_back(voh.handle().face());
-							else
-								rbf.push_back(voh.handle().opp().face());
-							goto target2;
-						}
-					}
-				}
-			}
-		target2:;
-		}
-		dprint("设置region_border_face");
+		dprint("当前区域含有的顶点数：", region_vertex.size());
+#if 0
+		return false;
+#endif
 
 		//扩展advancing_front
-		int extend_layer = 3;
-		//std::deque<bool> visited(mesh->n_vertices(), false);
+		int extend_layer = 4;
 		newv_flag.resize(mesh->n_vertices(), false);
-		std::vector<InfoOnVertex*> new_hierarchy[2];
-		for (int i = 0; i < 2; ++i)
+		new_vertex.clear();
+		for (int i = begin_; i < count; ++i)
 		{
-			if (grow_flag[i])
+			auto rvi = region_vertex[i];
+			bool growid = grow_dir[rvi.idx()];
+			for (auto vv = mesh->vv_begin(rvi); vv != mesh->vv_end(rvi); ++vv)
 			{
-				for (auto iov : advancing_front[i].back())
+				int vvid = vv->idx();
+				if (regionv_flag[vvid] || newv_flag[vvid])
+					continue;
+				newv_flag[vvid] = true;
+				new_vertex.push_back(vv.handle());
+				grow_dir[vvid] = growid;
+			}
+		}
+		begin_ = 0;
+		for (int i = 0; i < extend_layer - 1; ++i)
+		{
+			int end_ = new_vertex.size();
+			for (int j = begin_; j < end_; ++j)
+			{
+				auto rvj = new_vertex[j];
+				bool growid = grow_dir[rvj.idx()];
+				for (auto vv = mesh->vv_begin(rvj); vv != mesh->vv_end(rvj); ++vv)
 				{
-					for (const auto& iov_nei : iov->mark)
-					{
-						int nid = iov_nei.first->v.idx();
-						if (!regionv_flag[nid] && !newv_flag[nid])
-						{
-							new_hierarchy[i].push_back(iov_nei.first);
-							newv_flag[nid] = true;
-						}
-					}
+					int vvid = vv->idx();
+					if (regionv_flag[vvid] || newv_flag[vvid])
+						continue;
+					newv_flag[vvid] = true;
+					new_vertex.push_back(vv.handle());
+					grow_dir[vvid] = growid;
 				}
-				int begin_ = 0;
-				for (int j = 0; j < extend_layer - 1; ++j)
+			}
+			begin_ = end_;
+		}
+
+		newf_flag.resize(mesh->n_faces(), false);
+		new_face.clear();
+		for (auto new_v : new_vertex)
+		{
+			int newid = new_v.idx();
+			for (auto vf = mesh->vf_begin(new_v); vf != mesh->vf_end(new_v); ++vf)
+			{
+				int vfid = vf->idx();
+				if (regionf_flag[vfid] || newf_flag[vfid])
+					continue;
+				for (auto vfv = mesh->fv_begin(vf.handle()); vfv != mesh->fv_end(vf.handle()); ++vfv)
 				{
-					int end_ = new_hierarchy[i].size();
-					for (int k = begin_; k < end_; ++k)
-					{
-						for (const auto& iov_nei : new_hierarchy[i][k]->mark)
-						{
-							int nid = iov_nei.first->v.idx();
-							if (!regionv_flag[nid] && !newv_flag[nid])
-							{
-								new_hierarchy[i].push_back(iov_nei.first);
-								newv_flag[nid] = true;
-							}
-						}
-					}
-					begin_ = end_;
+					if (!regionv_flag[vfv->idx()] && !newv_flag[vfv->idx()])
+						goto target2;
 				}
-				advancing_front[i].push_back(std::move(new_hierarchy[i]));
+				newf_flag[vfid] = true;
+				new_face.push_back(vf.handle());
+			target2:;
 			}
 		}
 		dprint("扩展advancing_front");
+		sub_vertex = new_vertex;
+		sub_face = new_face;
 
 		//优化新区域的场
-		ResetField(advancing_front, lp, grow_flag);
+		if (!cf->mesh)
+			cf->init(mesh);
+		cf->runLocalOpt(new_face, grow_dir, newf_flag, regionf_flag);
 		dprint("优化新区域的场");
 
 		return true;
 	}
 
-	void LoopGen::ResetField(std::vector<std::vector<InfoOnVertex*>> advancing_front[2], LocalParametrization& lp, bool grow_flag[2])
+	void LoopGen::ResetField(LocalParametrization& lp)
 	{
-		//std::vector<FaceHandle> field_face;
-		//std::deque<bool> ff_flag(mesh->n_faces(), false);
-		auto& regionv_flag = lp.GetRegionVFlag();
-		auto& regionf_flag = lp.GetRegionFFlag();
-		auto& newv_flag = lp.GetNewVFlag();
-		auto& newf_flag = lp.GetNewFFlag(); newf_flag.resize(mesh->n_faces(), false);
-		auto& new_face = lp.GetNewFace(); new_face.clear();
-		for (int i = 0; i < 2; ++i)
-		{
-			if (grow_flag[i])
-			{
-				for (auto iov : advancing_front[i].back())
-				{
-					for (auto vf = mesh->vf_begin(iov->v); vf != mesh->vf_end(iov->v); ++vf)
-					{
-						int vf_id = vf->idx();
-						if (newf_flag[vf_id] || regionf_flag[vf_id])
-							continue;
-						for (auto vfv = mesh->fv_begin(vf.handle()); vfv != mesh->fv_end(vf.handle()); ++vfv)
-						{
-							if (!newv_flag[vfv->idx()] && !regionv_flag[vfv->idx()])
-								goto target;
-						}
-						newf_flag[vf_id] = true;
-						new_face.push_back(vf.handle());
-					target:;
-					}
-				}
-			}
-		}
-
+		auto& new_face = lp.GetNewFace();
+		auto& newf_flag = lp.GetNewFFlag();
 		std::vector<int> ff_idmap(mesh->n_faces(), -1);
 		int count = 0;
 		for (auto ff : new_face)
@@ -982,7 +961,7 @@ namespace LoopGen
 			ff_idmap[ff.idx()] = count++;
 		}
 		std::vector<Eigen::Triplet<double>> triple;
-		Eigen::VectorXd right(new_face.size()); right.setZero();
+		Eigen::VectorXd right(count); right.setZero();
 		double twicePI = 2 * PI;
 		auto modifyRange = [&](double angle)
 		{
@@ -990,10 +969,11 @@ namespace LoopGen
 			else if (angle >= twicePI) angle -= twicePI;
 			return angle;
 		};
+
 		auto& crossfield = cf->getCrossField();
 		const auto& normal = cf->getNormal();
 		const auto& faceBase = cf->getFaceBase();
-		auto& face_field_shift = lp.GetFFS();
+		auto& regionf_flag = lp.GetRegionFFlag();
 		for (auto ff : new_face)
 		{
 			int ff_id = ff.idx();
@@ -1026,7 +1006,7 @@ namespace LoopGen
 				}
 				else if (regionf_flag[oppo_fid])
 				{
-					const auto& field_ = crossfield.col(4 * oppo_fid + face_field_shift[oppo_fid]);
+					const auto& field_ = crossfield.col(4 * oppo_fid);
 					double a = atan2(field_.dot(faceBase.col(2 * oppo_fid + 1)), field_.dot(faceBase.col(2 * oppo_fid)));
 					if (a < 0) a += PI;
 					right(ff_idm) += a;
@@ -1199,68 +1179,29 @@ namespace LoopGen
 		InfoOnVertex* iov = InfoOnMesh[33233 * 2].energy < InfoOnMesh[33233 * 2 + 1].energy ? &InfoOnMesh[33233 * 2] : &InfoOnMesh[33233 * 2 + 1];
 
 		std::vector<std::vector<InfoOnVertex*>> advancing_front[2];
-		ConstructSubRegion(iov, advancing_front);
 
 		LocalParametrization lp(*mesh, *cf, iov->v, iov == &InfoOnMesh[iov->v.idx() * 2] ? 0 : 1);
+		ConstructInitialRegion(iov, lp);
 		bool grow_flag[2] = { true,true };
+		int shift = iov != &InfoOnMesh[iov->v.idx() * 2] ? 0 : 1;
+		int itertimes = 0;
+		int rr = 0;
 		do
 		{
-			auto& newvertex = lp.GetNewVertex(); newvertex.clear();
-			auto& newface = lp.GetNewFace(); newface.clear();
-			auto& regionf_flag = lp.GetRegionFFlag(); //visited_f.resize(mesh->n_faces(), false);
-			auto& regionv_flag = lp.GetRegionVFlag(); //visited_v.resize(mesh->n_vertices(), false);
-			auto& newf_flag = lp.GetNewFFlag(); newf_flag.resize(mesh->n_faces(), false);
-			auto& newv_flag = lp.GetNewVFlag(); newv_flag.resize(mesh->n_vertices(), false);
-			std::deque<bool> visited = regionv_flag;
-			for (int i = 0; i < 2; ++i)
-			{
-				if (!grow_flag[i])
-					continue;
-				for (auto& vv : advancing_front[i].back())
-				{
-					newvertex.push_back(vv->v);
-					//regionv_flag[vv->v.idx()] = true;
-					newv_flag[vv->v.idx()] = true;
-					visited[vv->v.idx()] = true;
-				}
-			}
-			for (int i = 0; i < 2; ++i)
-			{
-				if (!grow_flag[i])
-					continue;
-				for (auto& vv : advancing_front[i].back())
-				{
-					for (auto vf = mesh->vf_begin(vv->v); vf != mesh->vf_end(vv->v); ++vf)
-					{
-						int vf_id = vf->idx();
-						if (regionf_flag[vf_id] || newf_flag[vf_id])
-							continue;
-						for (auto vfv = mesh->fv_begin(vf.handle()); vfv != mesh->fv_end(vf.handle()); ++vfv)
-						{
-							if (!regionv_flag[vfv->idx()] && !newv_flag[vfv->idx()])
-								goto target;
-						}
-						//regionf_flag[vf->idx()] = true;
-						newf_flag[vf_id] = true;
-						newface.push_back(vf.handle());
-					target:;
-					}
-				}
-			}
-			ConstructRegionCut(iov->v, iov != &InfoOnMesh[iov->v.idx() * 2] ? 0 : 1, visited, lp.GetCut());
-
-			//sub_vertex = lp.GetVertex(); sub_face = lp.GetFace(); sub_cut = lp.GetCut();
-
+			std::deque<bool> visited_v = lp.GetRegionVFlag();
+			for (auto ver : lp.GetNewVertex())
+				visited_v[ver.idx()] = true;
+			ConstructRegionCut(iov->v, shift, visited_v, lp.GetCut());
+			dprint("计算cut");
 			lp.run();
-
-		} while (SpreadSubRegion(advancing_front, lp, grow_flag));
-
-
-
+			if (rr == 8)
+				break;
+			++rr;
+		} while (SpreadSubRegion(lp, grow_flag));
+		region_vertex = lp.GetRegionVertex();
+		idmap = lp.GetVidMap();
 		uv_para[0] = std::move(lp.uv[0]);
 		uv_para[1] = std::move(lp.uv[1]);
-
-
 	}
 
 	double LoopGen::RefineLoopByPlanarity(std::vector<VertexHandle>& loop, PlaneLoop& planar_loop, int shift)
@@ -1362,34 +1303,46 @@ namespace LoopGen
 		return EvaluatePlanarity(xyz, plane);
 	}
 
-	bool LoopGen::RefineLoopByParametrization(InfoOnVertex& iov, LocalParametrization& lp)
+	bool LoopGen::RefineLoopByParametrization(InfoOnVertex &iov, LocalParametrization& lp, std::deque<bool>& visited_v, std::deque<bool>& visited_f)
 	{
-		iov.pl.clear();
+		static int il = 0;
+		il++;
+		if (il == 9030)
+		{
+			int iwaf = 0;
+		}
 		double v_para = lp.GetV(iov.v.idx());
 		auto hitr = mesh->voh_begin(iov.v);
+		if (!visited_f[hitr.handle().face().idx()])
+			return false;
 		double s0 = v_para - lp.GetV(mesh->to_vertex_handle(mesh->next_halfedge_handle(hitr.handle())).idx());
 		double distance[2];
 		PointOnHalfedge poh[2];
 		int id[2] = { 0,0 };
 		for (; hitr != mesh->voh_end(iov.v); ++hitr)
 		{
-			if (!lp.GetRegionFFlag()[hitr.handle().face().idx()])
-				continue;
-			double s1 = v_para - lp.GetV(mesh->to_vertex_handle(hitr.handle()).idx());
-			if (s0 * s1 < 0)
+			/*if (il == 9030)
 			{
-				if (s0 > 0)
+				dprint(hitr->idx() / 2);
+			}*/
+			double s1 = v_para - lp.GetV(mesh->to_vertex_handle(hitr.handle()).idx());
+			if (visited_f[hitr.handle().face().idx()])
+			{
+				if (s0 * s1 < 0)
 				{
-					poh[0].h = mesh->next_halfedge_handle(hitr.handle());
-					poh[0].c = s0 / (s0 - s1);
-					distance[0] = s0; distance[1] = s1;
-					++id[0];
-				}
-				else
-				{
-					poh[1].h = mesh->opposite_halfedge_handle(mesh->next_halfedge_handle(hitr.handle()));
-					poh[1].c = s1 / (s1 - s0);
-					++id[1];
+					if (s0 > 0)
+					{
+						poh[0].h = mesh->next_halfedge_handle(hitr.handle());
+						poh[0].c = s0 / (s0 - s1);
+						distance[0] = s0; distance[1] = s1;
+						++id[0];
+					}
+					else
+					{
+						poh[1].h = mesh->opposite_halfedge_handle(mesh->next_halfedge_handle(hitr.handle()));
+						poh[1].c = s1 / (s1 - s0);
+						++id[1];
+					}
 				}
 			}
 			s0 = s1;
@@ -1428,7 +1381,12 @@ namespace LoopGen
 		while (h.idx() != poh[1].h.idx())
 		{
 			int vid = mesh->from_vertex_handle(mesh->prev_halfedge_handle(mesh->opposite_halfedge_handle(h))).idx();
-			if (!lp.region_v_flag[vid])
+			/*if (il == 9030)
+			{
+				dprint(vid);
+				dprint("halfedge:", h.idx() / 2);
+			}*/
+			if (!visited_v[vid])
 				return false;
 			double s = v_para - lp.GetV(vid);
 			if (s > 0)
@@ -1459,7 +1417,6 @@ namespace LoopGen
 			xyz[2](i) = pos[2];
 		}
 	}
-
 
 	double LoopGen::EvaluateSimilarity(Eigen::Matrix3Xd& loop0, Eigen::Matrix3Xd& loop1, double u, int begin_seg)
 	{

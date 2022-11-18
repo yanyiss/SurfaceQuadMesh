@@ -85,7 +85,6 @@ namespace LoopGen
 			int nn;
 			data >> nn;
 			--lineNum;
-			InfoOnMesh[ii].v = mesh->vertex_handle(ii / 2);
 			InfoOnMesh[ii].pl.clear();
 			InfoOnMesh[ii].pl.reserve(nn);
 			for (int i = 0; i < nn; ++i)

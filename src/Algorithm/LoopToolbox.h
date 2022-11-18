@@ -17,9 +17,7 @@ namespace LoopGen
 			uv[0].resize(1); uv[0].setZero();
 			uv[1].resize(1); uv[1].setZero();
 			vidmap.resize(mesh->n_vertices()); vidmap[v.idx()] = 0;
-			face_field_shift.resize(mesh->n_faces(), -1);
-			face_field_shift[mesh->vf_begin(v)->idx()] = shift;
-			region_border_face.push_back(mesh->vf_begin(v).handle());
+			grow_dir.resize(mesh->n_vertices(), false);
 		};
 		~LocalParametrization(){};
 	public:
@@ -34,9 +32,8 @@ namespace LoopGen
 		inline std::deque<bool>& GetRegionVFlag() { return region_v_flag; }
 		inline std::deque<bool>& GetCutV_Flag() { return cutv_flag; }
 		inline std::deque<bool>& GetCutF_Flag() { return cutf_flag; }
+		inline std::deque<bool>& GetGrowDir() { return grow_dir; }
 		inline std::vector<int>& GetVidMap() { return vidmap; }
-		inline std::vector<FaceHandle>& GetRBF() { return region_border_face; }
-		inline std::vector<int>& GetFFS() { return face_field_shift; }
 		inline double GetRegularU(int vid) { return uv[0](vidmap[vid]) - std::floor(uv[0](vidmap[vid])); }
 		inline double GetU(int vid) { return uv[0](vidmap[vid]); }
 		inline double GetV(int vid) { return uv[1](vidmap[vid]); }
@@ -58,11 +55,9 @@ namespace LoopGen
 		std::deque<bool> region_v_flag;
 		std::deque<bool> cutv_flag;
 		std::deque<bool> cutf_flag;
-		std::vector<int> face_field_shift;
+		std::deque<bool> grow_dir;
 		std::vector<int> vidmap;
 		Eigen::VectorXd uv[2];
-
-		std::vector<FaceHandle> region_border_face;
 
 		void run();
 	};
@@ -105,6 +100,8 @@ namespace LoopGen
 		};
 		std::vector<double> eov;
 		//std::vector<std::vector<InfoOnVertex*>> advancing_front[2];
+		std::vector<VertexHandle> region_vertex;
+		std::vector<int> idmap;
 		Eigen::VectorXd uv_para[2];
 		std::vector<double> similarity_energy;
 		std::vector<InfoOnVertex> InfoOnMesh;
@@ -119,16 +116,16 @@ namespace LoopGen
 		void InitializeField();
 		void InitializeGraphWeight(double alpha = 899);
 		void InitializePQ();
-		void ConstructSubRegion(InfoOnVertex* iov, std::vector<std::vector<InfoOnVertex*>> advancing_front[2]);
-		bool SpreadSubRegion(std::vector<std::vector<InfoOnVertex*>> advancing_front[2], LocalParametrization& lp, bool grow_flag[2]);
-		void ResetField(std::vector<std::vector<InfoOnVertex*>> advancing_front[2], LocalParametrization& lp, bool grow_flag[2]);
+		void ConstructInitialRegion(InfoOnVertex* iov, LocalParametrization &lp);
+		bool SpreadSubRegion(LocalParametrization& lp, bool grow_flag[2]);
+		void ResetField(LocalParametrization& lp);
 		void ConstructRegionCut(VertexHandle v, int shift, std::deque<bool>& visited, std::vector<VertexHandle> &cut);
 		void OptimizeLoop();
 		bool IsGood(InfoOnVertex* iov0, InfoOnVertex* iov1, LocalParametrization& lp, double threshold = 2.0);
 
 		bool FieldAligned_PlanarLoop(VertexHandle v, std::vector<VertexHandle> &loop, int shift = 0);
 		double RefineLoopByPlanarity(std::vector<VertexHandle>& loop, PlaneLoop& planar_loop, int shift);
-		bool RefineLoopByParametrization(InfoOnVertex &iov, LocalParametrization& lp);
+		bool RefineLoopByParametrization(InfoOnVertex &iov, LocalParametrization& lp, std::deque<bool> &visited_v, std::deque<bool> &visited_f);
 		void GetPositionFromLoop(const std::vector<VertexHandle>& loop, Eigen::VectorXd xyz[3]);
 		double EvaluateSimilarity(Eigen::Matrix3Xd &loop0, Eigen::Matrix3Xd &loop1, double u, int begin_seg);
 	};

@@ -302,15 +302,7 @@ void InteractiveViewerWidget::pick_vertex(int x,int y)
 	lastestVertex = r;
 	//printf("Select Vertex : %d\n", r);
 	dprint("Select Vertex:", r, mesh.voh_begin(mesh.vertex_handle(r)).handle().idx() / 2);
-	static std::vector<int> vidmap(mesh.n_vertices());
-	static bool fei = true;
-	if (true)
-	{
-		int count = 0;
-		for (auto vv : lg->sub_vertex)
-			vidmap[vv.idx()] = count++;
-		fei = false;
-	}
+	dprint("uv para:", lg->uv_para[0](lg->idmap[r]), lg->uv_para[1](lg->idmap[r]));
 
 	std::vector<int>::iterator it;
 	if( (it = std::find(selectedVertex.begin(),selectedVertex.end(), r)) == selectedVertex.end() )
@@ -612,13 +604,13 @@ void InteractiveViewerWidget::draw_field()
 		glLineWidth(1);
 		glColor3d(0.9, 0.1, 0.1);
 		glBegin(GL_LINES);
-		for (int i = 0; i < crossfield.cols(); i += 2)
+		for (int i = 0; i < crossfield.cols(); i += 4)
 		{
-			/*Eigen::Vector3d dd = (crossfield.col(i) + crossfield.col(i + 1)) * 0.5;
+			Eigen::Vector3d dd = (crossfield.col(i) + crossfield.col(i + 2)) * 0.5;
 			glVertex3dv(dd.data());
-			glVertex3dv(crossfield.col(i ).data());*/
-			glVertex3dv(crossfield.col(i).data());
-			glVertex3dv(crossfield.col(i + 1).data());
+			glVertex3dv(crossfield.col(i ).data());
+			/*glVertex3dv(crossfield.col(i).data());
+			glVertex3dv(crossfield.col(i + 1).data());*/
 		}
 		glEnd();
 
@@ -675,7 +667,7 @@ void InteractiveViewerWidget::showField()
 			int i = tf.idx() * 4;
 			Eigen::Vector3d vc(c[0], c[1], c[2]);
 			Eigen::Vector3d temp = crossfield.col(i + 1);
-#if 1
+#if 0
 			crossfield.col(i) = vc + crossfield.col(i) * avgLen;
 			crossfield.col(i + 1) = vc + crossfield.col(i + 2) * avgLen;
 			crossfield.col(i + 2) = vc + temp * avgLen;
@@ -961,50 +953,112 @@ void InteractiveViewerWidget::draw_submesh()
 		
 		
 #endif
-		/*Eigen::VectorXd* uv = lg->uv_para;
-		double uvmax = -100; double uvmin = 100;
-		int j = 1;
-		for (int i = 0; i < uv[j].size(); ++i)
-		{
-			uvmax = std::max(uvmax, uv[j](i));
-			uvmin = std::min(uvmin, uv[j](i));
-		}
-		double step = uvmax - uvmin;
+		Eigen::VectorXd* uv = lg->uv_para;
 		glPointSize(10);
 		glBegin(GL_POINTS);
-		for (int i = 0; i < lg->sub_vertex.size(); ++i)
+#if 0
+		//画出u参数
+		for (auto v : lg->region_vertex)
 		{
-			double c = (uv[j](i) - uvmin) / step;
+			double c = uv[0](lg->idmap[v.idx()]);
 			glColor3d(c, c, c);
-			glVertex3dv(mesh.point(lg->sub_vertex[i]).data());
+			glVertex3dv(mesh.point(v).data());
+		}
+		for (auto v : lg->sub_vertex)
+		{
+			double c = uv[0](lg->idmap[v.idx()]);
+			glColor3d(c, c, c);
+			glVertex3dv(mesh.point(v).data());
+		}
+#else
+		////画出v参数
+		//double uma = -DBL_MAX, umi = DBL_MIN;
+		//for (auto v : lg->sub_vertex)
+		//{
+		//	uma = std::max(uma, uv[1](lg->idmap[v.idx()]));
+		//	umi = std::min(umi, uv[1](lg->idmap[v.idx()]));
+		//}
+		//double step = 1.0 / (uma - umi);
+		//for (auto v : lg->region_vertex)
+		//{
+		//	double c = (uv[1](lg->idmap[v.idx()]) - umi) * step;
+		//	glColor3d(c, c, c);
+		//	glVertex3dv(mesh.point(v).data());
+		//}
+		//for (auto v : lg->sub_vertex)
+		//{
+		//	double c = (uv[1](lg->idmap[v.idx()]) - umi) * step;
+		//	glColor3d(c, c, c);
+		//	glVertex3dv(mesh.point(v).data());
+		//}
+#endif
+		glEnd();
+		
+		/*glBegin(GL_POINTS);
+		glColor3d(0.1, 0.5, 0.6);
+		for (auto v : lg->sub_vertex)
+		{
+			glVertex3dv(mesh.point(v).data());
 		}
 		glEnd();*/
 
-		//int count = 0;
-		//glBegin(GL_LINES);
-		//glColor3d(0.8, 0.2, 0.1);
-		//for (auto& ss : lg->advancing_front)
-		//{
-		//	for (auto& tt : ss)
-		//	{
-		//		for (auto& rr : tt)
-		//		{
-		//			if (++count % 10 != 0)
-		//				continue;
-		//			auto& pos = mesh.point(rr->v);
-		//			glVertex3dv(pos.data());
-		//			//auto rst = rr == &lg->InfoOnMesh[2 * rr->v.idx()] ? &lg->InfoOnMesh[2 * rr->v.idx() + 1] : &lg->InfoOnMesh[2 * rr->v.idx()];
-		//			for (auto& pp : rr->pl)
-		//			{
-		//				auto poin = (1 - pp.c) * mesh.point(mesh.to_vertex_handle(pp.h)) + pp.c * mesh.point(mesh.from_vertex_handle(pp.h));
-		//				glVertex3dv(poin.data());
-		//				glVertex3dv(poin.data());
-		//			}
-		//			glVertex3dv(pos.data());
-		//		}
-		//	}
-		//}
-		//glEnd();
+		glBegin(GL_TRIANGLES);
+		glColor3d(0.2, 0.3, 0.9);
+		for (auto f : lg->sub_face)
+		{
+			for (auto fv : mesh.fv_range(f))
+			{
+				glVertex3dv(mesh.point(fv).data());
+			}
+		}
+		glEnd();
+
+#if 1
+		//画loop
+		int count = 0;
+		glBegin(GL_LINES);
+		glColor3d(0.8, 0.2, 0.1);
+		for (auto& v : lg->region_vertex)
+		{
+			if (++count % 10 != 0)
+				continue;
+			auto& pos = mesh.point(v);
+			glVertex3dv(pos.data());
+			//auto rst = rr == &lg->InfoOnMesh[2 * rr->v.idx()] ? &lg->InfoOnMesh[2 * rr->v.idx() + 1] : &lg->InfoOnMesh[2 * rr->v.idx()];
+			auto rr = &lg->InfoOnMesh[2 * v.idx()];
+			for (auto& pp : rr->pl)
+			{
+				auto poin = (1 - pp.c) * mesh.point(mesh.to_vertex_handle(pp.h)) + pp.c * mesh.point(mesh.from_vertex_handle(pp.h));
+				glVertex3dv(poin.data());
+				glVertex3dv(poin.data());
+			}
+			glVertex3dv(pos.data());
+		}
+		glEnd();
+#endif
+
+#if 1
+		static bool pe = false;
+		if (!pe)
+		{
+			pe = true;
+			crossfield = lg->cf->getCrossField();
+			avgLen = 0.2 * calc_mesh_ave_edge_length(&mesh);
+			for (auto tf : mesh.faces())
+			{
+				OpenMesh::Vec3d c = mesh.calc_centroid(tf);
+				int i = tf.idx() * 4;
+				Eigen::Vector3d vc(c[0], c[1], c[2]);
+				Eigen::Vector3d temp = crossfield.col(i + 1);
+
+				crossfield.col(i) = vc + crossfield.col(i) * avgLen;
+				crossfield.col(i + 1) = vc + crossfield.col(i + 1) * avgLen;
+				crossfield.col(i + 2) = vc + crossfield.col(i + 2) * avgLen;
+				crossfield.col(i + 3) = vc + crossfield.col(i + 3) * avgLen;
+			}
+		}
+#endif
+
 	}
 }
 
