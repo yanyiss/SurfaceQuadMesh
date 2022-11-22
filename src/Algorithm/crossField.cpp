@@ -29,7 +29,6 @@ void crossField::calculateMeshFaceBase()
 
 void crossField::runPolynomial()
 {
-	setCurvatureConstraint();
 
 	using namespace std;
 
@@ -625,6 +624,18 @@ void crossField::setCurvatureConstraint()
 	mesh->remove_property(f0);
 }
 
+void crossField::setOuterConstraint(std::vector<OpenMesh::FaceHandle>& cons_face)
+{
+	int cols = constraintVector.cols();
+	constraintVector.conservativeResize(3, cols + cons_face.size());
+	for (auto cff : cons_face)
+	{
+		constraintId.push_back(cff.idx());
+		constraintVector.col(cols) = crossfield.col(cff.idx()*4);
+		++cols;
+	}
+}
+
 //void crossField::setCurvatureConstraint()
 //{
 //	constraintId.clear();
@@ -711,6 +722,7 @@ void crossField::setMatching()
 
  void crossField::setSingularity()
 {
+	 singularity.clear();
 	 int count = 0;
 	 for (auto& tv : mesh->vertices())
 	 {

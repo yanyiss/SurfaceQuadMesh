@@ -302,7 +302,7 @@ void InteractiveViewerWidget::pick_vertex(int x,int y)
 	lastestVertex = r;
 	//printf("Select Vertex : %d\n", r);
 	dprint("Select Vertex:", r, mesh.voh_begin(mesh.vertex_handle(r)).handle().idx() / 2);
-	dprint("uv para:", lg->uv_para[0](lg->idmap[r]), lg->uv_para[1](lg->idmap[r]));
+	//dprint("uv para:", lg->uv_para[0](lg->idmap[r]), lg->uv_para[1](lg->idmap[r]));
 
 	std::vector<int>::iterator it;
 	if( (it = std::find(selectedVertex.begin(),selectedVertex.end(), r)) == selectedVertex.end() )
@@ -607,10 +607,17 @@ void InteractiveViewerWidget::draw_field()
 		for (int i = 0; i < crossfield.cols(); i += 4)
 		{
 			Eigen::Vector3d dd = (crossfield.col(i) + crossfield.col(i + 2)) * 0.5;
+#if 0
 			glVertex3dv(dd.data());
-			glVertex3dv(crossfield.col(i ).data());
-			/*glVertex3dv(crossfield.col(i).data());
-			glVertex3dv(crossfield.col(i + 1).data());*/
+			glVertex3dv(crossfield.col(i).data());
+			glVertex3dv(dd.data());
+			glVertex3dv(crossfield.col(i + 1).data());
+#else
+			glVertex3dv(dd.data()); glVertex3dv(crossfield.col(i).data());
+			glVertex3dv(dd.data()); glVertex3dv(crossfield.col(i + 1).data());
+			glVertex3dv(dd.data()); glVertex3dv(crossfield.col(i + 2).data());
+			glVertex3dv(dd.data()); glVertex3dv(crossfield.col(i + 3).data());
+#endif
 		}
 		glEnd();
 
@@ -622,6 +629,11 @@ void InteractiveViewerWidget::draw_field()
 		{
 			glVertex3dv(mesh.point(mesh.vertex_handle(s)).data());
 		}
+		glEnd();
+		glPointSize(6);
+		glColor3d(0.7, 0.1, 0.6);
+		glBegin(GL_POINTS);
+		glVertex3dv(mesh.point(mesh.vertex_handle(32240)).data());
 		glEnd();
 	}
 }
@@ -961,36 +973,39 @@ void InteractiveViewerWidget::draw_submesh()
 		for (auto v : lg->region_vertex)
 		{
 			double c = uv[0](lg->idmap[v.idx()]);
+			c -= std::floor(c);
 			glColor3d(c, c, c);
 			glVertex3dv(mesh.point(v).data());
 		}
 		for (auto v : lg->sub_vertex)
 		{
 			double c = uv[0](lg->idmap[v.idx()]);
+			c -= std::floor(c);
 			glColor3d(c, c, c);
 			glVertex3dv(mesh.point(v).data());
 		}
-#else
-		////画出v参数
-		//double uma = -DBL_MAX, umi = DBL_MIN;
-		//for (auto v : lg->sub_vertex)
-		//{
-		//	uma = std::max(uma, uv[1](lg->idmap[v.idx()]));
-		//	umi = std::min(umi, uv[1](lg->idmap[v.idx()]));
-		//}
-		//double step = 1.0 / (uma - umi);
-		//for (auto v : lg->region_vertex)
-		//{
-		//	double c = (uv[1](lg->idmap[v.idx()]) - umi) * step;
-		//	glColor3d(c, c, c);
-		//	glVertex3dv(mesh.point(v).data());
-		//}
-		//for (auto v : lg->sub_vertex)
-		//{
-		//	double c = (uv[1](lg->idmap[v.idx()]) - umi) * step;
-		//	glColor3d(c, c, c);
-		//	glVertex3dv(mesh.point(v).data());
-		//}
+#endif
+#if 0
+		//画出v参数
+		double uma = -DBL_MAX, umi = DBL_MIN;
+		for (auto v : lg->sub_vertex)
+		{
+			uma = std::max(uma, uv[1](lg->idmap[v.idx()]));
+			umi = std::min(umi, uv[1](lg->idmap[v.idx()]));
+		}
+		double step = 1.0 / (uma - umi);
+		for (auto v : lg->region_vertex)
+		{
+			double c = (uv[1](lg->idmap[v.idx()]) - umi) * step;
+			glColor3d(c, c, c);
+			glVertex3dv(mesh.point(v).data());
+		}
+		for (auto v : lg->sub_vertex)
+		{
+			double c = (uv[1](lg->idmap[v.idx()]) - umi) * step;
+			glColor3d(c, c, c);
+			glVertex3dv(mesh.point(v).data());
+		}
 #endif
 		glEnd();
 		
@@ -1002,7 +1017,7 @@ void InteractiveViewerWidget::draw_submesh()
 		}
 		glEnd();*/
 
-		/*glBegin(GL_TRIANGLES);
+		glBegin(GL_TRIANGLES);
 		glColor3d(0.2, 0.3, 0.9);
 		for (auto f : lg->sub_face)
 		{
@@ -1011,7 +1026,7 @@ void InteractiveViewerWidget::draw_submesh()
 				glVertex3dv(mesh.point(fv).data());
 			}
 		}
-		glEnd();*/
+		glEnd();
 
 #if 1
 		//画loop
@@ -1035,6 +1050,63 @@ void InteractiveViewerWidget::draw_submesh()
 			glVertex3dv(pos.data());
 		}
 		glEnd();
+
+		//count = 0;
+		//glBegin(GL_LINES);
+		//glColor3d(0.8, 0.2, 0.1);
+		//for (auto& v : lg->region_vertex)
+		//{
+		//	//if (++count % 10 != 0)
+		//		//continue;
+		//	auto rr = &lg->InfoOnMesh[2 * v.idx() + 1];
+		//	if (rr->pl.empty())
+		//		continue;
+		//	auto poin = (1 - rr->pl[0].c) * mesh.point(mesh.to_vertex_handle(rr->pl[0].h)) + rr->pl[0].c * mesh.point(mesh.from_vertex_handle(rr->pl[0].h));
+		//	glVertex3dv(poin.data());
+		//	for (int i = 0; i < rr->pl.size() - 1; ++i)
+		//	{
+		//		auto poin = (1 - rr->pl[i].c) * mesh.point(mesh.to_vertex_handle(rr->pl[i].h)) + rr->pl[i].c * mesh.point(mesh.from_vertex_handle(rr->pl[i].h));
+		//		glVertex3dv(poin.data());
+		//		glVertex3dv(poin.data());
+		//	}
+		//	poin = (1 - rr->pl.back().c) * mesh.point(mesh.to_vertex_handle(rr->pl.back().h)) + rr->pl.back().c * mesh.point(mesh.from_vertex_handle(rr->pl.back().h));
+		//	glVertex3dv(poin.data());
+		//}
+		//glEnd();
+#else
+		std::vector<OpenMesh::VertexHandle> vhs;
+		vhs.push_back(mesh.vertex_handle(9935));
+		vhs.push_back(mesh.vertex_handle(36412));
+
+		glColor3d(0.2, 0.5, 0.6);
+		glBegin(GL_POINTS);
+		glVertex3dv(mesh.point(vhs[0]).data());
+		glVertex3dv(mesh.point(vhs[1]).data());
+		glEnd();
+
+		glBegin(GL_LINES);
+		glColor3d(0.8, 0.2, 0.1);
+		for (auto& v : vhs)
+		{
+			auto& pos = mesh.point(v);
+			glVertex3dv(pos.data());
+			//auto rst = rr == &lg->InfoOnMesh[2 * rr->v.idx()] ? &lg->InfoOnMesh[2 * rr->v.idx() + 1] : &lg->InfoOnMesh[2 * rr->v.idx()];
+			auto rr = &lg->InfoOnMesh[2 * v.idx()];
+			for (auto& pp : rr->pl)
+			{
+				auto poin = (1 - pp.c) * mesh.point(mesh.to_vertex_handle(pp.h)) + pp.c * mesh.point(mesh.from_vertex_handle(pp.h));
+				glVertex3dv(poin.data());
+				glVertex3dv(poin.data());
+			}
+			glVertex3dv(pos.data());
+		}
+		glColor3d(0.1, 0.9, 0.1);
+		glVertex3dv(mesh.point(mesh.from_vertex_handle(mesh.halfedge_handle(212524))).data());
+		glVertex3dv(mesh.point(mesh.to_vertex_handle(mesh.halfedge_handle(212524))).data());
+		glColor3d(0.1, 0.1, 0.9);
+		glVertex3dv(mesh.point(mesh.from_vertex_handle(mesh.halfedge_handle(121117))).data());
+		glVertex3dv(mesh.point(mesh.to_vertex_handle(mesh.halfedge_handle(121117))).data());
+		glEnd();
 #endif
 
 #if 1
@@ -1049,7 +1121,6 @@ void InteractiveViewerWidget::draw_submesh()
 				OpenMesh::Vec3d c = mesh.calc_centroid(tf);
 				int i = tf.idx() * 4;
 				Eigen::Vector3d vc(c[0], c[1], c[2]);
-				Eigen::Vector3d temp = crossfield.col(i + 1);
 
 				crossfield.col(i) = vc + crossfield.col(i) * avgLen;
 				crossfield.col(i + 1) = vc + crossfield.col(i + 1) * avgLen;

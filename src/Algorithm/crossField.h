@@ -21,6 +21,7 @@ class crossField
 public:
 	crossField(Mesh *m) {
 		init(m);
+		setCurvatureConstraint();
 		runPolynomial();
 	};
 	crossField(std::string& field_file);
@@ -46,6 +47,7 @@ public:
 	//void runIteration(std::vector<OpenMesh::Vec3d>& crossfield);
 
 	void setCurvatureConstraint();
+	void setOuterConstraint(std::vector<OpenMesh::FaceHandle> &cons_face);
 	void setMatching();
 	void setSingularity();
 	void setNormal();

@@ -34,11 +34,13 @@ namespace LoopGen
 		inline std::deque<bool>& GetCutF_Flag() { return cutf_flag; }
 		inline std::deque<bool>& GetGrowDir() { return grow_dir; }
 		inline std::vector<int>& GetVidMap() { return vidmap; }
-		inline double GetRegularU(int vid) { return uv[0](vidmap[vid]) - std::floor(uv[0](vidmap[vid])); }
-		inline double GetU(int vid) { return uv[0](vidmap[vid]); }
+		inline double GetRegularU(int vid) { if (vidmap[vid] > uv[0].size()) { dprint(vid, vidmap[vid]); system("pause"); } return uv[0](vidmap[vid]) - std::floor(uv[0](vidmap[vid])); }
+		inline double GetU(int vid) { if (vidmap[vid] > uv[0].size()) { dprint(vid, vidmap[vid]); system("pause"); } return uv[0](vidmap[vid]); }
 		inline double GetV(int vid) { return uv[1](vidmap[vid]); }
 		inline Eigen::VectorXd& GetU() { return uv[0]; }
 		inline Eigen::VectorXd& GetV() { return uv[1]; }
+		inline Eigen::VectorXd& GetNormalSimilarityAngle() { return normal_similarity_angle; }
+
 
 	//private:
 		Mesh* mesh;
@@ -58,8 +60,10 @@ namespace LoopGen
 		std::deque<bool> grow_dir;
 		std::vector<int> vidmap;
 		Eigen::VectorXd uv[2];
-
+		Eigen::VectorXd normal_similarity_angle;
+		bool has_nsa = false;
 		void run();
+		void InitNormalSimilarityAngle();
 	};
 
 
@@ -121,11 +125,13 @@ namespace LoopGen
 		void ResetField(LocalParametrization& lp);
 		void ConstructRegionCut(VertexHandle v, int shift, std::deque<bool>& visited, std::vector<VertexHandle> &cut);
 		void OptimizeLoop();
+		void AssembleSimilarityAngle(InfoOnVertex* v_ptr, Eigen::VectorXd& sa, LocalParametrization &lp, int loop_fragment_num);
 		bool IsGood(InfoOnVertex* iov0, InfoOnVertex* iov1, LocalParametrization& lp, double threshold = 2.0);
 
 		bool FieldAligned_PlanarLoop(VertexHandle v, std::vector<VertexHandle> &loop, int shift = 0);
 		double RefineLoopByPlanarity(std::vector<VertexHandle>& loop, PlaneLoop& planar_loop, int shift);
 		bool RefineLoopByParametrization(InfoOnVertex &iov, LocalParametrization& lp, std::deque<bool> &visited_v, std::deque<bool> &visited_f);
+		void SetUParaLine(InfoOnVertex& iov, LocalParametrization& lp, std::deque<bool>& visited_v, std::deque<bool>& visited_f);
 		void GetPositionFromLoop(const std::vector<VertexHandle>& loop, Eigen::VectorXd xyz[3]);
 		double EvaluateSimilarity(Eigen::Matrix3Xd &loop0, Eigen::Matrix3Xd &loop1, double u, int begin_seg);
 	};
