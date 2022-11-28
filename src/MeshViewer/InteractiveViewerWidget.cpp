@@ -630,10 +630,10 @@ void InteractiveViewerWidget::draw_field()
 			glVertex3dv(mesh.point(mesh.vertex_handle(s)).data());
 		}
 		glEnd();
-		glPointSize(6);
+		glPointSize(12);
 		glColor3d(0.7, 0.1, 0.6);
 		glBegin(GL_POINTS);
-		glVertex3dv(mesh.point(mesh.vertex_handle(32240)).data());
+		glVertex3dv(mesh.point(mesh.vertex_handle(5535)).data());
 		glEnd();
 	}
 }
@@ -1017,7 +1017,7 @@ void InteractiveViewerWidget::draw_submesh()
 		}
 		glEnd();*/
 
-		glBegin(GL_TRIANGLES);
+		/*glBegin(GL_TRIANGLES);
 		glColor3d(0.2, 0.3, 0.9);
 		for (auto f : lg->sub_face)
 		{
@@ -1026,17 +1026,17 @@ void InteractiveViewerWidget::draw_submesh()
 				glVertex3dv(mesh.point(fv).data());
 			}
 		}
-		glEnd();
+		glEnd();*/
 
-#if 1
+#if 0
 		//»­loop
 		int count = 0;
 		glBegin(GL_LINES);
 		glColor3d(0.8, 0.2, 0.1);
 		for (auto& v : lg->region_vertex)
 		{
-			if (++count % 10 != 0)
-				continue;
+			//if (++count % 3 != 0)
+				//continue;
 			auto& pos = mesh.point(v);
 			glVertex3dv(pos.data());
 			//auto rst = rr == &lg->InfoOnMesh[2 * rr->v.idx()] ? &lg->InfoOnMesh[2 * rr->v.idx() + 1] : &lg->InfoOnMesh[2 * rr->v.idx()];

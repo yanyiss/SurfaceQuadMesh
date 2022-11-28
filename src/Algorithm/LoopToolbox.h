@@ -34,8 +34,8 @@ namespace LoopGen
 		inline std::deque<bool>& GetCutF_Flag() { return cutf_flag; }
 		inline std::deque<bool>& GetGrowDir() { return grow_dir; }
 		inline std::vector<int>& GetVidMap() { return vidmap; }
-		inline double GetRegularU(int vid) { if (vidmap[vid] > uv[0].size()) { dprint(vid, vidmap[vid]); system("pause"); } return uv[0](vidmap[vid]) - std::floor(uv[0](vidmap[vid])); }
-		inline double GetU(int vid) { if (vidmap[vid] > uv[0].size()) { dprint(vid, vidmap[vid]); system("pause"); } return uv[0](vidmap[vid]); }
+		inline double GetRegularU(int vid) { return uv[0](vidmap[vid]) - std::floor(uv[0](vidmap[vid])); }
+		inline double GetU(int vid) { return uv[0](vidmap[vid]); }
 		inline double GetV(int vid) { return uv[1](vidmap[vid]); }
 		inline Eigen::VectorXd& GetU() { return uv[0]; }
 		inline Eigen::VectorXd& GetV() { return uv[1]; }

@@ -894,15 +894,24 @@ namespace LoopGen
 		auto& regionf_flag = lp.GetRegionFFlag();
 		auto& grow_dir = lp.GetGrowDir();
 
-#if 1
-		double energy_threshold = 0.15;
+#if 0
+		double energy_threshold = 0.16; 
+		std::ofstream file_writer[2];
+		file_writer[0].open("..//resource//statics//" + model_name + ".statics00", std::ios::out | std::ios::app);
+		file_writer[1].open("..//resource//statics//" + model_name + ".statics11", std::ios::out | std::ios::app);
+		int exceed[2] = { 0,0 };
+		std::deque<bool> if_similarity_energy_low(mesh->n_vertices(), true);
+		double max_en = -1;
 		for (int i = 0; i < vertex_cache.size(); ++i)
 		{
 			//dprint(i);
 			int new_id = vertex_cache[i].idx();
 			int grow_id = grow_dir[new_id] ? 1 : 0;
 			if (!grow_flag[grow_id])
+			{
+				if_similarity_energy_low[new_id] = false;
 				continue;
+			}
 			InfoOnVertex* iov0 = &InfoOnMesh[new_id * 2];
 			Eigen::VectorXd sa0;
 			int loop_fragment_num = iov0->pl.size();
@@ -921,31 +930,45 @@ namespace LoopGen
 					//sum += std::min(100.0, fabs(sa0(j) / sa1(j)) + fabs(sa1(j) / sa0(j)) - 2.0);
 					sum += fabs(sin(sa0(j) - sa1(j))) + 1 - cos(sa0(j) - sa1(j));
 				}
-				dprint(sum / sa0.size());
+				file_writer[0] << sa0.size() << std::endl;
+				file_writer[1] << sum / sa0.size() << std::endl;
+				//dprint(sum / sa0.size());
+				max_en = std::max(sum / sa0.size(), max_en);
 				if (sum > energy_threshold * sa0.size())
-					grow_flag[grow_id] = false;
+				{
+					if (exceed[grow_id] > 2)
+					{
+						if_similarity_energy_low[new_id] = false;
+						grow_flag[grow_id] = false;
+					}
+					++exceed[grow_id];
+				}
 			}
 		}
-		if (!grow_flag[0] && !grow_flag[1])
-			return false;
+		file_writer[0].close();
+		file_writer[1].close();
+		dprint("max ene:", max_en);
 #else
 		//检测相似性能量
 		auto& normal_similarity_angle = lp.GetNormalSimilarityAngle();
+		int loop_fragment_num = InfoOnMesh[2 * lp.GetRegionVertex().front().idx()].pl.size();
 		if (vertex_cache_flag[lp.GetRegionVertex().front().idx()] && !lp.has_nsa)
 		{
 			lp.has_nsa = true;
-			AssembleSimilarityAngle(&InfoOnMesh[2 * lp.GetRegionVertex().front().idx()], normal_similarity_angle, lp, 100);
+			AssembleSimilarityAngle(&InfoOnMesh[2 * lp.GetRegionVertex().front().idx()], normal_similarity_angle, lp, loop_fragment_num);
 		}
-		Eigen::VectorXd inverse_normal_similarity_angle(normal_similarity_angle.size());
+		/*Eigen::VectorXd inverse_normal_similarity_angle(normal_similarity_angle.size());
 		for (int i = 0; i < normal_similarity_angle.size(); ++i)
-			inverse_normal_similarity_angle(i) = 1.0 / normal_similarity_angle(i);
+			inverse_normal_similarity_angle(i) = 1.0 / normal_similarity_angle(i);*/
 
 		Eigen::VectorXd similarity_angle_sum(normal_similarity_angle.size()); similarity_angle_sum.setZero();
-		double energy_threshold = 3;
+		double energy_threshold = 0.18;
 		//static omp_lock_t lock;
 		//omp_init_lock(&lock);
 //#pragma omp parallel for
 
+		int exceed[2] = { 0,0 };
+		std::deque<bool> if_similarity_energy_low(mesh->n_vertices(), true);
 		for (int i = 0; i < vertex_cache.size(); ++i)
 		{
 			//dprint(i);
@@ -954,24 +977,30 @@ namespace LoopGen
 			if (!grow_flag[grow_id])
 				continue;
 			Eigen::VectorXd similarity_angle;
-			AssembleSimilarityAngle(&InfoOnMesh[2 * new_id], similarity_angle, lp, 100);
+			AssembleSimilarityAngle(&InfoOnMesh[2 * new_id], similarity_angle, lp, loop_fragment_num);
 			double sum = 0;
 			for (int j = 0; j < similarity_angle.size(); ++j) {
 				//dprint(j);
 				//dprint(similarity_angle(j), normal_similarity_angle(j), inverse_normal_similarity_angle(j));
-				sum += std::min(100.0, fabs(normal_similarity_angle(j) / similarity_angle(j)) + fabs(similarity_angle(j) * inverse_normal_similarity_angle(j)) - 2.0);
+				//sum += std::min(100.0, fabs(normal_similarity_angle(j) / similarity_angle(j)) + fabs(similarity_angle(j) * inverse_normal_similarity_angle(j)) - 2.0);
+				sum += fabs(sin(normal_similarity_angle(j) - similarity_angle(j))) + 1 - cos(normal_similarity_angle(j) - similarity_angle(j));
 			}
 			//dprint(sum / similarity_angle.size());
 			if (sum > energy_threshold * similarity_angle.size())
-				grow_flag[grow_id] = false;
+			{
+				if (exceed[grow_id] > 2)
+				{
+					if_similarity_energy_low[new_id] = false;
+					grow_flag[grow_id] = false;
+				}
+				++exceed[grow_id];
+			}
 			//omp_set_lock(&lock);
-			similarity_angle_sum += similarity_angle;
+			//similarity_angle_sum += similarity_angle;
 			//omp_unset_lock(&lock);
 		}
 		//omp_destroy_lock(&lock);
 		//normal_similarity_angle = ( normal_similarity_angle * lp.GetRegionVertex().size() + similarity_angle_sum) / (lp.GetRegionVertex().size() + vertex_cache.size());
-		if (!grow_flag[0] && !grow_flag[1])
-			return false;
 
 #if PRINT_DEBUG_INFO
 		dprint("检测相似性能量");
@@ -989,7 +1018,8 @@ namespace LoopGen
 		auto& vidmap = lp.GetVidMap();
 		for (auto new_v : vertex_cache)
 		{
-			if (grow_flag[grow_dir[new_v.idx()]])
+			//if (grow_flag[grow_dir[new_v.idx()]])
+			if (if_similarity_energy_low[new_v.idx()])
 			{
 				region_vertex.push_back(new_v);
 				int newid = new_v.idx();
@@ -1019,6 +1049,8 @@ namespace LoopGen
 #if 0
 		return false;
 #endif
+		if (!grow_flag[0] && !grow_flag[1])
+			return false;
 
 		//扩展advancing_front
 		int extend_layer = 3;
@@ -1082,8 +1114,8 @@ namespace LoopGen
 #if PRINT_DEBUG_INFO
 		dprint("扩展advancing_front");
 #endif
-		sub_vertex = new_vertex;
-		sub_face = new_face;
+		//sub_vertex = new_vertex;
+		//sub_face = new_face;
 		//优化新区域的场
 		if (!cf->mesh)
 			cf->init(mesh);
@@ -1356,14 +1388,14 @@ namespace LoopGen
 
 	void LoopGen::OptimizeLoop()
 	{
-#if 0
-		int vid_set[11] = { 16389,31031,4946,7182,11107,36214,26030,20447,2430,31958,28795};
+#if 1
+		int vid_set[11] = { 16389,31376,14727,1701,6417,15421,38796,16429,20133,22572,5860};
 		cf->constraintId.clear();
 		cf->constraintVector.resize(0, 0);
 		for (int i = 0; i < 11; ++i)
 		{
 			dprint("iiiiiiiiiiiiiiiiiiiiiiiii", i, vid_set[i]);
-			//if (i == 2)
+			//if (i == 1 || i == 3)
 				//continue;
 			InfoOnVertex* iov = InfoOnMesh[vid_set[i] * 2].energy < InfoOnMesh[vid_set[i] * 2 + 1].energy ? &InfoOnMesh[vid_set[i] * 2] : &InfoOnMesh[vid_set[i] * 2 + 1];
 
@@ -1384,18 +1416,20 @@ namespace LoopGen
 #if PRINT_DEBUG_INFO
 				dprint("计算cut");
 #endif
-				if (rr == 10) break;
+				if (rr == 4 && vid_set[i] == 14727) break;
 				++rr;
 				dprint(rr);
 				lp.run();
 			} while (SpreadSubRegion(lp, grow_flag));
-
+			region_vertex.insert(region_vertex.end(), lp.GetRegionVertex().begin(), lp.GetRegionVertex().end());
 			auto& region_face = lp.GetRegionFace();
 			cf->setOuterConstraint(region_face);
+			sub_vertex.insert(sub_vertex.end(), lp.GetNewVertex().begin(), lp.GetNewVertex().end());
+			sub_face.insert(sub_face.end(), lp.GetNewFace().begin(), lp.GetNewFace().end());
 		}
 		cf->runPolynomial();
 #else
-		int vvvid = 20447;
+		int vvvid = 20133;
 		InfoOnVertex* iov = InfoOnMesh[vvvid * 2].energy < InfoOnMesh[vvvid * 2 + 1].energy ? &InfoOnMesh[vvvid * 2] : &InfoOnMesh[vvvid * 2 + 1];
 
 		std::vector<std::vector<InfoOnVertex*>> advancing_front[2];
@@ -1413,11 +1447,13 @@ namespace LoopGen
 				visited_v[ver.idx()] = true;
 			ConstructRegionCut(iov->v, shift, visited_v, lp.GetCut());
 			dprint("计算cut");
-			if (rr == 8) break;
+			//if (rr == 1) break;
 			++rr;
 			dprint(rr);
 			lp.run();
 		} while (SpreadSubRegion(lp, grow_flag));
+		sub_vertex.insert(sub_vertex.end(), lp.GetNewVertex().begin(), lp.GetNewVertex().end());
+		sub_face.insert(sub_face.end(), lp.GetNewFace().begin(), lp.GetNewFace().end());
 		region_vertex = lp.GetRegionVertex();
 		idmap = lp.GetVidMap();
 		uv_para[0] = std::move(lp.uv[0]);
