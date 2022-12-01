@@ -3,7 +3,7 @@
 #include <complex>
 #include <Eigen\Sparse>
 
-#define PI 3.14159265358979323
+#include "..\Toolbox\mathFunctions.h"
 #include "..\Toolbox\dprint.h"
 #include "..\Toolbox\filesOperator.h"
 #include "StatisticsMostValues.h"

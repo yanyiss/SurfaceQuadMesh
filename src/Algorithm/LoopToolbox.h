@@ -97,6 +97,7 @@ namespace LoopGen
 		Eigen::VectorXd uv[2];
 		Eigen::VectorXd normal_similarity_angle;
 		bool has_nsa = false;
+		InfoOnVertex* iov;
 
 		void run();
 	};
@@ -152,9 +153,8 @@ namespace LoopGen
 		void ResetLocalField(LocalParametrization &lp, std::vector<FaceHandle>& opt_face, std::deque<bool>& opt_flag, std::deque<bool>& constraint_flag);
 
 		void ConstructInitialRegion(InfoOnVertex* iov, LocalParametrization &lp);
-		void ConstructRegionCut(InfoOnVertex* iov, std::deque<bool>& visited, std::vector<VertexHandle>& cut);
 		bool SpreadSubRegion(LocalParametrization& lp, bool grow_flag[2]);
-
+		void ConstructRegionCut(InfoOnVertex* iov, std::deque<bool>& visited, std::vector<VertexHandle>& cut);
 		void OptimizeLoop();
 
 		void SetUParaLine(InfoOnVertex& iov, LocalParametrization& lp, std::deque<bool>& visited_v, std::deque<bool>& visited_f);

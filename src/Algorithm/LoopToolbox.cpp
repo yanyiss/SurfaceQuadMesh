@@ -110,6 +110,9 @@ namespace LoopGen
 		std::vector<double> size_ratio(nf, 1.0);
 		uv[0].conservativeResize(region_vertex_size + new_vertex_size); uv[0].tail(new_vertex_size).setZero();
 		uv[1].conservativeResize(region_vertex_size + new_vertex_size); uv[1].tail(new_vertex_size).setZero();
+		//Eigen::Vector3d right[2];
+		//right[0].resize(new_vertex_size + new_face_size); right[0].setZero();
+		//right[1].resize(new_vertex_size + new_face_size); right[1].setZero();
 
 		//const auto& crossfield = cf->getCrossField();
 		for (auto v : new_vertex)
@@ -126,19 +129,19 @@ namespace LoopGen
 				{
 					double dot_ = R.dot(f_info.second.second);
 					int fvid = f_info.first.idx();
-					//w[fvid] += dot_;
 					if (f_info.second.first)
 						uv[0](vm) -= dot_;
+						//right[0](vm) -= dot_;
 					if (!new_v_flag[fvid])
 					{
 						uv[0](vm) -= dot_ * GetU(fvid);
 						uv[1](vm) -= dot_ * GetV(fvid);
+						//right[0](vm) -= dot_ * GetU(fvid);
+						//right[1](vm) -= dot_ * GetV(fvid);
 					}
 					else
 						w[fvid] += dot_;
 				}
-				//uv[0](vm) += crossfield.col(4 * vf_id).dot(R) * size_ratio[vf_id];
-				//uv[1](vm) += crossfield.col(4 * vf_id + 1).dot(R) * size_ratio[vf_id];
 				uv[0](vm) += x_axis.col(vf_id).dot(R) * size_ratio[vf_id];
 				uv[1](vm) += y_axis.col(vf_id).dot(R) * size_ratio[vf_id];
 			}
@@ -153,6 +156,16 @@ namespace LoopGen
 				w[vvid] = 0;
 			}
 		}
+
+		/*int count = new_vertex_size;
+		std::vector<int> fidmap(mesh->n_faces());
+		for (auto f : new_face)
+		{
+			fidmap[f.idx()] = count++;
+		}
+		Eigen::Vector3d field_value[2];
+		field_value[0].resize(new_face_size); field_value[0].setZero();
+		field_value[1].resize(new_face_size); field_value[1].setZero();*/
 
 		Eigen::SparseMatrix<double> A(new_vertex_size, new_vertex_size);
 		A.setFromTriplets(triple.begin(), triple.end());
@@ -618,7 +631,7 @@ namespace LoopGen
 		advancing_front[0][0] = std::move(hierarchy_vertex[0]);
 		advancing_front[1].push_back(std::move(hierarchy_vertex[1]));
 
-		double energy_threshold = 2.0;
+		double energy_threshold = 0.2;
 
 		std::deque<bool> visited_v(mesh->n_vertices(), false);
 		visited_v[iov->v.idx()] = true;
@@ -723,34 +736,6 @@ namespace LoopGen
 			int ftid = ft.idx();
 			x_axis.col(ftid) = crossfield.col(4 * ftid + ff_id[ftid]);
 			y_axis.col(ftid) = crossfield.col(4 * ftid + (ff_id[ftid] + 1) % 4);
-			/*Eigen::Vector3d temp;
-			switch (ff_id[ftid])
-			{
-			case 0:
-				break;
-			case 1:
-				temp = crossfield.col(ftid * 4);
-				crossfield.col(ftid * 4) = crossfield.col(ftid * 4 + 1);
-				crossfield.col(ftid * 4 + 1) = crossfield.col(ftid * 4 + 2);
-				crossfield.col(ftid * 4 + 2) = crossfield.col(ftid * 4 + 3);
-				crossfield.col(ftid * 4 + 3) = temp;
-				break;
-			case 2:
-				temp = crossfield.col(ftid * 4);
-				crossfield.col(ftid * 4) = crossfield.col(ftid * 4 + 2);
-				crossfield.col(ftid * 4 + 2) = temp;
-				temp = crossfield.col(ftid * 4 + 1);
-				crossfield.col(ftid * 4 + 1) = crossfield.col(ftid * 4 + 3);
-				crossfield.col(ftid * 4 + 3) = temp;
-				break;
-			case 3:
-				temp = crossfield.col(ftid * 4 + 3);
-				crossfield.col(ftid * 4 + 3) = crossfield.col(ftid * 4 + 2);
-				crossfield.col(ftid * 4 + 2) = crossfield.col(ftid * 4 + 1);
-				crossfield.col(ftid * 4 + 1) = crossfield.col(ftid * 4);
-				crossfield.col(ftid * 4) = temp;
-				break;
-			}*/
 			face_tree.pop();
 			for (auto fh = mesh->fh_begin(ft); fh != mesh->fh_end(ft); ++fh)
 			{
@@ -818,10 +803,7 @@ namespace LoopGen
 		{
 			for (int j = i + 1; j < loop_fragment_num; ++j)
 			{
-				double dot_ = fragment.col(i).dot(fragment.col(j));
-				if (dot_ > 1.0) dot_ = 1.0;
-				if (dot_ < -1.0) dot_ = -1.0;
-				sa(count++) = acos(dot_);
+				sa(count++) = conservativeArcCos(fragment.col(i).dot(fragment.col(j)));
 			}
 		}
 		/*for (int i = 0; i < sa.size(); ++i)
@@ -966,7 +948,7 @@ namespace LoopGen
 				//dprint(j);
 				//dprint(similarity_angle(j), normal_similarity_angle(j), inverse_normal_similarity_angle(j));
 				//sum += std::min(100.0, fabs(normal_similarity_angle(j) / similarity_angle(j)) + fabs(similarity_angle(j) * inverse_normal_similarity_angle(j)) - 2.0);
-				sum += fabs(sin(normal_similarity_angle(j) - similarity_angle(j))) + 1 - cos(normal_similarity_angle(j) - similarity_angle(j));
+				sum += fabs(normal_similarity_angle(j) - similarity_angle(j));
 			}
 			//dprint(sum / similarity_angle.size());
 			if (sum > energy_threshold * similarity_angle.size())
@@ -1144,16 +1126,12 @@ namespace LoopGen
 				auto ev = (position.col(fh.handle().to().idx()) - position.col(fh.handle().from().idx())).normalized();
 				COMPLEX e_f = COMPLEX(ev.dot(faceBase.col(fid * 2)), -ev.dot(faceBase.col(fid * 2 + 1)));
 				COMPLEX e_g = COMPLEX(ev.dot(faceBase.col(gid * 2)), -ev.dot(faceBase.col(gid * 2 + 1)));
-				//e_f *= e_f; e_f *= e_f;
-				//e_g *= e_g; e_g *= e_g;
 				if (opt_flag[fid])
 				{
 					triple.emplace_back(count, idmap[fid], e_f);
 				}
 				else
 				{
-					//COMPLEX dir = COMPLEX(crossfield.col(fid * 4).dot(faceBase.col(2 * fid)), crossfield.col(fid * 4).dot(faceBase.col(2 * fid + 1)));
-					//dir *= dir; dir *= dir;
 					COMPLEX dir = COMPLEX(x_axis.col(fid).dot(faceBase.col(2 * fid)), x_axis.col(fid).dot(faceBase.col(2 * fid + 1)));
 					b(count) -= e_f * dir;
 				}
@@ -1163,8 +1141,6 @@ namespace LoopGen
 				}
 				else
 				{
-					//COMPLEX dir = COMPLEX(crossfield.col(gid * 4).dot(faceBase.col(2 * gid)), crossfield.col(gid * 4).dot(faceBase.col(2 * gid + 1)));
-					//dir *= dir; dir *= dir;
 					COMPLEX dir = COMPLEX(x_axis.col(gid).dot(faceBase.col(2 * gid)), x_axis.col(gid).dot(faceBase.col(2 * gid + 1)));
 					b(count) = +e_g * dir;
 				}
@@ -1183,8 +1159,7 @@ namespace LoopGen
 		for (auto f : opt_face)
 		{
 			int fid = f.idx();
-			double theta = std::arg(b(idmap[fid]));// *0.25;
-			//dprint(b(idmap[fid]), theta);
+			double theta = std::arg(b(idmap[fid]));
 			x_axis.col(fid) = faceBase.col(fid * 2) * cos(theta) + faceBase.col(fid * 2 + 1) * sin(theta);
 			y_axis.col(fid) = faceBase.col(fid * 2) * cos(theta + 0.5 * PI) + faceBase.col(fid * 2 + 1) * sin(theta + 0.5 * PI);
 		}
@@ -1230,7 +1205,49 @@ namespace LoopGen
 
 	void LoopGen::OptimizeLoop()
 	{
-#if 1
+		int vid_set[11] = { 16389,31376,14727,1701,6417,15421,38796,16429,20133,22572,5860 };
+		cf->constraintId.clear();
+		cf->constraintVector.resize(0, 0);
+		for (int i = 0; i < 11; ++i)
+		{
+			dprint("iiiiiiiiiiiiiiiiiiiiiiiii", i, vid_set[i]);
+			//if (i == 1 || i == 3)
+				//continue;
+			InfoOnVertex* iov = InfoOnMesh[vid_set[i] * 2].energy < InfoOnMesh[vid_set[i] * 2 + 1].energy ? &InfoOnMesh[vid_set[i] * 2] : &InfoOnMesh[vid_set[i] * 2 + 1];
+
+			//std::vector<std::vector<InfoOnVertex*>> advancing_front[2];
+
+			LocalParametrization lp(*mesh, *cf, iov->v/*, iov == &InfoOnMesh[iov->v.idx() * 2] ? 0 : 1*/);
+			ConstructInitialRegion(iov, lp);
+			bool grow_flag[2] = { true,true };
+			//
+			int itertimes = 0;
+			int rr = 0;
+			do
+			{
+				std::deque<bool> visited_v = lp.GetRegionVFlag();
+				for (auto ver : lp.GetNewVertex())
+					visited_v[ver.idx()] = true;
+				ConstructRegionCut(iov, visited_v, lp.GetCut());
+#if PRINT_DEBUG_INFO
+				dprint("¼ÆËãcut");
+#endif
+				if (rr == 4 && vid_set[i] == 14727) break;
+				++rr;
+				dprint(rr);
+				lp.run();
+			} while (SpreadSubRegion(lp, grow_flag));
+			all_plane_loop.insert(all_plane_loop.end(), lp.GetAllPL().begin(), lp.GetAllPL().end());
+			region_vertex.insert(region_vertex.end(), lp.GetRegionVertex().begin(), lp.GetRegionVertex().end());
+			auto& region_face = lp.GetRegionFace();
+			cf->setOuterConstraint(region_face, lp.GetXAxis());
+			sub_vertex.insert(sub_vertex.end(), lp.GetNewVertex().begin(), lp.GetNewVertex().end());
+			sub_face.insert(sub_face.end(), lp.GetNewFace().begin(), lp.GetNewFace().end());
+		}
+		cf->runPolynomial();
+
+		
+#if 0
 		int vid_set[11] = { 16389,31376,14727,1701,6417,15421,38796,16429,20133,22572,5860};
 		cf->constraintId.clear();
 		cf->constraintVector.resize(0, 0);
@@ -1271,7 +1288,8 @@ namespace LoopGen
 			sub_face.insert(sub_face.end(), lp.GetNewFace().begin(), lp.GetNewFace().end());
 		}
 		cf->runPolynomial();
-#else
+#endif
+#if 0
 		int vvvid = 16389;
 		InfoOnVertex* iov = InfoOnMesh[vvvid * 2].energy < InfoOnMesh[vvvid * 2 + 1].energy ? &InfoOnMesh[vvvid * 2] : &InfoOnMesh[vvvid * 2 + 1];
 
@@ -1616,8 +1634,11 @@ namespace LoopGen
 		{
 			for (int j = i + 1; j < n; ++j)
 			{
-				dot = fabs(fragment0.col(i).dot(fragment0.col(j)))/(fabs((fragment1.col(i).dot(fragment1.col(j)))) + YYSS_FAIRLY_SMALL);
-				sum += std::min(100.0, dot + 1.0 / (dot + YYSS_FAIRLY_SMALL) - 2);
+				//dot = fabs(fragment0.col(i).dot(fragment0.col(j)))/(fabs((fragment1.col(i).dot(fragment1.col(j)))) + YYSS_FAIRLY_SMALL);
+				//sum += fabs(sin(normal_similarity_angle(j) - similarity_angle(j))) + 1 - cos(normal_similarity_angle(j) - similarity_angle(j));
+				double theta = conservativeArcCos(fragment0.col(i).dot(fragment0.col(j))) - conservativeArcCos(fragment1.col(i).dot(fragment1.col(j)));
+				sum += fabs(theta);
+				//sum += std::min(100.0, dot + 1.0 / (dot + YYSS_FAIRLY_SMALL) - 2);
 				//dprint(i, j, fabs(fragment0.col(i).dot(fragment0.col(j))), fabs((fragment1.col(i).dot(fragment1.col(j)))), dot, dot + 1.0 / (dot + YYSS_FAIRLY_SMALL) - 2);
 				//dot = fragment0.col(i).dot(fragment0.col(j)) - fragment1.col(i).dot(fragment1.col(j));
 				//sum += dot * dot;

@@ -878,7 +878,7 @@ void InteractiveViewerWidget::draw_energy()
 	
 
 #else
-	double max_e = 2;
+	double max_e = 0.2;
 	double step_e =1.0/max_e;
 	if (loop_gen_init)
 	{
@@ -1017,7 +1017,7 @@ void InteractiveViewerWidget::draw_submesh()
 		}
 		glEnd();*/
 
-		/*glBegin(GL_TRIANGLES);
+		glBegin(GL_TRIANGLES);
 		glColor3d(0.2, 0.3, 0.9);
 		for (auto f : lg->sub_face)
 		{
@@ -1026,7 +1026,7 @@ void InteractiveViewerWidget::draw_submesh()
 				glVertex3dv(mesh.point(fv).data());
 			}
 		}
-		glEnd();*/
+		glEnd();
 
 #if 1
 		//»­loop
