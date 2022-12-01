@@ -177,7 +177,7 @@ public:
 	bool if_draw_plane = false;
 	void draw_plane();
 	void draw_planeloop();
-	LoopGen::LoopGen::PlaneLoop plane_loop[2];
+	LoopGen::PlaneLoop plane_loop[2];
 #pragma endregion
 };
 

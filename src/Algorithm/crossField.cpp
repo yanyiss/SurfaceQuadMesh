@@ -624,14 +624,15 @@ void crossField::setCurvatureConstraint()
 	mesh->remove_property(f0);
 }
 
-void crossField::setOuterConstraint(std::vector<OpenMesh::FaceHandle>& cons_face)
+void crossField::setOuterConstraint(std::vector<OpenMesh::FaceHandle>& cons_face, Eigen::Matrix3Xd& cons_direction)
 {
 	int cols = constraintVector.cols();
 	constraintVector.conservativeResize(3, cols + cons_face.size());
 	for (auto cff : cons_face)
 	{
 		constraintId.push_back(cff.idx());
-		constraintVector.col(cols) = crossfield.col(cff.idx()*4);
+		//constraintVector.col(cols) = crossfield.col(cff.idx()*4);
+		constraintVector.col(cols) = cons_direction.col(cff.idx());
 		++cols;
 	}
 }

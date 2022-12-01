@@ -338,10 +338,10 @@ void InteractiveViewerWidget::pick_edge(int x,int y)
 	int desiredEdge = find_edge_using_selected_point();
 	if(desiredEdge < 0) return;
 	lastestEdge = desiredEdge;
-	if(lg->similarity_energy.empty())
-		dprint("Select Edge :", desiredEdge);// , "similarity energy:", std::min(lg->similarity_energy[desiredEdge * 2], lg->similarity_energy[desiredEdge * 2 + 1]));
-	else
-		dprint("Select Edge :", desiredEdge, "similarity energy:", std::min(lg->similarity_energy[desiredEdge * 2], lg->similarity_energy[desiredEdge * 2 + 1]));
+	//if(lg->similarity_energy.empty())
+	//	dprint("Select Edge :", desiredEdge);// , "similarity energy:", std::min(lg->similarity_energy[desiredEdge * 2], lg->similarity_energy[desiredEdge * 2 + 1]));
+	//else
+	//	dprint("Select Edge :", desiredEdge, "similarity energy:", std::min(lg->similarity_energy[desiredEdge * 2], lg->similarity_energy[desiredEdge * 2 + 1]));
 	std::vector<int>::iterator it;
 	if( (it = std::find(selectedEdge.begin(),selectedEdge.end(),desiredEdge)) == selectedEdge.end() )
 	{
@@ -1028,51 +1028,27 @@ void InteractiveViewerWidget::draw_submesh()
 		}
 		glEnd();*/
 
-#if 0
+#if 1
 		//»­loop
-		int count = 0;
 		glBegin(GL_LINES);
 		glColor3d(0.8, 0.2, 0.1);
-		for (auto& v : lg->region_vertex)
+		int nv = mesh.n_vertices();
+		for (int j = 0; j < lg->all_plane_loop.size(); ++j)
 		{
-			//if (++count % 3 != 0)
-				//continue;
-			auto& pos = mesh.point(v);
-			glVertex3dv(pos.data());
-			//auto rst = rr == &lg->InfoOnMesh[2 * rr->v.idx()] ? &lg->InfoOnMesh[2 * rr->v.idx() + 1] : &lg->InfoOnMesh[2 * rr->v.idx()];
-			auto rr = &lg->InfoOnMesh[2 * v.idx()];
-			for (auto& pp : rr->pl)
+			auto& pl = lg->all_plane_loop[j];
+			int nn = pl.size();
+			auto poin = mesh.point(mesh.vertex_handle(j % nv));
+			glVertex3dv(poin.data());
+			for (int i = 0; i < nn; ++i)
 			{
-				auto poin = (1 - pp.c) * mesh.point(mesh.to_vertex_handle(pp.h)) + pp.c * mesh.point(mesh.from_vertex_handle(pp.h));
+				poin = (1 - pl[i].c) * mesh.point(mesh.to_vertex_handle(pl[i].h)) + pl[i].c * mesh.point(mesh.from_vertex_handle(pl[i].h));
 				glVertex3dv(poin.data());
 				glVertex3dv(poin.data());
 			}
-			glVertex3dv(pos.data());
+			poin = mesh.point(mesh.vertex_handle(j % nv));
+			glVertex3dv(poin.data());
 		}
 		glEnd();
-
-		//count = 0;
-		//glBegin(GL_LINES);
-		//glColor3d(0.8, 0.2, 0.1);
-		//for (auto& v : lg->region_vertex)
-		//{
-		//	//if (++count % 10 != 0)
-		//		//continue;
-		//	auto rr = &lg->InfoOnMesh[2 * v.idx() + 1];
-		//	if (rr->pl.empty())
-		//		continue;
-		//	auto poin = (1 - rr->pl[0].c) * mesh.point(mesh.to_vertex_handle(rr->pl[0].h)) + rr->pl[0].c * mesh.point(mesh.from_vertex_handle(rr->pl[0].h));
-		//	glVertex3dv(poin.data());
-		//	for (int i = 0; i < rr->pl.size() - 1; ++i)
-		//	{
-		//		auto poin = (1 - rr->pl[i].c) * mesh.point(mesh.to_vertex_handle(rr->pl[i].h)) + rr->pl[i].c * mesh.point(mesh.from_vertex_handle(rr->pl[i].h));
-		//		glVertex3dv(poin.data());
-		//		glVertex3dv(poin.data());
-		//	}
-		//	poin = (1 - rr->pl.back().c) * mesh.point(mesh.to_vertex_handle(rr->pl.back().h)) + rr->pl.back().c * mesh.point(mesh.from_vertex_handle(rr->pl.back().h));
-		//	glVertex3dv(poin.data());
-		//}
-		//glEnd();
 #else
 		std::vector<OpenMesh::VertexHandle> vhs;
 		vhs.push_back(mesh.vertex_handle(9935));

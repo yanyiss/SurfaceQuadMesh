@@ -47,7 +47,7 @@ public:
 	//void runIteration(std::vector<OpenMesh::Vec3d>& crossfield);
 
 	void setCurvatureConstraint();
-	void setOuterConstraint(std::vector<OpenMesh::FaceHandle> &cons_face);
+	void setOuterConstraint(std::vector<OpenMesh::FaceHandle> &cons_face, Eigen::Matrix3Xd &cons_direction);
 	void setMatching();
 	void setSingularity();
 	void setNormal();

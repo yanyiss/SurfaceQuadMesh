@@ -62,7 +62,7 @@ namespace LoopGen
 	bool WriteEnergy(std::vector<double>& energy, std::string& model_name)
 	{
 		std::ofstream file_writer;
-		file_writer.open("..//resource//energy//" + model_name + "_sim.energy");
+		file_writer.open("..//resource//energy//" + model_name + ".energy");
 		if (file_writer.fail()) {
 			return false;
 		}
@@ -75,7 +75,7 @@ namespace LoopGen
 	bool ReadEnergy(std::vector<double>& energy, std::string& model_name)
 	{
 		std::ifstream file_reader;
-		file_reader.open("..//resource//energy//" + model_name + "_sim.energy", std::ios::in);
+		file_reader.open("..//resource//energy//" + model_name + ".energy", std::ios::in);
 		if (!file_reader.good())
 			return false;
 		char line[1024] = { 0 };
