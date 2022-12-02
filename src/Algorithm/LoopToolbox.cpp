@@ -928,15 +928,15 @@ namespace LoopGen
 
 		Eigen::VectorXd similarity_angle_sum(normal_similarity_angle.size()); similarity_angle_sum.setZero();
 		double energy_threshold = 0.18;
-		//static omp_lock_t lock;
-		//omp_init_lock(&lock);
-//#pragma omp parallel for
 
 		int exceed[2] = { 0,0 };
 		std::deque<bool> if_similarity_energy_low(mesh->n_vertices(), true);
+
+		static omp_lock_t lock;
+		omp_init_lock(&lock);
+#pragma omp parallel for
 		for (int i = 0; i < vertex_cache.size(); ++i)
 		{
-			//dprint(i);
 			int new_id = vertex_cache[i].idx();
 			int grow_id = grow_dir[new_id] ? 1 : 0;
 			if (!grow_flag[grow_id])
@@ -953,18 +953,17 @@ namespace LoopGen
 			//dprint(sum / similarity_angle.size());
 			if (sum > energy_threshold * similarity_angle.size())
 			{
+				omp_set_lock(&lock);
 				if (exceed[grow_id] > 2)
 				{
 					if_similarity_energy_low[new_id] = false;
 					grow_flag[grow_id] = false;
 				}
 				++exceed[grow_id];
+				omp_unset_lock(&lock);
 			}
-			//omp_set_lock(&lock);
-			//similarity_angle_sum += similarity_angle;
-			//omp_unset_lock(&lock);
 		}
-		//omp_destroy_lock(&lock);
+		omp_destroy_lock(&lock);
 		//normal_similarity_angle = ( normal_similarity_angle * lp.GetRegionVertex().size() + similarity_angle_sum) / (lp.GetRegionVertex().size() + vertex_cache.size());
 
 #if PRINT_DEBUG_INFO
@@ -972,6 +971,17 @@ namespace LoopGen
 #endif
 
 #endif
+		dprint("grow_flag", grow_flag[0], grow_flag[1]);
+		for (int i = 0; i < 2; ++i)
+		{
+			if (grow_flag[i])
+			{
+				double grad = LoopLenGrad(vertex_cache, lp, vertex_cache_flag, i == 0 ? false : true);
+				dprint("grad:", grad);
+				if (grad > PI)
+					grow_flag[i] = false;
+			}
+		}
 
 		//更新新区域
 		int count = lp.GetRegionVertex().size();
@@ -1017,6 +1027,7 @@ namespace LoopGen
 #if 0
 		return false;
 #endif
+		//若已超过能量阈值或者遇到接近平面的区域，则退出
 		if (!grow_flag[0] && !grow_flag[1])
 			return false;
 
@@ -1205,46 +1216,46 @@ namespace LoopGen
 
 	void LoopGen::OptimizeLoop()
 	{
-		int vid_set[11] = { 16389,31376,14727,1701,6417,15421,38796,16429,20133,22572,5860 };
-		cf->constraintId.clear();
-		cf->constraintVector.resize(0, 0);
-		for (int i = 0; i < 11; ++i)
-		{
-			dprint("iiiiiiiiiiiiiiiiiiiiiiiii", i, vid_set[i]);
-			//if (i == 1 || i == 3)
-				//continue;
-			InfoOnVertex* iov = InfoOnMesh[vid_set[i] * 2].energy < InfoOnMesh[vid_set[i] * 2 + 1].energy ? &InfoOnMesh[vid_set[i] * 2] : &InfoOnMesh[vid_set[i] * 2 + 1];
-
-			//std::vector<std::vector<InfoOnVertex*>> advancing_front[2];
-
-			LocalParametrization lp(*mesh, *cf, iov->v/*, iov == &InfoOnMesh[iov->v.idx() * 2] ? 0 : 1*/);
-			ConstructInitialRegion(iov, lp);
-			bool grow_flag[2] = { true,true };
-			//
-			int itertimes = 0;
-			int rr = 0;
-			do
-			{
-				std::deque<bool> visited_v = lp.GetRegionVFlag();
-				for (auto ver : lp.GetNewVertex())
-					visited_v[ver.idx()] = true;
-				ConstructRegionCut(iov, visited_v, lp.GetCut());
-#if PRINT_DEBUG_INFO
-				dprint("计算cut");
-#endif
-				if (rr == 4 && vid_set[i] == 14727) break;
-				++rr;
-				dprint(rr);
-				lp.run();
-			} while (SpreadSubRegion(lp, grow_flag));
-			all_plane_loop.insert(all_plane_loop.end(), lp.GetAllPL().begin(), lp.GetAllPL().end());
-			region_vertex.insert(region_vertex.end(), lp.GetRegionVertex().begin(), lp.GetRegionVertex().end());
-			auto& region_face = lp.GetRegionFace();
-			cf->setOuterConstraint(region_face, lp.GetXAxis());
-			sub_vertex.insert(sub_vertex.end(), lp.GetNewVertex().begin(), lp.GetNewVertex().end());
-			sub_face.insert(sub_face.end(), lp.GetNewFace().begin(), lp.GetNewFace().end());
-		}
-		cf->runPolynomial();
+//		int vid_set[11] = { 16389,31376,14727,1701,6417,15421,38796,16429,20133,22572,5860 };
+//		cf->constraintId.clear();
+//		cf->constraintVector.resize(0, 0);
+//		for (int i = 0; i < 11; ++i)
+//		{
+//			dprint("iiiiiiiiiiiiiiiiiiiiiiiii", i, vid_set[i]);
+//			//if (i == 1 || i == 3)
+//				//continue;
+//			InfoOnVertex* iov = InfoOnMesh[vid_set[i] * 2].energy < InfoOnMesh[vid_set[i] * 2 + 1].energy ? &InfoOnMesh[vid_set[i] * 2] : &InfoOnMesh[vid_set[i] * 2 + 1];
+//
+//			//std::vector<std::vector<InfoOnVertex*>> advancing_front[2];
+//
+//			LocalParametrization lp(*mesh, *cf, iov->v/*, iov == &InfoOnMesh[iov->v.idx() * 2] ? 0 : 1*/);
+//			ConstructInitialRegion(iov, lp);
+//			bool grow_flag[2] = { true,true };
+//			//
+//			int itertimes = 0;
+//			int rr = 0;
+//			do
+//			{
+//				std::deque<bool> visited_v = lp.GetRegionVFlag();
+//				for (auto ver : lp.GetNewVertex())
+//					visited_v[ver.idx()] = true;
+//				ConstructRegionCut(iov, visited_v, lp.GetCut());
+//#if PRINT_DEBUG_INFO
+//				dprint("计算cut");
+//#endif
+//				//if (rr == 4 && vid_set[i] == 14727) break;
+//				++rr;
+//				dprint(rr);
+//				lp.run();
+//			} while (SpreadSubRegion(lp, grow_flag));
+//			all_plane_loop.insert(all_plane_loop.end(), lp.GetAllPL().begin(), lp.GetAllPL().end());
+//			region_vertex.insert(region_vertex.end(), lp.GetRegionVertex().begin(), lp.GetRegionVertex().end());
+//			auto& region_face = lp.GetRegionFace();
+//			cf->setOuterConstraint(region_face, lp.GetXAxis());
+//			sub_vertex.insert(sub_vertex.end(), lp.GetNewVertex().begin(), lp.GetNewVertex().end());
+//			sub_face.insert(sub_face.end(), lp.GetNewFace().begin(), lp.GetNewFace().end());
+//		}
+//		cf->runPolynomial();
 
 		
 #if 0
@@ -1289,7 +1300,7 @@ namespace LoopGen
 		}
 		cf->runPolynomial();
 #endif
-#if 0
+#if 1
 		int vvvid = 16389;
 		InfoOnVertex* iov = InfoOnMesh[vvvid * 2].energy < InfoOnMesh[vvvid * 2 + 1].energy ? &InfoOnMesh[vvvid * 2] : &InfoOnMesh[vvvid * 2 + 1];
 
@@ -1308,7 +1319,7 @@ namespace LoopGen
 				visited_v[ver.idx()] = true;
 			ConstructRegionCut(iov, visited_v, lp.GetCut());
 			dprint("计算cut");
-			//if (rr == 1) break;
+			if (rr == 12) break;
 			++rr;
 			dprint(rr);
 			lp.run();
@@ -1492,6 +1503,104 @@ namespace LoopGen
 		lp.GetAllPL()[v.idx()] = std::move(planar_loop);
 		//iov.pl = std::move(planar_loop);
 		return true;
+	}
+
+	double LoopGen::LoopLenGrad(std::vector<VertexHandle>& vertex_set, LocalParametrization& lp, std::deque<bool>& vertex_flag, bool growDir)
+	{
+		int vsn = vertex_set.size();
+		std::vector<double> len(vsn, -1.0);
+		auto& grow_dir = lp.GetGrowDir();
+#pragma omp parallel for
+		for (int i = 0; i < vsn; ++i)
+		{
+			if (grow_dir[vertex_set[i].idx()] != growDir)
+				continue;
+			/*bool if_compute = false;
+			for (auto vv : mesh->vv_range(vertex_set[i]))
+			{
+				if (!vertex_flag[vertex_set[i].idx()])
+					if_compute = true;
+			}
+			if (!if_compute)
+				continue;*/
+			const auto& pl = lp.GetAllPL()[vertex_set[i].idx()];
+			int pln = pl.size();
+			Vec3d pos[2] = { mesh->point(vertex_set[i]), 
+				pl.front().c * mesh->point(mesh->from_vertex_handle(pl.front().h)) + (1 - pl.front().c) * mesh->point(mesh->to_vertex_handle(pl.front().h)) };
+			len[i] = 0;
+			len[i] += (pos[0] - pos[1]).norm();
+			for (int j = 1; j < pln; ++j)
+			{
+				pos[(j + 1) & 1] = pl[j].c * mesh->point(mesh->from_vertex_handle(pl[j].h)) + (1 - pl[j].c) * mesh->point(mesh->to_vertex_handle(pl[j].h));
+				len[i] += (pos[0] - pos[1]).norm();
+			}
+			len[i] += (mesh->point(vertex_set[i]) - pl.back().c * mesh->point(mesh->from_vertex_handle(pl.back().h))
+				- (1 - pl.back().c) * mesh->point(mesh->to_vertex_handle(pl.back().h))).norm();
+		}
+		double minmax_len[2] = { YYSS_INFINITE, 0.0 };
+		int minmax_id[2];
+		for (int i = 0; i < vsn; ++i)
+		{
+			if (len[i] < 0.0)
+				continue;
+			if (len[i] < minmax_len[0])
+			{
+				minmax_len[0] = len[i];
+				minmax_id[0] = vertex_set[i].idx();
+			}
+			if (len[i] > minmax_len[1])
+			{
+				minmax_len[1] = len[i];
+				minmax_id[1] = vertex_set[i].idx();
+			}
+		}
+		//计算 minmax_id 中两条 loop 在 u = 0.5 处的点的距离
+		Vec3d pos[2];
+		auto assembleU = [&](const PointOnHalfedge& poh)
+		{
+			double t0 = lp.GetRegularU(mesh->from_vertex_handle(poh.h).idx());
+			double t1 = lp.GetRegularU(mesh->to_vertex_handle(poh.h).idx());
+			//dprint("t0t1", t0, t1);
+			if (fabs(t0 - t1) > 0.5) { if (t0 < t1) { t0 += 1.0; } else { t1 += 1.0; } }
+			double u = poh.c * t0 + (1 - poh.c) * t1;
+			return u - std::floor(u);
+		};
+		auto setdata = [&](int i)
+		{
+			double up[2];
+			//up[0] = lp.GetRegularU(minmax_id[i]);
+			const auto& pl = lp.GetAllPL()[minmax_id[i]];
+			int pln = pl.size();
+			up[0] = assembleU(pl.front());
+			for (int j = 1; j < pln; ++j)
+			{
+				up[j & 1] = assembleU(pl[j]);
+				if ((up[0] - 0.5) * (up[1] - 0.5) <= 0.0 && fabs(up[0] - up[1]) < 0.5)
+				{
+					Vec3d p0 = pl[j - 1].c * mesh->point(mesh->from_vertex_handle(pl[j - 1].h))
+						+ (1 - pl[j - 1].c) * mesh->point(mesh->to_vertex_handle(pl[j - 1].h));
+					Vec3d p1 = pl[j].c * mesh->point(mesh->from_vertex_handle(pl[j].h))
+						+ (1 - pl[j].c) * mesh->point(mesh->to_vertex_handle(pl[j].h));
+					double lambda = (0.5 - up[(j + 1) & 1]) / fabs(up[0] - up[1]);
+					pos[i] = (1 - lambda) * p0 + lambda * p1;
+					dprint("up", up[0], up[1]);
+					return true;
+				}
+			}
+			return false;
+		};
+		dprint("setdata:", setdata(0), setdata(1));
+		dprint(minmax_len[0], minmax_len[1]);
+		dprint(pos[0], "\t", pos[1]);
+		static int rrr = 0;
+		++rrr;
+		dprint("rrr", rrr);
+		//if (rrr > 18)
+		{
+			u0point5.push_back(pos[0]);
+			u0point5.push_back(pos[1]);
+		}
+		return (minmax_len[1] - minmax_len[0]) / (pos[0] - pos[1]).norm();
 	}
 
 	void LoopGen::SetUParaLine(InfoOnVertex& iov, LocalParametrization& lp, std::deque<bool>& visited_v, std::deque<bool>& visited_f)

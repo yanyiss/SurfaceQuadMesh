@@ -302,6 +302,7 @@ void InteractiveViewerWidget::pick_vertex(int x,int y)
 	lastestVertex = r;
 	//printf("Select Vertex : %d\n", r);
 	dprint("Select Vertex:", r, mesh.voh_begin(mesh.vertex_handle(r)).handle().idx() / 2);
+	dprint("Vertex Position:", mesh.point(mesh.vertex_handle(r)));
 	//dprint("uv para:", lg->uv_para[0](lg->idmap[r]), lg->uv_para[1](lg->idmap[r]));
 
 	std::vector<int>::iterator it;
@@ -1017,7 +1018,7 @@ void InteractiveViewerWidget::draw_submesh()
 		}
 		glEnd();*/
 
-		glBegin(GL_TRIANGLES);
+		/*glBegin(GL_TRIANGLES);
 		glColor3d(0.2, 0.3, 0.9);
 		for (auto f : lg->sub_face)
 		{
@@ -1026,8 +1027,18 @@ void InteractiveViewerWidget::draw_submesh()
 				glVertex3dv(mesh.point(fv).data());
 			}
 		}
-		glEnd();
+		glEnd();*/
 
+		randomNumberGen rng;
+		glPointSize(11);
+		glBegin(GL_POINTS);
+		for (int i = 0; i < lg->u0point5.size(); i += 2)
+		{
+			glColor3d(rng.get(), rng.get(), rng.get());
+			glVertex3dv(lg->u0point5[i].data());
+			glVertex3dv(lg->u0point5[i + 1].data());
+		}
+		glEnd();
 #if 1
 		//»­loop
 		glBegin(GL_LINES);
@@ -1035,6 +1046,8 @@ void InteractiveViewerWidget::draw_submesh()
 		int nv = mesh.n_vertices();
 		for (int j = 0; j < lg->all_plane_loop.size(); ++j)
 		{
+			if (j % 10 != 0)
+				continue;
 			auto& pl = lg->all_plane_loop[j];
 			int nn = pl.size();
 			auto poin = mesh.point(mesh.vertex_handle(j % nv));
