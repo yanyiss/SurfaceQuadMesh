@@ -624,16 +624,32 @@ void crossField::setCurvatureConstraint()
 	mesh->remove_property(f0);
 }
 
-void crossField::setOuterConstraint(std::vector<OpenMesh::FaceHandle>& cons_face, Eigen::Matrix3Xd& cons_direction)
+void crossField::setOuterConstraint(std::deque<bool>& cons_flag, Eigen::Matrix3Xd& cons_direction)
 {
-	int cols = constraintVector.cols();
-	constraintVector.conservativeResize(3, cols + cons_face.size());
-	for (auto cff : cons_face)
+	//int cols = constraintVector.cols();
+	//constraintVector.conservativeResize(3, cols + cons_face.size());
+	//for (auto cff : cons_face)
+	//{
+	//	constraintId.push_back(cff.idx());
+	//	//constraintVector.col(cols) = crossfield.col(cff.idx()*4);
+	//	constraintVector.col(cols) = cons_direction.col(cff.idx());
+	//	++cols;
+	//}
+	int count = 0;
+	for (int i = 0; i < mesh->n_faces(); ++i)
+		if (cons_flag[i])
+			++count;
+	constraintId.reserve(count);
+	constraintVector.resize(3, count);
+	int cols = 0;
+	for (int i = 0; i < mesh->n_faces(); ++i)
 	{
-		constraintId.push_back(cff.idx());
-		//constraintVector.col(cols) = crossfield.col(cff.idx()*4);
-		constraintVector.col(cols) = cons_direction.col(cff.idx());
-		++cols;
+		if (cons_flag[i])
+		{
+			constraintId.push_back(i);
+			constraintVector.col(cols) = cons_direction.col(i);
+			++cols;
+		}
 	}
 }
 

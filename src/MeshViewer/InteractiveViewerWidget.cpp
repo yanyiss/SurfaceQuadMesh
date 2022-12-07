@@ -631,10 +631,19 @@ void InteractiveViewerWidget::draw_field()
 			glVertex3dv(mesh.point(mesh.vertex_handle(s)).data());
 		}
 		glEnd();
+
+
 		glPointSize(12);
-		glColor3d(0.7, 0.1, 0.6);
 		glBegin(GL_POINTS);
-		glVertex3dv(mesh.point(mesh.vertex_handle(5535)).data());
+		/*glColor3d(0.7, 0.1, 0.0);
+		glVertex3dv(mesh.point(mesh.vertex_handle(14238)).data());
+		glColor3d(0.0, 0.7, 0.60);
+		glVertex3dv(mesh.point(mesh.vertex_handle(37644)).data());
+		glVertex3dv(mesh.point(mesh.vertex_handle(34504)).data());
+		glVertex3dv(mesh.point(mesh.vertex_handle(37606)).data());
+		glVertex3dv(mesh.point(mesh.vertex_handle(27276)).data());
+		glVertex3dv(mesh.point(mesh.vertex_handle(40641)).data());
+		glVertex3dv(mesh.point(mesh.vertex_handle(27270)).data());*/
 		glEnd();
 	}
 }
@@ -702,6 +711,7 @@ void InteractiveViewerWidget::showLoop()
 {
 	setDrawMode(InteractiveViewerWidget::SOLID_FLAT);
 	setMouseMode(InteractiveViewerWidget::TRANS);
+	timeRecorder tr;
 	if (!if_has_field)
 	{
 		showField();
@@ -725,6 +735,7 @@ void InteractiveViewerWidget::showLoop()
 		file_reader.close();*/
 
 	}
+	tr.out("all time:");
 
 	/*if (selectedVertex.empty())
 		return;
@@ -1010,15 +1021,19 @@ void InteractiveViewerWidget::draw_submesh()
 #endif
 		glEnd();
 		
-		/*glBegin(GL_POINTS);
+#if 1
+		glPointSize(8);
+		glBegin(GL_POINTS);
 		glColor3d(0.1, 0.5, 0.6);
 		for (auto v : lg->sub_vertex)
 		{
 			glVertex3dv(mesh.point(v).data());
 		}
-		glEnd();*/
+		glEnd();
+#endif
 
-		/*glBegin(GL_TRIANGLES);
+#if 0
+		glBegin(GL_TRIANGLES);
 		glColor3d(0.2, 0.3, 0.9);
 		for (auto f : lg->sub_face)
 		{
@@ -1027,9 +1042,54 @@ void InteractiveViewerWidget::draw_submesh()
 				glVertex3dv(mesh.point(fv).data());
 			}
 		}
+		glEnd();
+#endif
+
+		/*glBegin(GL_POINTS);
+		glColor3d(0.3, 0, 0.9);
+		for (auto v : lg->region_vertex)
+		{
+			if (lg->growDIR[v.idx()] == 0)
+				glColor3d(0.1, 0.8, 0.1);
+			else
+				glColor3d(0.1, 0.1, 0.9);
+			glVertex3dv(mesh.point(v).data());
+		}
+		for (auto v : lg->sub_vertex)
+		{
+			if (lg->growDIR[v.idx()] == 0)
+				glColor3d(0.1, 0.8, 0.1);
+			else
+				glColor3d(0.1, 0.1, 0.9);
+			glVertex3dv(mesh.point(v).data());
+		}
 		glEnd();*/
 
-		randomNumberGen rng;
+		//画出cut
+		glLineWidth(12);
+		glBegin(GL_LINES);
+		glColor3d(0.3, 0.5, 0.4);
+		if (lg->cut_vertex.size() > 1)
+		{
+			for (int i = 0; i < lg->cut_vertex.size() - 1; ++i)
+			{
+				glVertex3dv(mesh.point(lg->cut_vertex[i]).data());
+				glVertex3dv(mesh.point(lg->cut_vertex[i + 1]).data());
+			}
+		}
+		glEnd();
+
+		//画出种子点
+#if 1
+		glPointSize(16);
+		glBegin(GL_POINTS);
+		glColor3d(0.3, 1.0, 0.3);
+		for (auto sv : lg->seed_vertex)
+			glVertex3dv(mesh.point(sv).data());
+		glEnd();
+#endif
+
+		/*randomNumberGen rng;
 		glPointSize(11);
 		glBegin(GL_POINTS);
 		for (int i = 0; i < lg->u0point5.size(); i += 2)
@@ -1038,9 +1098,10 @@ void InteractiveViewerWidget::draw_submesh()
 			glVertex3dv(lg->u0point5[i].data());
 			glVertex3dv(lg->u0point5[i + 1].data());
 		}
-		glEnd();
+		glEnd();*/
 #if 1
 		//画loop
+		glLineWidth(3);
 		glBegin(GL_LINES);
 		glColor3d(0.8, 0.2, 0.1);
 		int nv = mesh.n_vertices();
@@ -1152,7 +1213,7 @@ void InteractiveViewerWidget::draw_planeloop()
 	{
 		if (plane_loop[i].empty())
 			continue;
-		for (int j = 0; j < plane_loop[i].size() - 1; ++j)
+		for (int j = 0; j < plane_loop[i].size() - 2; ++j)
 		{
 			auto& pl = plane_loop[i][j];
 			auto& ps = plane_loop[i][j + 1];

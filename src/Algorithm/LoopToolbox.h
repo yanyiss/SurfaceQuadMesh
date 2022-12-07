@@ -24,6 +24,21 @@ namespace LoopGen
 			return energy > right.energy;
 		}*/
 	};
+	struct info_pair
+	{
+		InfoOnVertex* iov;
+		double energy;
+		info_pair() {}
+		info_pair(InfoOnVertex* iov_, double e)
+		{
+			iov = iov_; energy = e;
+		}
+		bool operator>(const info_pair& right) const
+		{
+			return energy > right.energy;
+		}
+	};
+	typedef std::priority_queue<info_pair, std::vector<info_pair>, std::greater<info_pair>> info_pair_pq;
     
     class LocalParametrization
 	{
@@ -42,7 +57,7 @@ namespace LoopGen
 			vidmap.resize(nv); vidmap[v.idx()] = 0;
 			x_axis.resize(3, nf);
 			y_axis.resize(3, nf);
-			grow_dir.resize(nv, false);
+			grow_dir.resize(nv, -1);
 		};
 		~LocalParametrization(){};
 	public:
@@ -58,7 +73,7 @@ namespace LoopGen
 		inline std::deque<bool>& GetRegionVFlag() { return region_v_flag; }
 		inline std::deque<bool>& GetCutV_Flag() { return cutv_flag; }
 		inline std::deque<bool>& GetCutF_Flag() { return cutf_flag; }
-		inline std::deque<bool>& GetGrowDir() { return grow_dir; }
+		inline std::vector<int>& GetGrowDir() { return grow_dir; }
 
 		inline std::vector<PlaneLoop>& GetAllPL() { return all_pl; }
 		inline Eigen::Matrix3Xd& GetXAxis() { return x_axis; }
@@ -88,7 +103,7 @@ namespace LoopGen
 		std::deque<bool> region_v_flag;
 		std::deque<bool> cutv_flag;
 		std::deque<bool> cutf_flag;
-		std::deque<bool> grow_dir;
+		std::vector<int> grow_dir;
 
 		std::vector<PlaneLoop> all_pl;
 		Eigen::Matrix3Xd x_axis;
@@ -146,17 +161,26 @@ namespace LoopGen
 		std::vector<double> similarity_energy;
 		std::vector<int> idmap;
 		std::vector<PlaneLoop> all_plane_loop;
-		std::vector<Vec3d> u0point5;
+		//std::vector<Vec3d> u0point5;
+		std::vector<VertexHandle> seed_vertex;
+		std::vector<VertexHandle> cut_vertex;
+		std::vector<int> growDIR;
+
+		//算法重要参数
+		double energy_threshold = 0.18;
+		int extend_layer = 3;
 
 		//优化阶段函数
 		void AssembleSimilarityAngle(VertexHandle v, Eigen::VectorXd& sa, LocalParametrization& lp, int loop_fragment_num);
 		bool RefineLoopByParametrization(VertexHandle v, LocalParametrization& lp, std::deque<bool>& visited_v, std::deque<bool>& visited_f);
 		void ResetLocalField(LocalParametrization &lp, std::vector<FaceHandle>& opt_face, std::deque<bool>& opt_flag, std::deque<bool>& constraint_flag);
-		double LoopLenGrad(std::vector<VertexHandle> &vertex_set, LocalParametrization &lp, std::deque<bool> &vertex_flag, bool growDir);
+		double LoopLenGrad(std::vector<VertexHandle> &vertex_set, LocalParametrization &lp, std::deque<bool> &vertex_flag, int growDir);
+		void AssembleIOVLoopEnergy(info_pair_pq &pq);
+		bool CheckTopology(std::vector<VertexHandle>& vertex_set, std::deque<bool> &set_flag, std::vector<int> &grow_dir);
 
 		void ConstructInitialRegion(InfoOnVertex* iov, LocalParametrization &lp);
 		bool SpreadSubRegion(LocalParametrization& lp, bool grow_flag[2]);
-		void ConstructRegionCut(InfoOnVertex* iov, std::deque<bool>& visited, std::vector<VertexHandle>& cut);
+		bool ConstructRegionCut(InfoOnVertex* iov, std::deque<bool>& visited, std::vector<VertexHandle>& cut);
 		void OptimizeLoop();
 
 		void SetUParaLine(InfoOnVertex& iov, LocalParametrization& lp, std::deque<bool>& visited_v, std::deque<bool>& visited_f);
