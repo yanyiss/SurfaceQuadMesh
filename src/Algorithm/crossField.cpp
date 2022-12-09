@@ -186,7 +186,6 @@ void crossField::runPolynomial()
 			crossfield.col(i * 4 + j) = faceBase.col(i * 2)*cos(arg + j * PI*0.5) + faceBase.col(i * 2 + 1)*sin(arg + j * PI*0.5);
 		}
 	}
-	setNormal();
 	setMatching();
 	setSingularity();
 }
@@ -637,8 +636,10 @@ void crossField::setOuterConstraint(std::deque<bool>& cons_flag, Eigen::Matrix3X
 	//}
 	int count = 0;
 	for (int i = 0; i < mesh->n_faces(); ++i)
+	{
 		if (cons_flag[i])
 			++count;
+	}
 	constraintId.reserve(count);
 	constraintVector.resize(3, count);
 	int cols = 0;

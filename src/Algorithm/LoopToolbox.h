@@ -39,7 +39,20 @@ namespace LoopGen
 		}
 	};
 	typedef std::priority_queue<info_pair, std::vector<info_pair>, std::greater<info_pair>> info_pair_pq;
-    
+	struct cylinder
+	{
+		std::vector<VertexHandle> vertices;
+		std::vector<FaceHandle> faces;
+		std::deque<bool> vertice_flag;
+		std::deque<bool> face_flag;
+		Eigen::VectorXd uv[2];
+		std::vector<int> vidmap;
+		std::vector<int> boundary[2];
+	};
+	struct multi_cylinder
+	{
+		std::vector<cylinder> cylinders;
+	};
     class LocalParametrization
 	{
 	public:
@@ -155,8 +168,10 @@ namespace LoopGen
 		void InitializePQ();
 
 		//用于数据交换与绘制的变量
-		std::vector<VertexHandle> region_vertex;
-		std::vector<VertexHandle> sub_vertex; std::vector<FaceHandle> sub_face;
+		//std::vector<VertexHandle> region_vertex;
+		//std::vector<VertexHandle> sub_vertex; std::vector<FaceHandle> sub_face;
+		std::deque<bool> optimized_face_flag;
+		std::deque<bool> optimized_vert_flag;
 		Eigen::VectorXd uv_para[2];
 		std::vector<double> similarity_energy;
 		std::vector<int> idmap;

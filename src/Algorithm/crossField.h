@@ -40,6 +40,7 @@ public:
 			auto& p = mesh->point(tv);
 			position.col(tv.idx()) << p[0], p[1], p[2];
 		}
+		setNormal();
 		calculateMeshFaceBase();
 	}
 	void runPolynomial();
