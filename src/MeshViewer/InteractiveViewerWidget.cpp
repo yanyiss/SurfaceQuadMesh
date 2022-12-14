@@ -672,7 +672,7 @@ void InteractiveViewerWidget::render_text_slot(OpenMesh::Vec3d pos, QString str)
 	render_text(pos[0],pos[1],pos[2],str);
 }
 
-#include "../Algorithm/LoopToolbox.h"
+#include "../Algorithm/LoopGen.h"
 void InteractiveViewerWidget::showField()
 {
 	if (!if_has_field)
@@ -719,7 +719,7 @@ void InteractiveViewerWidget::showLoop()
 	if (!loop_gen_init)
 	{
 		loop_gen_init = true;
-		lg->InitializeGraphWeight();
+		//lg->cf->InitializeGraphWeight();
 		lg->InitializePQ();
 		lg->OptimizeLoop();
 		/*std::ifstream file_reader;
@@ -1021,22 +1021,47 @@ void InteractiveViewerWidget::draw_submesh()
 #endif
 		glEnd();
 		
+		//画出区域点，附加生长方向
 #if 1
 		glPointSize(8);
 		glBegin(GL_POINTS);
 		glColor3d(0.1, 0.5, 0.6);
-		for (auto v : lg->sub_vertex)
+		for (auto v : mesh.vertices())
 		{
+			if (!lg->optimized_vert_flag[v.idx()])
+				continue;
+			/*if (lg->growDIR[v.idx()] == 0)
+				glColor3d(0.4, 0.2, 0.6);
+			else if (lg->growDIR[v.idx()] == 1)
+				glColor3d(0.1, 0.7, 0.2);
+			else
+				glColor3d(0.1, 0.1, 0.1);*/
 			glVertex3dv(mesh.point(v).data());
 		}
 		glEnd();
 #endif
 
-#if 0
+		//画区域边界
+#if 1
+		glLineWidth(6);
+		glColor3d(1.0, 1.0, 1.0);
+		glBegin(GL_LINES);
+		for(auto te:mesh.edges())
+			if (lg->bound_edge_flag[te.idx()])
+			{
+				glVertex3dv(mesh.point(te.v0()).data());
+				glVertex3dv(mesh.point(te.v1()).data());
+			}
+		glEnd();
+#endif
+		//画出区域的面
+#if 1
 		glBegin(GL_TRIANGLES);
 		glColor3d(0.2, 0.3, 0.9);
-		for (auto f : lg->sub_face)
+		for (auto f : mesh.faces())
 		{
+			if (!lg->optimized_face_flag[f.idx()])
+				continue;
 			for (auto fv : mesh.fv_range(f))
 			{
 				glVertex3dv(mesh.point(fv).data());
@@ -1078,6 +1103,7 @@ void InteractiveViewerWidget::draw_submesh()
 			}
 		}
 		glEnd();
+
 
 		//画出种子点
 #if 1

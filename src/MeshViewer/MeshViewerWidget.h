@@ -7,7 +7,7 @@
 
 #include "QGLViewerWidget.h"
 #include "MeshDefinition.h"
-#include "..\Algorithm\LoopToolbox.h"
+#include "..\Algorithm\LoopGen.h"
 
 class MeshViewerWidget : public QGLViewerWidget 
 {
