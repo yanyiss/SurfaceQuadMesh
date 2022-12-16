@@ -1284,7 +1284,7 @@ namespace LoopGen
 		optimized_face_flag.resize(mesh->n_faces(), false);
 		optimized_vert_flag.resize(mesh->n_vertices(), false);
 		bound_edge_flag.resize(mesh->n_edges(), false);
-		cset.vertex_cylinder_map.resize(mesh->n_vertices());
+		//cset.vertex_cylinder_map.resize(mesh->n_vertices());
 		while (true)
 		{
 			info_pair ip;
@@ -1381,17 +1381,22 @@ namespace LoopGen
 						bound_edge_flag[fh.idx() / 2] = true;
 
 			cylinder cy;
+			cy.mesh = mesh;
 			cy.id = cset.cylinders.size();
 			cy.vertices = std::move(lp.region_vertex);
 			cy.faces = std::move(lp.region_face);
 			cy.vertice_flag = std::move(lp.region_v_flag);
 			cy.face_flag = std::move(lp.region_f_flag);
+			cy.cut_v_flag = std::move(lp.cutv_flag);
+			cy.cut_f_flag = std::move(lp.cutf_flag);
 			cy.vidmap = std::move(lp.vidmap);
 			cy.uv[0] = std::move(lp.GetU());
 			cy.uv[1] = std::move(lp.GetV());
-			for (auto cyv : cy.vertices)
-				cset.vertex_cylinder_map[cyv.idx()].push_back(cy.id);
-			cset.push_back(cy);
+			//for (auto cyv : cy.vertices)
+				//cset.vertex_cylinder_map[cyv.idx()].push_back(cy.id);
+			cy.SetBound();
+			cset.cylinders.push_back(std::move(cy));
+			//cset.push_back(cy);
 			//break;
 		}
 		cf->setOuterConstraint(constraint_flag, constraint_dir);
@@ -1401,15 +1406,137 @@ namespace LoopGen
 		dprint("complete");
 	}
 
+	void LoopGen::UpdateIOM()
+	{
+		for (auto& iov : InfoOnMesh)
+		{
+			iov.mark.clear();
+			iov.pl.swap(PlaneLoop());
+		}
+		auto& matching = cf->getMatching();
+		for (auto eitr = mesh->edges_begin(); eitr != mesh->edges_end(); ++eitr)
+		{
+			int index = 0;
+			auto h = mesh->halfedge_handle(eitr.handle(), 0);
+			auto fromvert = mesh->from_vertex_handle(h);
+			auto tovert = mesh->to_vertex_handle(h);
+			auto ht = mesh->voh_begin(fromvert).handle();
+			//ÄæÊ±ÕëËÑË÷
+			while (ht.idx() != h.idx())
+			{
+				ht = mesh->opposite_halfedge_handle(mesh->prev_halfedge_handle(ht));
+				index += matching[ht.idx()];
+			}
+			h = mesh->next_halfedge_handle(h);
+			ht = mesh->voh_begin(tovert).handle();
+			while (ht.idx() != h.idx())
+			{
+				ht = mesh->opposite_halfedge_handle(mesh->prev_halfedge_handle(ht));
+				index += 4 - matching[ht.idx()];
+			}
+			index %= 4;
+
+			switch (index)
+			{
+			case 0:
+				InfoOnMesh[2 * fromvert.idx()].mark.insert(std::make_pair(2 * tovert.idx(), 0));
+				InfoOnMesh[2 * tovert.idx()].mark.insert(std::make_pair(2 * fromvert.idx(), 0));
+				InfoOnMesh[2 * fromvert.idx() + 1].mark.insert(std::make_pair(2 * tovert.idx() + 1, 0));
+				InfoOnMesh[2 * tovert.idx() + 1].mark.insert(std::make_pair(2 * fromvert.idx() + 1, 0));
+				break;
+			case 1:
+				InfoOnMesh[2 * fromvert.idx()].mark.insert(std::make_pair(2 * tovert.idx() + 1, 0));
+				InfoOnMesh[2 * tovert.idx()].mark.insert(std::make_pair(2 * fromvert.idx() + 1, 0));
+				InfoOnMesh[2 * fromvert.idx() + 1].mark.insert(std::make_pair(2 * tovert.idx(), 0));
+				InfoOnMesh[2 * tovert.idx() + 1].mark.insert(std::make_pair(2 * fromvert.idx(), 0));
+				break;
+			case 2:
+				InfoOnMesh[2 * fromvert.idx()].mark.insert(std::make_pair(2 * tovert.idx(), 0));
+				InfoOnMesh[2 * tovert.idx()].mark.insert(std::make_pair(2 * fromvert.idx(), 0));
+				InfoOnMesh[2 * fromvert.idx() + 1].mark.insert(std::make_pair(2 * tovert.idx() + 1, 0));
+				InfoOnMesh[2 * tovert.idx() + 1].mark.insert(std::make_pair(2 * fromvert.idx() + 1, 0));
+				break;
+			case 3:
+				InfoOnMesh[2 * fromvert.idx()].mark.insert(std::make_pair(2 * tovert.idx() + 1, 0));
+				InfoOnMesh[2 * tovert.idx()].mark.insert(std::make_pair(2 * fromvert.idx() + 1, 0));
+				InfoOnMesh[2 * fromvert.idx() + 1].mark.insert(std::make_pair(2 * tovert.idx(), 0));
+				InfoOnMesh[2 * tovert.idx() + 1].mark.insert(std::make_pair(2 * fromvert.idx(), 0));
+				break;
+			}
+		}
+		auto& crossfield = cf->getCrossField();
+		for (auto& cy : cset.cylinders)
+		{
+			VertexHandle vh = cy.vertices.front();
+			HalfedgeHandle heh = mesh->voh_begin(vh);
+			FaceHandle fh = mesh->face_handle(heh);
+			auto grad = cy.GetUGrad(fh);
+			int dir_flag = -1;
+			double dir_max = -1.0;
+			for (int i = 4 * fh.idx(); i < 4 * fh.idx() + 4; ++i)
+			{
+				double dot_ = grad[0] * crossfield(0, i) + grad[1] * crossfield(1, i) + grad[2] * crossfield(2, i);
+				if (dot_ > dir_max)
+				{
+					dir_flag = i;
+					dir_max = dot_;
+				}
+			}
+
+			int begin = vh.idx() * 2 + dir_flag % 2;
+			auto& ior = cy.info_on_region;
+			ior.resize(mesh->n_vertices() * 2, false);
+			ior[begin] = true;
+			std::queue<InfoOnVertex*> vtree;
+			vtree.push(&InfoOnMesh[begin]);
+			while (!vtree.empty())
+			{
+				InfoOnVertex* iov = vtree.front();
+				vtree.pop();
+				cset.iov_cylinder_map[iov->id].push_back(cy.id);
+				for (const auto& iov_nei : iov->mark)
+				{
+					if (ior[iov_nei.first] || !cy.vertice_flag[iov_nei.first / 2])
+						continue;
+					vtree.push(&InfoOnMesh[iov_nei.first]);
+					ior[iov_nei.first] = true;
+				}
+			}
+		}
+	}
+
+	void LoopGen::ProcessOverlap()
+	{
+		cylinder* base;
+		auto merge = [&]()
+		{
+
+		};
+		auto cut = [&]()
+		{
+
+		};
+		for (int i = 0; i < cset.cylinders.size(); ++i)
+		{
+			base = &cset.cylinders[i];
+			for (auto tv : base->vertices)
+			{
+				//if(i)
+			}
+		}
+	}
+
 	void LoopGen::LookForCrossingLoop()
 	{
+		UpdateIOM();
+		ProcessOverlap();
 		for (auto& cy : cset.cylinders)
 		{
 			for (auto he : cy.bounds)
 			{
 				auto bv = mesh->to_vertex_handle(he);
-				if (cset.vertex_cylinder_map[bv.idx()].size() > 1)
-					continue;
+				//if (cset.vertex_cylinder_map[bv.idx()].size() > 1)
+					//continue;
 
 			}
 		}
@@ -1762,6 +1889,24 @@ namespace LoopGen
 		}
 		return true;
 	}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 #if 0
 	void LoopGen::SetUParaLine(InfoOnVertex& iov, LocalParametrization& lp, std::deque<bool>& visited_v, std::deque<bool>& visited_f)
 	{

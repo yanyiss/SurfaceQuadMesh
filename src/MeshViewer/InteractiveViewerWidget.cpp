@@ -635,9 +635,9 @@ void InteractiveViewerWidget::draw_field()
 
 		glPointSize(12);
 		glBegin(GL_POINTS);
-		/*glColor3d(0.7, 0.1, 0.0);
-		glVertex3dv(mesh.point(mesh.vertex_handle(14238)).data());
-		glColor3d(0.0, 0.7, 0.60);
+		glColor3d(0.7, 0.1, 0.0);
+		glVertex3dv(mesh.point(mesh.vertex_handle(22373)).data());
+		/*glColor3d(0.0, 0.7, 0.60);
 		glVertex3dv(mesh.point(mesh.vertex_handle(37644)).data());
 		glVertex3dv(mesh.point(mesh.vertex_handle(34504)).data());
 		glVertex3dv(mesh.point(mesh.vertex_handle(37606)).data());

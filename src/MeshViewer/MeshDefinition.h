@@ -91,12 +91,6 @@ void compute_principal_curvature(Mesh* mesh_,
 								 std::vector<double>& K1, std::vector<double>& K2, 
 								 std::vector<OpenMesh::Vec3d>& dir1,std::vector<OpenMesh::Vec3d>& dir2);
 
-#if 0
-#pragma region functions by yanyisheshou at GCL
-double meshMinAngle(TriMesh &mesh);
-
-void printMeshQuality(TriMesh &mesh);
-
 template <typename T>
 void initMeshStatusAndNormal(T& m)
 {
@@ -110,6 +104,14 @@ void initMeshStatusAndNormal(T& m)
 	m.update_face_normals();
 	m.update_vertex_normals();
 }
+
+#if 0
+#pragma region functions by yanyisheshou at GCL
+double meshMinAngle(TriMesh &mesh);
+
+void printMeshQuality(TriMesh &mesh);
+
+
 
 template <typename T>
 bool isClosedMesh(T& mesh)

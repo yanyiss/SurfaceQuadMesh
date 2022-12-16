@@ -5,6 +5,7 @@
 #include <queue>
 
 #include "..\MeshViewer\MeshDefinition.h"
+#include "..\Toolbox\dprint.h"
 
 #define YYSS_INFINITE 1.0e12
 #define YYSS_FAIRLY_SMALL 1.0e-3
@@ -50,22 +51,32 @@ namespace LoopGen
 
 	struct cylinder
 	{
-		int id;
+		int id = -1;
+		Mesh* mesh = nullptr;
 		std::vector<VertexHandle> vertices;
-		std::vector<HalfedgeHandle> bounds;
+		std::vector<std::vector<HalfedgeHandle>> bounds;
 		std::vector<FaceHandle> faces;
 		std::deque<bool> vertice_flag;
+		std::deque<bool> info_on_region;
 		std::deque<bool> bound_flag;
 		std::deque<bool> face_flag;
+		std::deque<bool> cut_v_flag;
+		std::deque<bool> cut_f_flag;
 		std::vector<int> vidmap;
 		Eigen::VectorXd uv[2];
+
+		cylinder() {}
+		cylinder(cylinder&& rhs);
+		void SetBound();
+		OpenMesh::Vec3d GetUGrad(FaceHandle fh);
+		OpenMesh::Vec3d GetVGrad(FaceHandle fh);
 	};
 	struct cylinder_set
 	{
 		std::vector<cylinder> cylinders;
 		std::deque<bool> set_vertice_flag;
-		std::vector<std::vector<int>> vertex_cylinder_map;
-		void push_back(cylinder& cy);
+		std::vector<std::vector<int>> iov_cylinder_map;
+		//void push_back(cylinder& cy);
 
 	};
 

@@ -10,7 +10,7 @@ namespace LoopGen
 	class LoopGen
 	{
 	public:
-		LoopGen(Mesh& mesh_) :mesh(&mesh_) { /*InitializeAABBTREE();*/ };
+		LoopGen(Mesh& mesh_) :mesh(&mesh_) { /*InitializeAABBTREE();*/initMeshStatusAndNormal(*mesh); };
 		~LoopGen() {
 			if (cf) { delete cf; cf = nullptr; }
 		};
@@ -75,7 +75,8 @@ namespace LoopGen
 		void ConstructInitialRegion(InfoOnVertex* iov, LocalParametrization &lp);
 		bool SpreadSubRegion(LocalParametrization& lp, bool grow_flag[2]);
 		bool ConstructRegionCut(InfoOnVertex* iov, std::deque<bool>& visited, std::vector<VertexHandle>& cut);
-		void MergeOverlap();
+		void UpdateIOM();
+		void ProcessOverlap();
 		void LookForCrossingLoop();
 		void OptimizeLoop();
 
