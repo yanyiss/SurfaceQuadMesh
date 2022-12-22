@@ -12,7 +12,7 @@ void getFiles(std::string path, std::vector<std::string>& files)
 		{
 			//如果是目录,迭代之
 			//如果不是,加入列表
-			if ((fileinfo.attrib & _A_SUBDIR))
+			if ((fileinfo.attrib &  _A_SUBDIR))
 			{
 				if (strcmp(fileinfo.name, ".") != 0 && strcmp(fileinfo.name, "..") != 0)
 					getFiles(p.assign(path).append("\\").append(fileinfo.name), files);
@@ -26,67 +26,13 @@ void getFiles(std::string path, std::vector<std::string>& files)
 	}
 }
 
-#include <qstring.h>
-void truncateFilePath(std::string& file)
+void WriteVector(std::string filename, std::vector<double> &data)
 {
-	QString fileName = QString::fromStdString(file);
-	int id = fileName.lastIndexOf("/");
-	if (id == -1)
+	std::fstream ofile(filename.c_str(), std::ios_base::out);
+	int n = data.size();
+	for (int i = 0; i < n; ++i)
 	{
-		id = fileName.lastIndexOf("\\");
-		if (id == -1)
-			return;
+		ofile << data[i] << std::endl;
 	}
-	file = fileName.right(fileName.length() - id - 1).toLatin1().data();
-}
-
-void truncateFileExtension(std::string& file)
-{
-	QString fileName = QString::fromStdString(file);
-	int id = fileName.lastIndexOf(".");
-	if (id == -1)
-		return;
-	fileName.truncate(id);
-	file = fileName.toLatin1().data();
-}
-
-void truncateFileName(std::string& file)
-{
-	truncateFilePath(file);
-	truncateFileExtension(file);
-}
-
-
-namespace LoopGen
-{
-	bool WriteEnergy(std::vector<double>& energy, std::string& model_name)
-	{
-		std::ofstream file_writer;
-		file_writer.open("..//resource//energy//" + model_name + ".energy");
-		if (file_writer.fail()) {
-			return false;
-		}
-		for (auto e : energy)
-			file_writer << e << "\n";
-		file_writer.close();
-		return true;
-	}
-
-	bool ReadEnergy(std::vector<double>& energy, std::string& model_name)
-	{
-		std::ifstream file_reader;
-		file_reader.open("..//resource//energy//" + model_name + ".energy", std::ios::in);
-		if (!file_reader.good())
-			return false;
-		char line[1024] = { 0 };
-		int ii = 0;
-		while (file_reader.getline(line, sizeof(line)))
-		{
-			std::stringstream num(line);
-			num >> energy[ii];
-			++ii;
-		}
-		file_reader.close();
-		return true;
-	}
+	ofile.close();
 }

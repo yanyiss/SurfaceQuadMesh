@@ -37,6 +37,12 @@ void MainViewerWidget::initViewerWindow()
 	connect(MeshViewer,SIGNAL(set_edit_redo_enable_viewer_signal(bool)),SIGNAL(set_edit_redo_enable_signal(bool)));
 
 	connect(MeshParam, SIGNAL(print_info_signal()), SLOT(print_info()));
+	connect(MeshParam, SIGNAL(show_crossfield_signal()), SLOT(show_crossfield()));
+	connect(MeshParam, SIGNAL(change_M4_signal()), SLOT(change_M4()));
+	connect(MeshParam, SIGNAL(change_Direction_signal()), SLOT(change_Direction()));
+	connect(MeshParam, SIGNAL(test_matchings_signal()), SLOT(test_matchings()));
+	connect(MeshParam, SIGNAL(cal_vertex_loop_signal()), SLOT(cal_vertex_loop()));
+
 }
 
 void MainViewerWidget::createParamIDialog()
@@ -69,14 +75,6 @@ void MainViewerWidget::open_mesh_gui(QString fname)
 		LoadMeshSuccess = true;
 		MeshViewer->setDrawMode(InteractiveViewerWidget::FLAT_POINTS);
 		MeshViewer->setMouseMode(InteractiveViewerWidget::TRANS);
-		MeshViewer->file_name = fname.toLatin1().data();
-		if (MeshViewer->lg) { delete MeshViewer->lg; MeshViewer->lg = nullptr; }
-		MeshViewer->if_has_field = false;
-		MeshViewer->loop_gen_init = false;
-		MeshViewer->if_draw_field = false;
-		MeshViewer->if_draw_energy = false;
-		MeshViewer->plane_loop[0].clear();
-		MeshViewer->plane_loop[1].clear();
 		if(LoadMeshSuccess)
 		{
 			SetMeshForALL();
@@ -110,4 +108,26 @@ void MainViewerWidget::save_screen_gui(QString fname)
 void MainViewerWidget::print_info()
 {
 	MeshViewer->printBasicMeshInfo();
+}
+void MainViewerWidget::show_crossfield()
+{
+	MeshViewer->cal_crossfield();
+}
+void MainViewerWidget::change_M4()
+{
+	MeshViewer->changeM4LayerIndex();
+}
+void MainViewerWidget::change_Direction()
+{
+	MeshViewer->changeDirectionIndex();
+}
+void MainViewerWidget::test_matchings()
+{
+	MeshViewer->test_matchings();
+}
+
+
+void MainViewerWidget::cal_vertex_loop()
+{
+	MeshViewer->cal_vertex_loop();
 }

@@ -7,7 +7,7 @@
 
 #include "QGLViewerWidget.h"
 #include "MeshDefinition.h"
-#include "..\Algorithm\LoopGen.h"
+#include "..\Algorithm\LoopToolbox.h"
 
 class MeshViewerWidget : public QGLViewerWidget 
 {
@@ -108,7 +108,7 @@ protected:
 	bool loop_gen_init = false;
 	LoopGen::LoopGen* lg = nullptr;
 	std::vector<int> loop;
-	Eigen::Matrix3Xd crossfield;
+	Eigen::Matrix3Xd crossfield_position;
 	double avgLen;
 #pragma endregion
 };

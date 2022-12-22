@@ -132,9 +132,16 @@ protected:
 	void dropEvent(QDropEvent *event);
 
 public:
+	void SetCADFileName(QString &fileName);
 public:
-	void showField();
-	void showLoop();
+	void showFeature();
+	void cal_crossfield();
+	void changeM4LayerIndex();
+	void changeDirectionIndex();
+	void test_matchings();
+	void cal_vertex_loop();
+	void calM4Layers();
+	void showIsotropicMesh();
 	void showAnisotropicMesh();
 	void showDebugTest();
 private:
@@ -156,28 +163,31 @@ public:
 #pragma endregion
 
 
-#pragma region
-	std::string file_name;
+#pragma region lzx_new_func
+	
 	bool if_has_field = false;
 	bool loop_gen_init = false;
 	bool if_draw_field = false;
-	bool if_draw_energy = false;
-	bool if_draw_submesh = false;
 	LoopGen::LoopGen* lg = nullptr;
-	std::vector<VertexHandle> loop;
-	Eigen::Matrix3Xd crossfield;
+	std::vector<int> loop;
 	double avgLen;
 	void draw_field();
-	void draw_energy();
-	void draw_submesh();
-	double plane0[4] = { 0,0,1,0 };
-	double plane1[4] = { 0,0,1,0 };
-	double boundingXY0[4] = { 0,0,1,0 };
-	double boundingXY1[4] = { 0,0,1,0 };
-	bool if_draw_plane = false;
-	void draw_plane();
-	void draw_planeloop();
-	LoopGen::PlaneLoop plane_loop[2];
+
+	// for this mesh , set global field structure in interactiveViewerWidget 
+	bool if_draw_direction = false;
+	Eigen::Matrix3Xd crossfield_position;
+	int current_layer_index = 4;
+	int current_direction_index = 3;
+	std::vector<int> face_M4layer_index_begin;// 存face crossfield 第一个方向 所在的M4层
+	
+	// test region
+	bool if_draw_test_k_ring_node = false;
+	std::vector<LoopGen::LoopGen::LNode> test_k_ring_node;
+	bool if_draw_test_k_ring_fd = false;
+	Eigen::Matrix3Xd test_edge_fd;
+	bool if_draw_test_k_ring_path = false;
+	std::vector<OpenMesh::SmartHalfedgeHandle> test_k_ring_path;
+
 #pragma endregion
 };
 

@@ -886,94 +886,94 @@ void MeshViewerWidget::draw_CrossField()
 		if_has_field = true;
 		lg = new LoopGen::LoopGen(mesh);
 		lg->InitializeField();
-		crossfield = lg->cf->getCrossField();
+		crossfield_position = lg->cf->getCrossField();
 		avgLen = 0.2 * calc_mesh_ave_edge_length(&mesh);
 		for (auto tf : mesh.faces())
 		{
 			OpenMesh::Vec3d c = mesh.calc_centroid(tf);
 			int i = tf.idx() * 4;
 			Eigen::Vector3d vc(c[0], c[1], c[2]);
-			Eigen::Vector3d temp = crossfield.col(i + 1);
-			crossfield.col(i) = vc + crossfield.col(i) * avgLen;
-			crossfield.col(i + 1) = vc + crossfield.col(i + 2) * avgLen;
-			crossfield.col(i + 2) = vc + temp * avgLen;
-			crossfield.col(i + 3) = vc + crossfield.col(i + 3) * avgLen;
+			Eigen::Vector3d temp = crossfield_position.col(i + 1);
+			crossfield_position.col(i) = vc + crossfield_position.col(i) * avgLen;
+			crossfield_position.col(i + 1) = vc + crossfield_position.col(i + 1) * avgLen;
+			crossfield_position.col(i + 2) = vc + crossfield_position.col(i + 2) * avgLen;
+			crossfield_position.col(i + 3) = vc + crossfield_position.col(i + 3) * avgLen;
 		}
 	}
 	glLineWidth(2);
 	glColor3d(0.9, 0.1, 0.1);
 	glBegin(GL_LINES);
-	for (int i = 0; i < crossfield.cols(); i += 2)
+	for (int i = 0; i < crossfield_position.cols(); i += 2)
 	{
-		glVertex3dv(crossfield.col(i).data());
-		glVertex3dv(crossfield.col(i + 1).data());
+		glVertex3dv(crossfield_position.col(i).data());
+		glVertex3dv(crossfield_position.col(i + 1).data());
 	}
 	glEnd();
 }
 
 void MeshViewerWidget::draw_RegularCrossField()
 {
-	//if (!loop_gen_init)
-	//{
-	//	lg->InitializeGraphWeight();
-	//}
+	if (!loop_gen_init)
+	{
+		lg->InitializeGraphWeight();
+	}
 
-	//static bool flag = true;
-	//static std::vector<int> loop;
-	//static Eigen::Matrix3Xd crossfield;
-	//static double avglen = calc_mesh_ave_edge_length(&mesh) * 0.2;
-	//static Eigen::Vector3d ev;
-	//if (flag)
-	//{
-	//	LoopGen::LoopGen lg(mesh);
-	//	lg.InitializeField();
-	//	crossfield = lg.cf->getCrossField();
-	//	auto position = lg.cf->getPosition();
-	//	ev = position.col(20918) - position.col(29054);
-	//	//dprint(crossfield.col(3077 * 4).dot(ev.normalized()), crossfield.col(48306 * 4).dot(ev.normalized()), crossfield.col(48306 * 4 + 1).dot(ev.normalized()));
-	//	//dprint("fheu",crossfield.col(3077 * 4), crossfield.col(48306 * 4), crossfield.col(48306 * 4 + 1));
-	//	for (auto tf : mesh.faces())
-	//	{
-	//		OpenMesh::Vec3d c = mesh.calc_centroid(tf);
-	//		int i = tf.idx() * 4;
-	//		Eigen::Vector3d vc(c[0], c[1], c[2]);
-	//		Eigen::Vector3d temp = crossfield.col(i + 1);
-	//		crossfield.col(i) = vc + crossfield.col(i) * avglen;
-	//		crossfield.col(i + 1) = vc;// +crossfield.col(i + 2) * avglen;
-	//		crossfield.col(i + 2) = vc + temp * avglen;
-	//		crossfield.col(i + 3) = vc + crossfield.col(i + 3) * avglen;
-	//	}
-	//	//lg.cf->write_field();
-	//	lg.InitializeGraphWeight();
-	//	lg.FieldAligned_PlanarLoop(mesh.vertex_handle(9017), loop, 0);
-	//	flag = false;
-	//}
-	////dprint((crossfield.col(3077 * 4)- crossfield.col(3077 * 4+1)).normalized().dot(ev.normalized()), (crossfield.col(48306 * 4)- crossfield.col(48306 * 4+1)).normalized().dot(ev.normalized()), crossfield.col(48306 * 4 + 1).dot(ev.normalized()));
+	static bool flag = true;
+	static std::vector<int> loop;
+	static Eigen::Matrix3Xd crossfield;
+	static double avglen = calc_mesh_ave_edge_length(&mesh) * 0.2;
+	static Eigen::Vector3d ev;
+	if (flag)
+	{
+		LoopGen::LoopGen lg(mesh);
+		lg.InitializeField();
+		crossfield = lg.cf->getCrossField();
+		auto position = lg.cf->getPosition();
+		ev = position.col(20918) - position.col(29054);
+		//dprint(crossfield.col(3077 * 4).dot(ev.normalized()), crossfield.col(48306 * 4).dot(ev.normalized()), crossfield.col(48306 * 4 + 1).dot(ev.normalized()));
+		//dprint("fheu",crossfield.col(3077 * 4), crossfield.col(48306 * 4), crossfield.col(48306 * 4 + 1));
+		for (auto tf : mesh.faces())
+		{
+			OpenMesh::Vec3d c = mesh.calc_centroid(tf);
+			int i = tf.idx() * 4;
+			Eigen::Vector3d vc(c[0], c[1], c[2]);
+			Eigen::Vector3d temp = crossfield.col(i + 1);
+			crossfield.col(i) = vc + crossfield.col(i) * avglen;
+			crossfield.col(i + 1) = vc;// +crossfield.col(i + 2) * avglen;
+			crossfield.col(i + 2) = vc + temp * avglen;
+			crossfield.col(i + 3) = vc + crossfield.col(i + 3) * avglen;
+		}
+		//lg.cf->write_field();
+		lg.InitializeGraphWeight();
+		lg.FieldAligned_PlanarLoop(mesh.vertex_handle(9017), loop, 0);
+		flag = false;
+	}
+	//dprint((crossfield.col(3077 * 4)- crossfield.col(3077 * 4+1)).normalized().dot(ev.normalized()), (crossfield.col(48306 * 4)- crossfield.col(48306 * 4+1)).normalized().dot(ev.normalized()), crossfield.col(48306 * 4 + 1).dot(ev.normalized()));
 
-	////dprint("iuek",(crossfield.col(3077 * 4) - crossfield.col(3077 * 4 + 1)).normalized(), (crossfield.col(48306 * 4) - crossfield.col(48306 * 4 + 1)).normalized()); glColor3d(0.1, 0.1, 0.9);
-	//glLineWidth(10);
-	//glBegin(GL_LINES);
-	//for (int i = 0; i < loop.size() - 1; ++i)
-	//{
-	//	glVertex3dv(mesh.point(mesh.vertex_handle(loop[i])).data());
-	//	glVertex3dv(mesh.point(mesh.vertex_handle(loop[i + 1])).data());
-	//}
-	//glEnd();
+	//dprint("iuek",(crossfield.col(3077 * 4) - crossfield.col(3077 * 4 + 1)).normalized(), (crossfield.col(48306 * 4) - crossfield.col(48306 * 4 + 1)).normalized()); glColor3d(0.1, 0.1, 0.9);
+	glLineWidth(10);
+	glBegin(GL_LINES);
+	for (int i = 0; i < loop.size() - 1; ++i)
+	{
+		glVertex3dv(mesh.point(mesh.vertex_handle(loop[i])).data());
+		glVertex3dv(mesh.point(mesh.vertex_handle(loop[i + 1])).data());
+	}
+	glEnd();
 
-	//
+	
 
-	//glColor3d(0.1, 0.2, 0.8);
-	//glPointSize(10);
-	//glBegin(GL_POINTS);
-	//glVertex3dv(mesh.point(mesh.vertex_handle(9017)).data());
-	//glEnd();
+	glColor3d(0.1, 0.2, 0.8);
+	glPointSize(10);
+	glBegin(GL_POINTS);
+	glVertex3dv(mesh.point(mesh.vertex_handle(9017)).data());
+	glEnd();
 
-	//glColor3d(0.1, 0.9, 0.1);
-	//glBegin(GL_POLYGON);
-	//for (auto tfv : mesh.fv_range(mesh.face_handle(mesh.voh_begin(mesh.vertex_handle(9017)).handle())))
-	//{
-	//	glVertex3dv(mesh.point(tfv).data());
-	//}
-	//glEnd();
+	glColor3d(0.1, 0.9, 0.1);
+	glBegin(GL_POLYGON);
+	for (auto tfv : mesh.fv_range(mesh.face_handle(mesh.voh_begin(mesh.vertex_handle(9017)).handle())))
+	{
+		glVertex3dv(mesh.point(tfv).data());
+	}
+	glEnd();
 }
 

@@ -300,11 +300,7 @@ void InteractiveViewerWidget::pick_vertex(int x,int y)
 {
 	int r = find_vertex_using_selected_point();
 	lastestVertex = r;
-	//printf("Select Vertex : %d\n", r);
-	dprint("Select Vertex:", r, mesh.voh_begin(mesh.vertex_handle(r)).handle().idx() / 2);
-	dprint("Vertex Position:", mesh.point(mesh.vertex_handle(r)));
-	//dprint("uv para:", lg->uv_para[0](lg->idmap[r]), lg->uv_para[1](lg->idmap[r]));
-
+	printf("Select Vertex : %d\n", r);
 	std::vector<int>::iterator it;
 	if( (it = std::find(selectedVertex.begin(),selectedVertex.end(), r)) == selectedVertex.end() )
 	{
@@ -339,10 +335,7 @@ void InteractiveViewerWidget::pick_edge(int x,int y)
 	int desiredEdge = find_edge_using_selected_point();
 	if(desiredEdge < 0) return;
 	lastestEdge = desiredEdge;
-	//if(lg->similarity_energy.empty())
-	//	dprint("Select Edge :", desiredEdge);// , "similarity energy:", std::min(lg->similarity_energy[desiredEdge * 2], lg->similarity_energy[desiredEdge * 2 + 1]));
-	//else
-	//	dprint("Select Edge :", desiredEdge, "similarity energy:", std::min(lg->similarity_energy[desiredEdge * 2], lg->similarity_energy[desiredEdge * 2 + 1]));
+	printf("Select Edge : %d\n", desiredEdge);
 	std::vector<int>::iterator it;
 	if( (it = std::find(selectedEdge.begin(),selectedEdge.end(),desiredEdge)) == selectedEdge.end() )
 	{
@@ -509,10 +502,6 @@ void InteractiveViewerWidget::draw_interactive_portion(int drawmode)
 		}
 	}
 	draw_field();
-	if (if_draw_energy) draw_energy();
-	if (if_draw_submesh) draw_submesh();
-	//draw_plane();
-	draw_planeloop();
 	if(draw_new_mesh)
 	{
 		draw_scene_mesh(drawmode);
@@ -579,7 +568,7 @@ void InteractiveViewerWidget::draw_selected_edge()
 {
 	if( selectedEdge.size() > 0)
 	{
-		glLineWidth(2);
+		glLineWidth(5);
 		glColor3f(0.1, 0.1, 0.1);
 		Mesh::Point p1; Mesh::Point p2;
 		Mesh::EdgeHandle e_handle;
@@ -595,56 +584,6 @@ void InteractiveViewerWidget::draw_selected_edge()
 			glVertex3dv( p2.data() );
 			glEnd();
 		}
-	}
-}
-
-void InteractiveViewerWidget::draw_field()
-{
-	if (if_draw_field)
-	{
-		glLineWidth(1);
-		glColor3d(0.9, 0.1, 0.1);
-		glBegin(GL_LINES);
-		for (int i = 0; i < crossfield.cols(); i += 4)
-		{
-			Eigen::Vector3d dd = (crossfield.col(i) + crossfield.col(i + 2)) * 0.5;
-#if 0
-			glVertex3dv(dd.data());
-			glVertex3dv(crossfield.col(i).data());
-			glVertex3dv(dd.data());
-			glVertex3dv(crossfield.col(i + 1).data());
-#else
-			glVertex3dv(dd.data()); glVertex3dv(crossfield.col(i).data());
-			glVertex3dv(dd.data()); glVertex3dv(crossfield.col(i + 1).data());
-			glVertex3dv(dd.data()); glVertex3dv(crossfield.col(i + 2).data());
-			glVertex3dv(dd.data()); glVertex3dv(crossfield.col(i + 3).data());
-#endif
-		}
-		glEnd();
-
-		auto& sing = lg->cf->getSingularity();
-		glPointSize(6);
-		glColor3d(0.1, 0.1, 0.1);
-		glBegin(GL_POINTS);
-		for (auto& s : sing)
-		{
-			glVertex3dv(mesh.point(mesh.vertex_handle(s)).data());
-		}
-		glEnd();
-
-
-		glPointSize(12);
-		glBegin(GL_POINTS);
-		glColor3d(0.7, 0.1, 0.0);
-		glVertex3dv(mesh.point(mesh.vertex_handle(22373)).data());
-		/*glColor3d(0.0, 0.7, 0.60);
-		glVertex3dv(mesh.point(mesh.vertex_handle(37644)).data());
-		glVertex3dv(mesh.point(mesh.vertex_handle(34504)).data());
-		glVertex3dv(mesh.point(mesh.vertex_handle(37606)).data());
-		glVertex3dv(mesh.point(mesh.vertex_handle(27276)).data());
-		glVertex3dv(mesh.point(mesh.vertex_handle(40641)).data());
-		glVertex3dv(mesh.point(mesh.vertex_handle(27270)).data());*/
-		glEnd();
 	}
 }
 
@@ -672,34 +611,160 @@ void InteractiveViewerWidget::render_text_slot(OpenMesh::Vec3d pos, QString str)
 	render_text(pos[0],pos[1],pos[2],str);
 }
 
-#include "../Algorithm/LoopGen.h"
-void InteractiveViewerWidget::showField()
+void InteractiveViewerWidget::draw_field()
 {
+	if (if_draw_field)
+	{
+#pragma region 画奇异点
+		glColor3f(0, 0, 0);
+		glPointSize(10);
+		glBegin(GL_POINTS);
+		auto singularity = lg->cf->getSingularity();
+		for (size_t i = 0; i < singularity.size(); i++)
+		{
+			glVertex3dv(mesh.point(mesh.vertex_handle(singularity[i])).data());
+		}
+		glEnd();
+		glPointSize(1);
+#pragma endregion
+#pragma region 测试matching
+//		glLineWidth(5);
+//		glBegin(GL_LINES);
+//		int v_id = 1912;
+//		auto vhandle = mesh.vertex_handle(v_id);
+//		for (auto fh : mesh.vf_range(vhandle)) {
+//			int i = fh.idx();
+//			i = i * 4;
+//			glColor3d(0.1, 0.1, 0.1);
+//			Eigen::Vector3d tmp_mid_point = (crossfield_position.col(i) + crossfield_position.col(i + 2)) / 2;
+//			glVertex3dv(tmp_mid_point.data());
+//			glVertex3dv(crossfield_position.col(i ).data());
+//			glColor3d(0.1, 0.9, 0.1);
+//			glVertex3dv(tmp_mid_point.data());
+//			glVertex3dv(crossfield_position.col(i+1).data());
+//		}
+//		glEnd();
+#pragma endregion
+#pragma region 测试k-ring node
+		if (if_draw_test_k_ring_node) {
+			glColor3f(0, 0, 0.9);
+			glPointSize(5);
+			glBegin(GL_POINTS);
+			for (auto node:test_k_ring_node)
+			{
+				glVertex3dv(mesh.point(node.v).data());
+			}
+			glEnd();
+			glPointSize(1);
+		}
+#pragma endregion
+#pragma region 测试k-ring fd
+		if (if_draw_test_k_ring_fd) {
+			glLineWidth(5);
+			glColor3d(0.9, 0.1, 0.1);
+			glBegin(GL_LINES);
+			// 把在边上的插值方向画出来
+			double avgLen = 0.4 * calc_mesh_ave_edge_length(&mesh);
+			for (auto edge : test_k_ring_path) {
+				auto p = mesh.calc_edge_midpoint(edge);
+				auto fd = test_edge_fd.col(mesh.edge_handle(edge).idx() * 4 + current_direction_index);
+				fd = fd * avgLen;
+				glVertex3d(p[0] - fd[0], p[1] - fd[1], p[2] - fd[2]);
+				glVertex3d(p[0] + fd[0], p[1] + fd[1], p[2] + fd[2]);
+			}
+			glEnd();
+		}
+#pragma endregion
+#pragma region 测试k-ring path
+		if (if_draw_test_k_ring_path) {
+			glLineWidth(5);
+			glColor3d(0.1, 0.1, 0.9);
+			glBegin(GL_LINES);
+			for (auto edge : test_k_ring_path) {
+				auto v0 = edge.from();
+				auto v1 = edge.to();
+				glVertex3dv(mesh.point(v0).data());
+				glVertex3dv(mesh.point(v1).data());
+			}
+			glEnd();
+		}
+#pragma endregion
+
+		if (if_draw_direction) {
+			glLineWidth(1);
+			glColor3d(0.9, 0.1, 0.1);
+			glBegin(GL_LINES);
+			for (int i = 0; i < crossfield_position.cols(); i += 4)
+			{
+				Eigen::Vector3d tmp_mid_point = (crossfield_position.col(i) + crossfield_position.col(i + 2)) / 2;
+				int j = face_M4layer_index_begin[i / 4];
+				glVertex3dv(tmp_mid_point.data());
+				glVertex3dv(crossfield_position.col(i + (j + current_direction_index) % 4).data());
+			}
+			glEnd();
+		}
+		else {
+			// 画方向场，有不同方向
+			glLineWidth(1);
+			glColor3d(0.9, 0.1, 0.1);
+			glBegin(GL_LINES);
+			switch (current_layer_index)
+			{
+			case 0:
+			case 1:
+			case 2:
+			case 3:
+				for (int i = 0; i < crossfield_position.cols(); i += 4)
+				{
+					Eigen::Vector3d tmp_mid_point = (crossfield_position.col(i) + crossfield_position.col(i + 2)) / 2;
+					int j = face_M4layer_index_begin[i / 4];
+					glVertex3dv(tmp_mid_point.data());
+					glVertex3dv(crossfield_position.col(i + (current_layer_index - j + 4) % 4).data());
+				}
+				break;
+			case 4:
+				for (int i = 0; i < crossfield_position.cols(); i += 4)
+				{
+					Eigen::Vector3d tmp_mid_point = (crossfield_position.col(i) + crossfield_position.col(i + 2)) / 2;
+					for (int j = 0; j < 4; j++) {
+						glVertex3dv(tmp_mid_point.data());
+						glVertex3dv(crossfield_position.col(i + j).data());
+					}
+				}
+				break;
+			}
+			glEnd();
+		}
+	}
+}
+
+#pragma region origin_func
+#include "../Algorithm/LoopToolbox.h"
+void InteractiveViewerWidget::showFeature()
+{
+	// 计算完场之后，算一下每个面第一个方向的对应的基础m layer index
 	if (!if_has_field)
 	{
 		if_has_field = true;
 		lg = new LoopGen::LoopGen(mesh);
-		lg->SetModelName(file_name);
 		lg->InitializeField();
-		crossfield = lg->cf->getCrossField();
+		crossfield_position = lg->cf->getCrossField();
 		avgLen = 0.2 * calc_mesh_ave_edge_length(&mesh);
+		calM4Layers();
+		// std::cout <<"singularity " << lg->cf->getSingularity().size() << std::endl;
 		for (auto tf : mesh.faces())
 		{
 			OpenMesh::Vec3d c = mesh.calc_centroid(tf);
 			int i = tf.idx() * 4;
+			// *4 ?
 			Eigen::Vector3d vc(c[0], c[1], c[2]);
-			Eigen::Vector3d temp = crossfield.col(i + 1);
-#if 0
-			crossfield.col(i) = vc + crossfield.col(i) * avgLen;
-			crossfield.col(i + 1) = vc + crossfield.col(i + 2) * avgLen;
-			crossfield.col(i + 2) = vc + temp * avgLen;
-			crossfield.col(i + 3) = vc + crossfield.col(i + 3) * avgLen;
-#else
-			crossfield.col(i) = vc + crossfield.col(i) * avgLen;
-			crossfield.col(i + 1) = vc + crossfield.col(i + 1) * avgLen;
-			crossfield.col(i + 2) = vc + crossfield.col(i + 2) * avgLen;
-			crossfield.col(i + 3) = vc + crossfield.col(i + 3) * avgLen;
-#endif
+
+			crossfield_position.col(i) = vc + crossfield_position.col(i) * avgLen;
+			crossfield_position.col(i + 1) = vc + crossfield_position.col(i + 1) * avgLen;
+			crossfield_position.col(i + 2) = vc + crossfield_position.col(i + 2) * avgLen;
+			crossfield_position.col(i + 3) = vc + crossfield_position.col(i + 3) * avgLen;
+
+			// 计算每个三角形四个点的位置
 		}
 	}
 	if_draw_field = !if_draw_field;
@@ -707,603 +772,225 @@ void InteractiveViewerWidget::showField()
 	setMouseMode(InteractiveViewerWidget::TRANS);
 }
 
-void InteractiveViewerWidget::showLoop()
+void InteractiveViewerWidget::showIsotropicMesh()
 {
 	setDrawMode(InteractiveViewerWidget::SOLID_FLAT);
 	setMouseMode(InteractiveViewerWidget::TRANS);
-	timeRecorder tr;
 	if (!if_has_field)
 	{
-		showField();
+		// if dont have field, do showfeature,then get loopgen、cf
+		showFeature();
 	}
 	if (!loop_gen_init)
 	{
-		loop_gen_init = true;
-		//lg->cf->InitializeGraphWeight();
-		lg->InitializePQ();
-		lg->OptimizeLoop();
-		/*std::ifstream file_reader;
-		file_reader.open("..//resource//energy//vase.energy", std::ios::in);
-		char line[1024] = { 0 };
-		int row = 0; lg->eov.resize(mesh.n_vertices());
-		while (file_reader.getline(line, sizeof(line)))
-		{
-			std::stringstream num(line);
-			num >> lg->eov[row];
-			++row;
-}
-		file_reader.close();*/
-
+		lg->InitializeGraphWeight();
 	}
-	tr.out("all time:");
-
-	/*if (selectedVertex.empty())
-		return;
-	selectedVertex = { selectedVertex.back() };
-	plane_loop[0] = lg->InfoOnMesh[selectedVertex.back() * 2].pl;
-	plane_loop[1] = lg->InfoOnMesh[selectedVertex.back() * 2 + 1].pl;*/
-#if 1
-#if 1
 	if (selectedVertex.empty())
 		return;
-#else
-	selectedVertex.push_back(9018);
-#endif
+
+
 	selectedVertex = { selectedVertex.back() };
 	selectedEdge.clear();
-	Eigen::VectorXd xyz[3];
 	if (lg->FieldAligned_PlanarLoop(mesh.vertex_handle(selectedVertex.back()), loop, 0))
 	{
 		for (int i = 0; i < loop.size() - 1; ++i)
 		{
-			selectedEdge.push_back(mesh.find_halfedge(loop[i], loop[i + 1]).idx() / 2);
+			selectedEdge.push_back(mesh.find_halfedge(mesh.vertex_handle(loop[i]), mesh.vertex_handle(loop[i + 1])).idx() / 2);
 		}
-		lg->GetPositionFromLoop(loop, xyz);
-		if_draw_plane = true;
-		plane_loop[0].clear();
-#if 1
-		dprint(lg->RefineLoopByPlanarity(loop, plane_loop[0], 0));
-#else
-		lg->GetPositionFromLoop(loop, xyz);
-		double plane[4];
-		LoopGen::LeastSquarePlane(xyz, plane0);
-#endif
 	}
 	if (lg->FieldAligned_PlanarLoop(mesh.vertex_handle(selectedVertex.back()), loop, 1))
 	{
 		for (int i = 0; i < loop.size() - 1; ++i)
 		{
-			selectedEdge.push_back(mesh.find_halfedge(loop[i], loop[i + 1]).idx() / 2);
+			selectedEdge.push_back(mesh.find_halfedge(mesh.vertex_handle(loop[i]), mesh.vertex_handle(loop[i + 1])).idx() / 2);
 		}
-		lg->GetPositionFromLoop(loop, xyz);
-		if_draw_plane = true;
-		plane_loop[1].clear();
-#if 1
-		dprint(lg->RefineLoopByPlanarity(loop, plane_loop[1], 1));
-#else
-		lg->GetPositionFromLoop(loop, xyz);
-		double plane[4];
-		LoopGen::LeastSquarePlane(xyz, plane1);
-#endif
 	}
 	/*lg->FieldAligned_PlanarLoop(mesh.vertex_handle(29054), loop, 0);
 	for (int i = 0; i < loop.size() - 1; i += 2)
 	{
 		selectedEdge.push_back(mesh.find_halfedge(mesh.vertex_handle(loop[i]), mesh.vertex_handle(loop[i + 1])).idx() / 2);
 	}*/
-#endif
-
-
 	updateGL();
 }
 
 void InteractiveViewerWidget::showAnisotropicMesh()
 {
-	if_draw_energy = !if_draw_energy;
-	setDrawMode(InteractiveViewerWidget::SOLID_FLAT);
-	setMouseMode(InteractiveViewerWidget::TRANS);
+	current_layer_index = (current_layer_index + 1) % 5;
+	std::cout << "current_layer_index  " << current_layer_index << std::endl;
+	updateGL();
+	return;
 }
 
 #include "..\src\Toolbox\filesOperator.h"
 void InteractiveViewerWidget::showDebugTest()
 {
-	if_draw_submesh = !if_draw_submesh;
+	return;
+}
+
+#pragma endregion
+
+#pragma region 
+
+void InteractiveViewerWidget::cal_crossfield() {
+	if (!if_has_field)
+	{
+		if_has_field = true;
+		lg = new LoopGen::LoopGen(mesh);
+		lg->InitializeField();
+
+		crossfield_position = lg->cf->getCrossField();
+		avgLen = 0.2 * calc_mesh_ave_edge_length(&mesh);
+		// 因为 corssfield里面是归一化的
+		calM4Layers();
+		for (auto tf : mesh.faces())
+		{
+			OpenMesh::Vec3d c = mesh.calc_centroid(tf);
+			int i = tf.idx() * 4;
+			Eigen::Vector3d vc(c[0], c[1], c[2]);
+
+			crossfield_position.col(i) = vc + crossfield_position.col(i) * avgLen;
+			crossfield_position.col(i + 1) = vc + crossfield_position.col(i + 1) * avgLen;
+			crossfield_position.col(i + 2) = vc + crossfield_position.col(i + 2) * avgLen;
+			crossfield_position.col(i + 3) = vc + crossfield_position.col(i + 3) * avgLen;
+
+			// 计算每个三角形四个点的位置
+		}
+	}
+	if_draw_field = !if_draw_field;
 	setDrawMode(InteractiveViewerWidget::SOLID_FLAT);
 	setMouseMode(InteractiveViewerWidget::TRANS);
+	updateGL();
 }
 
-void InteractiveViewerWidget::draw_energy()
+void InteractiveViewerWidget::changeM4LayerIndex()
 {
-#if 0
-	//double ie = DBL_MAX;
-	//double ae = 0;
-	//static bool ff = true;
-	//static double ll = 0;
-	//if (loop_gen_init && ff)
-	//{
-	//	ff = false;
-	//	for (auto e : lg->eov)
-	//	{
-	//		if (e > 10e10)
-	//			continue;
-	//		ie = std::min(ie, e);
-	//		ae = std::max(ae, e);
-	//	}
-	//	ll = 1.0 / (ae - ie);
-	//}
-	//if (loop_gen_init)
-	//{
-	//	ie = 0.00030153500000000002;
-	//	ae = 0.22753200000000001;
-	//	ll = 1.0 / (ae - ie);
-	//	//double c = 0;
-	//	/*glPointSize(5);
-	//	for (auto v : mesh.vertices())
-	//	{
-	//		if (lg->eov[v.idx()] > 10e10)
-	//		{
-	//			glColor3d(0, 1, 0);
-	//			glBegin(GL_POINTS);
-	//			glVertex3dv(mesh.point(v).data());
-	//			glEnd();
-	//		}
-	//		else
-	//		{
-	//			c = pow((lg->eov[v.idx()] - ie) * ll, 0.4);
-	//			glColor3d(c, 0, 1 - c);
-	//			glBegin(GL_POINTS);
-	//			glVertex3dv(mesh.point(v).data());
-	//			glEnd();
-	//		}
-	//	}*/
-	//	for (auto f : mesh.faces())
-	//	{
-	//		double c = 0; VertexHandle v[3];
-	//		auto fv = mesh.fv_begin(f); /*c += pow((lg->eov[fv->idx()] - ie) * ll, 0.4);*/ v[0] = fv.handle();
-	//		++fv; /*c += pow((lg->eov[fv->idx()] - ie) * ll, 0.4);*/ v[1] = fv.handle();
-	//		++fv; /*c += pow((lg->eov[fv->idx()] - ie) * ll, 0.4);*/ v[2] = fv.handle();
-	//		for (int i = 0; i < 3; ++i)
-	//		{
-	//			if (lg->eov[v[i].idx()] > 10e10)
-	//			{
-	//				c = 10e11;
-	//				break;
-	//			}
-	//			c += pow((lg->eov[v[i].idx()] - ie) * ll, 0.4);
-	//		}
-	//		if (c > 10e10)
-	//		{
-	//			glColor3d(0, 1, 0);
-	//		}
-	//		else
-	//		{
-	//			c *= 0.33333333333333333333;
-	//			glColor3d(c, 0.2, 1 - c);
-	//		}
-	//		glBegin(GL_TRIANGLES);
-	//		glVertex3dv(mesh.point(v[0]).data());
-	//		glVertex3dv(mesh.point(v[2]).data());
-	//		glVertex3dv(mesh.point(v[1]).data());
-	//		glEnd();
-	//	}
-	//}
+	current_layer_index = (current_layer_index + 1) % 5;
+	updateGL();
+	return;
+}
+
+void InteractiveViewerWidget::changeDirectionIndex()
+{
+	if_draw_direction = true;
+	current_direction_index = (current_direction_index + 1) % 4;
+	lg->current_direction_index = current_direction_index;
+	std::cout << current_direction_index << std::endl;
+	updateGL();
+	return;
+}
+
+void InteractiveViewerWidget::test_matchings() {
+#pragma region test matching
+	// test matching
+	/*std::cout << "test" << std::endl;
+	int v_id = 1912;
+	auto vhandle = mesh.vertex_handle(v_id);
+	auto matchings = lg->cf->getMatching();
+	for (auto he : mesh.voh_range(vhandle)) {
+		auto fid = mesh.face_handle(he).idx();
+		auto gid = mesh.face_handle(he.opp()).idx();
+		std::cout << "matchings from " << fid << " to " << gid << " is: " << matchings[he.idx()] << std::endl;
+	}*/
+#pragma endregion
+
+#pragma region test_k_ring
+	// 测试k-ring是否计算正确
+	auto vhandle = mesh.vertex_handle(8164);
+	if (!if_has_field)
+	{
+		cal_crossfield();
+	}
+	lg->calM4Layers(vhandle);
+	lg->cal_M4_edge_Fd();
 	
+	test_k_ring_node = lg->cal_K_ring_node(vhandle);
+	if_draw_test_k_ring_node = !if_draw_test_k_ring_node;/**/
+#pragma endregion
 
-#else
-	double max_e = 0.2;
-	double step_e =1.0/max_e;
-	if (loop_gen_init)
-	{
-		glLineWidth(10);
-		glBegin(GL_LINES);
-		for(int i=0;i<lg->similarity_energy.size()/2;++i)
-		{
-			double t = std::min(lg->similarity_energy[2 * i], lg->similarity_energy[2 * i + 1]);
-			if (t > max_e)
-				glColor3d(0, 1, 0);
-			else
-			{
-				double c = t * step_e;
-				glColor3d(c, 0, 1 - c);
-			}
-			auto h = mesh.halfedge_handle(2 * i);
-			glVertex3dv(mesh.point(mesh.from_vertex_handle(h)).data());
-			glVertex3dv(mesh.point(mesh.to_vertex_handle(h)).data());
-		}
-		glEnd();
+#pragma region test_k_ring_path fd
+	// 测试k-ring 的两点间path是否正确
+	// 只能在k-ring做了dijkstra后使用
+	if (selectedVertex.empty() == false) {
+		if_draw_test_k_ring_fd = !if_draw_test_k_ring_fd;
+		test_edge_fd = lg->edge_fd;
+
+		if_draw_test_k_ring_path = !if_draw_test_k_ring_path;
+		lg->cal_K_ring_dijkstra(vhandle, test_k_ring_node);
+		int test_target = selectedVertex.back();
+		auto test_target_handle = mesh.vertex_handle(test_target);
+		test_k_ring_path = lg->cal_k_ring_path(vhandle, test_target_handle, test_k_ring_node);
 	}
+	// test_k_ring_node[10].v 是 578
+	/**/
 
-#endif
+#pragma endregion
+	updateGL();
 }
 
-void InteractiveViewerWidget::draw_submesh()
+void InteractiveViewerWidget::calM4Layers()
 {
-	if (loop_gen_init)
-	{
-#if 0
-		glPointSize(10);
-		glColor3d(0.9, 0.1, 0.1);
-		glBegin(GL_POINTS);
-		for (auto v : lg->sub_vertex)
-		{
-			glVertex3dv(mesh.point(v).data());
-		}
-		glEnd();
-
-		/*glColor3d(0.9, 0.9, 0.1);
-		glBegin(GL_TRIANGLES);
-		for (auto f : lg->sub_face)
-		{
-			for (auto fv : mesh.fv_range(f))
-				glVertex3dv(mesh.point(fv).data());
-		}
-		glEnd();*/
-
-		glPointSize(15);
-		glColor3d(0.1, 0.9, 0.9);
-		glBegin(GL_POINTS);
-		for (auto v : lg->sub_cut)
-			glVertex3dv(mesh.point(v).data());
-		glEnd();
-
-		auto& ff = lg->cutf_fflag;
-		glBegin(GL_TRIANGLES);
-		glColor3d(0.1, 0.1, 0.9);
-		for (int i = 0; i < ff.size(); ++i)
-		{
-			if (ff[i])
-			{
-				for (auto fv : mesh.fv_range(mesh.face_handle(i)))
-				{
-					glVertex3dv(mesh.point(fv).data());
-				}
-			}
-		}
-		glEnd();
-		glColor3d(0.9, 0.1, 0.1);
-		glBegin(GL_LINES);
-		for (int i = 0; i < lg->face_field_shift.size(); ++i)
-		{
-			if (lg->face_field_shift[i] < 0)
-				continue;
-			Eigen::Vector3d p = 0.5 * (crossfield.col(4 * i) + crossfield.col(4 * i + 2));
-			glVertex3dv(p.data());
-			glVertex3dv(crossfield.col(4 * i + lg->face_field_shift[i]).data());
-		}
-		glEnd();
-		
-#else
-		
-		
-		
-#endif
-		Eigen::VectorXd* uv = lg->uv_para;
-		glPointSize(10);
-		glBegin(GL_POINTS);
-#if 0
-		//画出u参数
-		for (auto v : lg->region_vertex)
-		{
-			double c = uv[0](lg->idmap[v.idx()]);
-			c -= std::floor(c);
-			glColor3d(c, c, c);
-			glVertex3dv(mesh.point(v).data());
-		}
-		for (auto v : lg->sub_vertex)
-		{
-			double c = uv[0](lg->idmap[v.idx()]);
-			c -= std::floor(c);
-			glColor3d(c, c, c);
-			glVertex3dv(mesh.point(v).data());
-		}
-#endif
-#if 0
-		//画出v参数
-		double uma = -DBL_MAX, umi = DBL_MIN;
-		for (auto v : lg->sub_vertex)
-		{
-			uma = std::max(uma, uv[1](lg->idmap[v.idx()]));
-			umi = std::min(umi, uv[1](lg->idmap[v.idx()]));
-		}
-		double step = 1.0 / (uma - umi);
-		for (auto v : lg->region_vertex)
-		{
-			double c = (uv[1](lg->idmap[v.idx()]) - umi) * step;
-			glColor3d(c, c, c);
-			glVertex3dv(mesh.point(v).data());
-		}
-		for (auto v : lg->sub_vertex)
-		{
-			double c = (uv[1](lg->idmap[v.idx()]) - umi) * step;
-			glColor3d(c, c, c);
-			glVertex3dv(mesh.point(v).data());
-		}
-#endif
-		glEnd();
-		
-		//画出区域点，附加生长方向
-#if 1
-		glPointSize(8);
-		glBegin(GL_POINTS);
-		glColor3d(0.1, 0.5, 0.6);
-		for (auto v : mesh.vertices())
-		{
-			if (!lg->optimized_vert_flag[v.idx()])
-				continue;
-			/*if (lg->growDIR[v.idx()] == 0)
-				glColor3d(0.4, 0.2, 0.6);
-			else if (lg->growDIR[v.idx()] == 1)
-				glColor3d(0.1, 0.7, 0.2);
-			else
-				glColor3d(0.1, 0.1, 0.1);*/
-			glVertex3dv(mesh.point(v).data());
-		}
-		glEnd();
-#endif
-
-		//画区域边界
-#if 1
-		glLineWidth(6);
-		glColor3d(1.0, 1.0, 1.0);
-		glBegin(GL_LINES);
-		for(auto te:mesh.edges())
-			if (lg->bound_edge_flag[te.idx()])
-			{
-				glVertex3dv(mesh.point(te.v0()).data());
-				glVertex3dv(mesh.point(te.v1()).data());
-			}
-		glEnd();
-#endif
-		//画出区域的面
-#if 1
-		glBegin(GL_TRIANGLES);
-		glColor3d(0.2, 0.3, 0.9);
-		for (auto f : mesh.faces())
-		{
-			if (!lg->optimized_face_flag[f.idx()])
-				continue;
-			for (auto fv : mesh.fv_range(f))
-			{
-				glVertex3dv(mesh.point(fv).data());
-			}
-		}
-		glEnd();
-#endif
-
-		/*glBegin(GL_POINTS);
-		glColor3d(0.3, 0, 0.9);
-		for (auto v : lg->region_vertex)
-		{
-			if (lg->growDIR[v.idx()] == 0)
-				glColor3d(0.1, 0.8, 0.1);
-			else
-				glColor3d(0.1, 0.1, 0.9);
-			glVertex3dv(mesh.point(v).data());
-		}
-		for (auto v : lg->sub_vertex)
-		{
-			if (lg->growDIR[v.idx()] == 0)
-				glColor3d(0.1, 0.8, 0.1);
-			else
-				glColor3d(0.1, 0.1, 0.9);
-			glVertex3dv(mesh.point(v).data());
-		}
-		glEnd();*/
-
-		//画出cut
-		glLineWidth(12);
-		glBegin(GL_LINES);
-		glColor3d(0.3, 0.5, 0.4);
-		if (lg->cut_vertex.size() > 1)
-		{
-			for (int i = 0; i < lg->cut_vertex.size() - 1; ++i)
-			{
-				glVertex3dv(mesh.point(lg->cut_vertex[i]).data());
-				glVertex3dv(mesh.point(lg->cut_vertex[i + 1]).data());
-			}
-		}
-		glEnd();
-
-
-		//画出种子点
-#if 1
-		glPointSize(16);
-		glBegin(GL_POINTS);
-		glColor3d(0.3, 1.0, 0.3);
-		for (auto sv : lg->seed_vertex)
-			glVertex3dv(mesh.point(sv).data());
-		glEnd();
-#endif
-
-		/*randomNumberGen rng;
-		glPointSize(11);
-		glBegin(GL_POINTS);
-		for (int i = 0; i < lg->u0point5.size(); i += 2)
-		{
-			glColor3d(rng.get(), rng.get(), rng.get());
-			glVertex3dv(lg->u0point5[i].data());
-			glVertex3dv(lg->u0point5[i + 1].data());
-		}
-		glEnd();*/
-#if 1
-		//画loop
-		glLineWidth(3);
-		glBegin(GL_LINES);
-		glColor3d(0.8, 0.2, 0.1);
-		int nv = mesh.n_vertices();
-		for (int j = 0; j < lg->all_plane_loop.size(); ++j)
-		{
-			if (j % 10 != 0)
-				continue;
-			auto& pl = lg->all_plane_loop[j];
-			int nn = pl.size();
-			auto poin = mesh.point(mesh.vertex_handle(j % nv));
-			glVertex3dv(poin.data());
-			for (int i = 0; i < nn; ++i)
-			{
-				poin = (1 - pl[i].c) * mesh.point(mesh.to_vertex_handle(pl[i].h)) + pl[i].c * mesh.point(mesh.from_vertex_handle(pl[i].h));
-				glVertex3dv(poin.data());
-				glVertex3dv(poin.data());
-			}
-			poin = mesh.point(mesh.vertex_handle(j % nv));
-			glVertex3dv(poin.data());
-		}
-		glEnd();
-#else
-		std::vector<OpenMesh::VertexHandle> vhs;
-		vhs.push_back(mesh.vertex_handle(9935));
-		vhs.push_back(mesh.vertex_handle(36412));
-
-		glColor3d(0.2, 0.5, 0.6);
-		glBegin(GL_POINTS);
-		glVertex3dv(mesh.point(vhs[0]).data());
-		glVertex3dv(mesh.point(vhs[1]).data());
-		glEnd();
-
-		glBegin(GL_LINES);
-		glColor3d(0.8, 0.2, 0.1);
-		for (auto& v : vhs)
-		{
-			auto& pos = mesh.point(v);
-			glVertex3dv(pos.data());
-			//auto rst = rr == &lg->InfoOnMesh[2 * rr->v.idx()] ? &lg->InfoOnMesh[2 * rr->v.idx() + 1] : &lg->InfoOnMesh[2 * rr->v.idx()];
-			auto rr = &lg->InfoOnMesh[2 * v.idx()];
-			for (auto& pp : rr->pl)
-			{
-				auto poin = (1 - pp.c) * mesh.point(mesh.to_vertex_handle(pp.h)) + pp.c * mesh.point(mesh.from_vertex_handle(pp.h));
-				glVertex3dv(poin.data());
-				glVertex3dv(poin.data());
-			}
-			glVertex3dv(pos.data());
-		}
-		glColor3d(0.1, 0.9, 0.1);
-		glVertex3dv(mesh.point(mesh.from_vertex_handle(mesh.halfedge_handle(212524))).data());
-		glVertex3dv(mesh.point(mesh.to_vertex_handle(mesh.halfedge_handle(212524))).data());
-		glColor3d(0.1, 0.1, 0.9);
-		glVertex3dv(mesh.point(mesh.from_vertex_handle(mesh.halfedge_handle(121117))).data());
-		glVertex3dv(mesh.point(mesh.to_vertex_handle(mesh.halfedge_handle(121117))).data());
-		glEnd();
-#endif
-
-#if 1
-		static bool pe = false;
-		if (!pe)
-		{
-			pe = true;
-			crossfield = lg->cf->getCrossField();
-			avgLen = 0.2 * calc_mesh_ave_edge_length(&mesh);
-			for (auto tf : mesh.faces())
-			{
-				OpenMesh::Vec3d c = mesh.calc_centroid(tf);
-				int i = tf.idx() * 4;
-				Eigen::Vector3d vc(c[0], c[1], c[2]);
-
-				crossfield.col(i) = vc + crossfield.col(i) * avgLen;
-				crossfield.col(i + 1) = vc + crossfield.col(i + 1) * avgLen;
-				crossfield.col(i + 2) = vc + crossfield.col(i + 2) * avgLen;
-				crossfield.col(i + 3) = vc + crossfield.col(i + 3) * avgLen;
-			}
-		}
-#endif
-
-	}
+	
+	lg->calM4Layers(mesh.vertex_handle(0));
+	lg->cal_M4_edge_Fd();
+	face_M4layer_index_begin = lg->get_face_M4layer_index_begin();
 }
 
-void InteractiveViewerWidget::draw_plane()
-{
-	if (if_draw_plane)
+void InteractiveViewerWidget::cal_vertex_loop() {
+	// 需要选中两个点，点击此函数
+	if (selectedVertex.empty())
+		return;
+	selectedVertex = { selectedVertex.back() };
+	selectedEdge.clear();
+	if (!if_has_field)
 	{
-		glColor3d(0.9, 0.9, 0.9);
-		glBegin(GL_POLYGON);
-		glVertex3d(2, 2, -(plane0[0] * 2 + plane0[1] * 2 + plane0[3]) / plane0[2]);
-		glVertex3d(-2, 2, -(plane0[0] * -2 + plane0[1] * 2 + plane0[3]) / plane0[2]);
-		glVertex3d(-2, -2, -(plane0[0] * -2 + plane0[1] * -2 + plane0[3]) / plane0[2]);
-		glVertex3d(2, -2, -(plane0[0] * 2 + plane0[1] * -2 + plane0[3]) / plane0[2]);
-		glEnd();
-
-		glBegin(GL_POLYGON);
-		glVertex3d(2, 2, -(plane1[0] * 2 + plane1[1] * 2 + plane1[3]) / plane1[2]);
-		glVertex3d(-2, 2, -(plane1[0] * -2 + plane1[1] * 2 + plane1[3]) / plane1[2]);
-		glVertex3d(-2, -2, -(plane1[0] * -2 + plane1[1] * -2 + plane1[3]) / plane1[2]);
-		glVertex3d(2, -2, -(plane1[0] * 2 + plane1[1] * -2 + plane1[3]) / plane1[2]);
-		glEnd();
+		cal_crossfield();
 	}
+	auto root = mesh.vertex_handle(selectedVertex.back());
+	// root = mesh.vertex_handle(35894);
+	double e_dis = DBL_MAX;
+	VertexHandle target;
+	OpenMesh::SmartHalfedgeHandle root_to_target;
+	for (auto he : mesh.voh_range(root)) {
+		if (mesh.calc_edge_length(he) < e_dis) {
+			e_dis = mesh.calc_edge_length(he);
+			target = he.to();
+			root_to_target = he;
+		}
+	}
+	selectedEdge.push_back(mesh.edge_handle(root_to_target).idx());
+
+	// 以root作为初始面来更新m4
+	lg->calM4Layers(root);
+	lg->cal_M4_edge_Fd();
+	face_M4layer_index_begin = lg->get_face_M4layer_index_begin();
+	lg->cal_local_node(); 
+
+	// 指定方向，计算结果
+	// 这一步，可不可以把算局部的部分，放到gloabl里面，这样每个算的方向就和希望的方向一致了？
+	// 但是实际上，你也不知道你选的点，是不是“希望”方向
+	// 找loop的本质是，希望找到一个能沿着场走的最小环（minimal环）
+
+	for (size_t i = 0; i < 2; i++)
+	{
+		lg->cal_Weighted_LocalGraph(i);
+		lg->cal_global_dijkstra(root, i);
+		auto path = lg->cal_global_path(root, target);
+		dprint("path size:", path.size());
+		if (path.size() == 1 ) {
+			path.clear();
+			lg->cal_Weighted_LocalGraph(i+2);
+			lg->cal_global_dijkstra(root, i+2);
+			path = lg->cal_global_path(root, target);
+		}
+		for (auto edge : path)
+		{
+			selectedEdge.push_back(mesh.edge_handle(edge).idx());
+		}
+	}
+	dprint("cal_vertex_loop end");
+	updateGL();
 }
+#pragma endregion
 
-void InteractiveViewerWidget::draw_planeloop()
-{
-#if 1
-	glColor3d(0.1, 0.8, 0.3);
-	glBegin(GL_LINES);
-	for (int i = 0; i < 2; ++i)
-	{
-		if (plane_loop[i].empty())
-			continue;
-		for (int j = 0; j < plane_loop[i].size() - 2; ++j)
-		{
-			auto& pl = plane_loop[i][j];
-			auto& ps = plane_loop[i][j + 1];
-			glVertex3dv(((1 - pl.c) * mesh.point(mesh.to_vertex_handle(pl.h)) + pl.c * mesh.point(mesh.from_vertex_handle(pl.h))).data());
-			glVertex3dv(((1 - ps.c) * mesh.point(mesh.to_vertex_handle(ps.h)) + ps.c * mesh.point(mesh.from_vertex_handle(ps.h))).data());
-		}
-	}
-	glEnd();
-#else
-	if (lg)
-	{
-		auto h = mesh.halfedge_handle(mesh.edges_begin().handle(), 0);
-		if (lg->InfoOnMesh.empty())
-			return;
-		
-		plane_loop[0] = lg->InfoOnMesh[mesh.from_vertex_handle(h).idx() * 2].pl;
-		plane_loop[1] = lg->InfoOnMesh[mesh.to_vertex_handle(h).idx() * 2].pl;
-		for (int i = 0; i < 2; ++i)
-		{
-			if (plane_loop[i].empty())
-				continue;
-			for (int j = 0; j < plane_loop[i].size() - 1; ++j)
-			{
-				auto& pl = plane_loop[i][j];
-				auto& ps = plane_loop[i][j + 1];
-				glVertex3dv(((1 - pl.c) * mesh.point(mesh.to_vertex_handle(pl.h)) + pl.c * mesh.point(mesh.from_vertex_handle(pl.h))).data());
-				glVertex3dv(((1 - ps.c) * mesh.point(mesh.to_vertex_handle(ps.h)) + ps.c * mesh.point(mesh.from_vertex_handle(ps.h))).data());
-			}
-		}
-		/*glColor3d(0.1, 0.8, 0.3);
-		glBegin(GL_LINES);
-		for (int i = 0; i < lg->loop0.cols(); ++i)
-		{
-			glVertex3dv(lg->loop0.col(i).data());
-			glVertex3dv(lg->loop0.col((i + 1) % lg->loop0.cols()).data());
-		}
-		for (int i = 0; i < lg->loop1.cols(); ++i)
-		{
-			glVertex3dv(lg->loop1.col(i).data());
-			glVertex3dv(lg->loop1.col((i + 1) % lg->loop1.cols()).data());
-		}
-		glEnd();*/
-
-		/*glPointSize(15);
-		glBegin(GL_POINTS);
-		glColor3d(0.9, 0.9, 0.9);
-		glVertex3dv(lg->fragment0.col(0).data());
-		glVertex3dv(lg->fragment1.col(0).data());
-		glColor3d(0.1, 0.1, 0.9);
-		glVertex3dv(lg->fragment0.col(1).data());
-		glVertex3dv(lg->fragment1.col(1).data());
-		glColor3d(0.9, 0.1, 0.1);
-		for (int i = 2; i < lg->fragment0.cols()-3; ++i)
-		{
-			glVertex3dv(lg->fragment0.col(i).data());
-		}
-		for (int i = 2; i < lg->fragment1.cols()-3; ++i)
-		{
-			glVertex3dv(lg->fragment1.col(i).data());
-		}
-		glEnd();*/
-	}
-#endif
-
-}
 
 

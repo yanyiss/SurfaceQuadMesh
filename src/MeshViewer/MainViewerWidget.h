@@ -134,6 +134,12 @@ public slots:
 
 	//
 	void print_info();
+	void show_crossfield();
+	void change_M4();
+	void change_Direction();
+	void test_matchings();
+	void cal_vertex_loop();
+
 
 signals:
 	void haveLoadMesh(QString filePath);
@@ -152,12 +158,12 @@ protected:
 	virtual void save_screen_gui(QString fname);
 
 public:
-		void showField() {
-			MeshViewer->showField();
+		void showFeature() {
+			MeshViewer->showFeature();
 
 		}
-		void showLoop() {
-			MeshViewer->showLoop();
+		void showIsotropicMesh() {
+			MeshViewer->showIsotropicMesh();
 		}
 		void showAnisotropicMesh() {
 			MeshViewer->showAnisotropicMesh();
