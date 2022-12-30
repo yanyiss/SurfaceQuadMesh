@@ -2,6 +2,7 @@
 
 #include "crossField.h"
 #include "LoopDef.h"
+#include "covering_space.h"
 #include "LocalParametrization.h"
 //#include "../Dependency/CPS/CPS_AABBTree.h"
 #include <queue>
@@ -21,6 +22,8 @@ namespace LoopGen
 		//模型基础信息
 		std::string model_name;
 		Mesh* mesh;
+		M2 m2;
+		M4 m4;
 		//模型加工信息
 		crossField* cf = nullptr;
 		

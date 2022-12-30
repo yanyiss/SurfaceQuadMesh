@@ -1,8 +1,8 @@
 #include "LoopGen.h"
 #include <omp.h>
 
-#define COMPUTE_NEW_PLANELOOP 1
-#define COMPUTE_NEW_ENERGY 1
+#define COMPUTE_NEW_PLANELOOP 0
+#define COMPUTE_NEW_ENERGY 0
 #define PRINT_DEBUG_INFO 0
 
 namespace LoopGen
@@ -1314,7 +1314,8 @@ namespace LoopGen
 			do
 			{
 				std::deque<bool> visited_v = lp.region_v_flag;
-				for (auto& ver : lp.new_vertex) visited_v[ver.idx()] = true;
+				for (auto& ver : lp.new_vertex)
+					visited_v[ver.idx()] = true;
 				if (!ConstructRegionCut(ip.iov, visited_v, lp.cut))
 					break;
 				lp.run(cf->getNormal());
@@ -1380,22 +1381,22 @@ namespace LoopGen
 					if (!lp.region_f_flag[mesh->face_handle(mesh->opposite_halfedge_handle(fh)).idx()])
 						bound_edge_flag[fh.idx() / 2] = true;
 
-			cylinder cy;
-			cy.mesh = mesh;
-			cy.id = cset.cylinders.size();
-			cy.vertices = std::move(lp.region_vertex);
-			cy.faces = std::move(lp.region_face);
-			cy.vertice_flag = std::move(lp.region_v_flag);
-			cy.face_flag = std::move(lp.region_f_flag);
-			cy.cut_v_flag = std::move(lp.cutv_flag);
-			cy.cut_f_flag = std::move(lp.cutf_flag);
-			cy.vidmap = std::move(lp.vidmap);
-			cy.uv[0] = std::move(lp.GetU());
-			cy.uv[1] = std::move(lp.GetV());
-			//for (auto cyv : cy.vertices)
-				//cset.vertex_cylinder_map[cyv.idx()].push_back(cy.id);
-			cy.SetBound();
-			cset.cylinders.push_back(std::move(cy));
+			//cylinder cy;
+			//cy.mesh = mesh;
+			//cy.id = cset.cylinders.size();
+			//cy.vertices = std::move(lp.region_vertex);
+			//cy.faces = std::move(lp.region_face);
+			//cy.vertice_flag = std::move(lp.region_v_flag);
+			//cy.face_flag = std::move(lp.region_f_flag);
+			//cy.cut_v_flag = std::move(lp.cutv_flag);
+			//cy.cut_f_flag = std::move(lp.cutf_flag);
+			//cy.vidmap = std::move(lp.vidmap);
+			//cy.uv[0] = std::move(lp.GetU());
+			//cy.uv[1] = std::move(lp.GetV());
+			////for (auto cyv : cy.vertices)
+			//	//cset.vertex_cylinder_map[cyv.idx()].push_back(cy.id);
+			//cy.SetBound();
+			//cset.cylinders.push_back(std::move(cy));
 			//cset.push_back(cy);
 			//break;
 		}
@@ -1530,16 +1531,16 @@ namespace LoopGen
 	{
 		UpdateIOM();
 		ProcessOverlap();
-		for (auto& cy : cset.cylinders)
-		{
-			for (auto he : cy.bounds)
-			{
-				auto bv = mesh->to_vertex_handle(he);
-				//if (cset.vertex_cylinder_map[bv.idx()].size() > 1)
-					//continue;
+		//for (auto& cy : cset.cylinders)
+		//{
+		//	for (auto he : cy.bounds)
+		//	{
+		//		auto bv = mesh->to_vertex_handle(he);
+		//		//if (cset.vertex_cylinder_map[bv.idx()].size() > 1)
+		//			//continue;
 
-			}
-		}
+		//	}
+		//}
 	}
 
 	bool LoopGen::RefineLoopByParametrization(VertexHandle v, LocalParametrization& lp, std::deque<bool>& visited_v, std::deque<bool>& visited_f)
