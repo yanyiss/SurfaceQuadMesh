@@ -374,75 +374,71 @@ namespace LoopGen
 		}
 	}
 
-	void crossField::setWeight(double alpha)
-	{
-		double doublePI = 2.0 * PI;
-		double halfPI = 0.5 * PI;
-		double _PI = -1.0 * PI;
-		double _halfPI = -0.5 * PI;
-
-		weight.resize(4, mesh->n_halfedges());
-		for (auto eitr = mesh->edges_begin(); eitr != mesh->edges_end(); ++eitr)
-		{
-			auto h0 = mesh->halfedge_handle(eitr.handle(), 0);
-			auto h1 = mesh->halfedge_handle(eitr.handle(), 1);
-			auto fid = mesh->face_handle(h0).idx();
-			auto gid = mesh->face_handle(h1).idx();
-			auto& fv = crossfield.col(fid * 4);
-			auto& gv = crossfield.col(gid * 4 + matching[h0.idx()]);
-			auto ev = position.col(mesh->to_vertex_handle(h0).idx()) - position.col(mesh->from_vertex_handle(h0).idx());
-			double arc0 = atan2(ev.cross(fv).dot(normal.col(fid)), ev.dot(fv)); //arc0 += arc0 > 0 ? 0 : doublePI;
-			double arc1 = atan2(ev.cross(gv).dot(normal.col(gid)), ev.dot(gv)); //arc1 += arc1 > 0 ? 0 : doublePI;
-			double arc = atan2(sin(arc0) + sin(arc1), cos(arc0) + cos(arc1));
-
-			auto& w0 = weight.col(h0.idx());
-			auto& w1 = weight.col(h1.idx());
-			double s = fabs(sin(arc));
-			double c = fabs(cos(arc));
-
-			if (s < c)
-			{
-				s = sqrt(alpha * s * s + 1);
-				c = YYSS_INFINITE;
-			}
-			else
-			{
-				s = YYSS_INFINITE;
-				c = sqrt(alpha * c * c + 1);
-			}
-			if (arc >= 0 && arc < halfPI)
-				w0 << s, YYSS_INFINITE, YYSS_INFINITE, c;
-			else if (arc >= halfPI && arc < PI)
-				w0 << YYSS_INFINITE, YYSS_INFINITE, s, c;
-			else if (arc >= _PI && arc < _halfPI)
-				w0 << YYSS_INFINITE, c, s, YYSS_INFINITE;
-			else
-				w0 << s, c, YYSS_INFINITE, YYSS_INFINITE;
-
-			switch (matching[h0.idx()])
-			{
-			case 0:
-				w1 << w0(2), w0(3), w0(0), w0(1);
-				break;
-			case 1:
-				w1 << w0(1), w0(2), w0(3), w0(0);
-				break;
-			case 2:
-				w1 << w0(0), w0(1), w0(2), w0(3);
-				break;
-			case 3:
-				w1 << w0(3), w0(0), w0(1), w0(2);
-				break;
-			}
-		}
-		dprint("Initialize Graph Weight Done!");
-	}
+	//void crossField::setWeight(double alpha)
+	//{
+	//	double doublePI = 2.0 * PI;
+	//	double halfPI = 0.5 * PI;
+	//	double _PI = -1.0 * PI;
+	//	double _halfPI = -0.5 * PI;
+	//	weight.resize(4, mesh->n_halfedges());
+	//	for (auto eitr = mesh->edges_begin(); eitr != mesh->edges_end(); ++eitr)
+	//	{
+	//		auto h0 = mesh->halfedge_handle(eitr.handle(), 0);
+	//		auto h1 = mesh->halfedge_handle(eitr.handle(), 1);
+	//		auto fid = mesh->face_handle(h0).idx();
+	//		auto gid = mesh->face_handle(h1).idx();
+	//		auto& fv = crossfield.col(fid * 4);
+	//		auto& gv = crossfield.col(gid * 4 + matching[h0.idx()]);
+	//		auto ev = position.col(mesh->to_vertex_handle(h0).idx()) - position.col(mesh->from_vertex_handle(h0).idx());
+	//		double arc0 = atan2(ev.cross(fv).dot(normal.col(fid)), ev.dot(fv)); //arc0 += arc0 > 0 ? 0 : doublePI;
+	//		double arc1 = atan2(ev.cross(gv).dot(normal.col(gid)), ev.dot(gv)); //arc1 += arc1 > 0 ? 0 : doublePI;
+	//		double arc = atan2(sin(arc0) + sin(arc1), cos(arc0) + cos(arc1));
+	//		auto& w0 = weight.col(h0.idx());
+	//		auto& w1 = weight.col(h1.idx());
+	//		double s = fabs(sin(arc));
+	//		double c = fabs(cos(arc));
+	//		if (s < c)
+	//		{
+	//			s = sqrt(alpha * s * s + 1);
+	//			c = YYSS_INFINITE;
+	//		}
+	//		else
+	//		{
+	//			s = YYSS_INFINITE;
+	//			c = sqrt(alpha * c * c + 1);
+	//		}
+	//		if (arc >= 0 && arc < halfPI)
+	//			w0 << s, YYSS_INFINITE, YYSS_INFINITE, c;
+	//		else if (arc >= halfPI && arc < PI)
+	//			w0 << YYSS_INFINITE, YYSS_INFINITE, s, c;
+	//		else if (arc >= _PI && arc < _halfPI)
+	//			w0 << YYSS_INFINITE, c, s, YYSS_INFINITE;
+	//		else
+	//			w0 << s, c, YYSS_INFINITE, YYSS_INFINITE;
+	//		switch (matching[h0.idx()])
+	//		{
+	//		case 0:
+	//			w1 << w0(2), w0(3), w0(0), w0(1);
+	//			break;
+	//		case 1:
+	//			w1 << w0(1), w0(2), w0(3), w0(0);
+	//			break;
+	//		case 2:
+	//			w1 << w0(0), w0(1), w0(2), w0(3);
+	//			break;
+	//		case 3:
+	//			w1 << w0(3), w0(0), w0(1), w0(2);
+	//			break;
+	//		}
+	//	}
+	//	dprint("Initialize Graph Weight Done!");
+	//}
 
 	void crossField::initFieldInfo()
 	{
 		setMatching();
 		setSingularity();
-		setWeight();
+		//setWeight();
 	}
 
 	void crossField::read_field()
@@ -452,15 +448,15 @@ namespace LoopGen
 		char line[1024] = { 0 };
 		file_reader.getline(line, sizeof(line));
 		std::stringstream n(line);
-		int mark[7];
-		n >> mark[0] >> mark[1] >> mark[2] >> mark[3] >> mark[4] >> mark[5] >> mark[6];
+		int mark[6];
+		n >> mark[0] >> mark[1] >> mark[2] >> mark[3] >> mark[4] >> mark[5];// >> mark[6];
 		crossfield.resize(3, mark[0]); mark[0] += 1;
 		normal.resize(3, mark[1]);     mark[1] += mark[0];
 		matching.resize(mark[2]);      mark[2] += mark[1];
 		position.resize(3, mark[3]);   mark[3] += mark[2];
 		singularity.resize(mark[4]);   mark[4] += mark[3];
 		faceBase.resize(3, mark[5]);   mark[5] += mark[4];
-		weight.resize(4, mark[6]);     mark[6] += mark[5];
+		//weight.resize(4, mark[6]);     mark[6] += mark[5];
 		int row = 1;
 		while (file_reader.getline(line, sizeof(line)))
 		{
@@ -489,10 +485,10 @@ namespace LoopGen
 			{
 				num >> faceBase(0, row - mark[4]) >> faceBase(1, row - mark[4]) >> faceBase(2, row - mark[4]);
 			}
-			else
+			/*else
 			{
 				num >> weight(0, row - mark[5]) >> weight(1, row - mark[5]) >> weight(2, row - mark[5]) >> weight(3, row - mark[5]);
-			}
+			}*/
 			++row;
 		}
 		file_reader.close();
@@ -507,7 +503,7 @@ namespace LoopGen
 		}
 		//crossfield, normal, matching, position, singularity, faceBase, weight
 		file_writer << mesh->n_faces() * 4 << " " << mesh->n_faces() << " " << mesh->n_halfedges() << " " << mesh->n_vertices()
-			<< " " << singularity.size() << " " << mesh->n_faces() * 2 << " " << mesh->n_halfedges() <<"\n";
+			<< " " << singularity.size() << " " << mesh->n_faces() * 2 /*<< " " << mesh->n_halfedges() */<<"\n";
 		for (auto i = 0; i < crossfield.cols(); ++i)
 			file_writer << crossfield(0, i) << " " << crossfield(1, i) << " " << crossfield(2, i) << "\n";
 		for (auto i = 0; i < normal.cols(); ++i)
@@ -520,8 +516,8 @@ namespace LoopGen
 			file_writer << sing << "\n";
 		for (auto i = 0; i < faceBase.cols(); ++i)
 			file_writer << faceBase(0, i) << " " << faceBase(1, i) << " " << faceBase(2, i) << "\n";
-		for (auto i = 0; i < weight.cols(); ++i)
-			file_writer << weight(0, i) << " " << weight(1, i) << " " << weight(2, i) << " " << weight(3, i) << "\n";
+		//for (auto i = 0; i < weight.cols(); ++i)
+		//	file_writer << weight(0, i) << " " << weight(1, i) << " " << weight(2, i) << " " << weight(3, i) << "\n";
 
 		file_writer.close();
 	}

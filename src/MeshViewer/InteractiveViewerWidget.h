@@ -164,7 +164,7 @@ public:
 	bool if_draw_energy = false;
 	bool if_draw_submesh = false;
 	LoopGen::LoopGen* lg = nullptr;
-	std::vector<VertexHandle> loop;
+	std::vector<LoopGen::VertexLayer*> loop;
 	Eigen::Matrix3Xd crossfield;
 	double avgLen;
 	void draw_field();

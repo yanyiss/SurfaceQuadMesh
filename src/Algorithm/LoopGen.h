@@ -22,10 +22,10 @@ namespace LoopGen
 		//模型基础信息
 		std::string model_name;
 		Mesh* mesh;
-		M2 m2;
-		M4 m4;
 		//模型加工信息
 		crossField* cf = nullptr;
+		M2 m2;
+		M4 m4;
 		
 		//初始化阶段变量
 		std::vector<InfoOnVertex> InfoOnMesh;
@@ -34,9 +34,10 @@ namespace LoopGen
 		void SetModelName(std::string& name) { model_name = name; truncateFileName(model_name); }
 
 		//初始化阶段函数
-		bool FieldAligned_PlanarLoop(VertexHandle v, std::vector<VertexHandle>& loop, int shift = 0);
-		double RefineLoopByPlanarity(std::vector<VertexHandle>& loop, PlaneLoop& planar_loop, int shift);
-		void GetPositionFromLoop(const std::vector<VertexHandle>& loop, Eigen::VectorXd xyz[3]);
+		//bool FieldAligned_PlanarLoop(VertexHandle v, std::vector<VertexHandle>& loop, int shift = 0);
+		bool FieldAligned_PlanarLoop(/*M4 &m4, */VertexLayer* vl, std::vector<VertexLayer*> &loop);
+		double RefineLoopByPlanarity(/*M4 &m4, */std::vector<VertexLayer*>& loop, PlaneLoop& planar_loop);
+		void GetPositionFromLoop(const std::vector<VertexLayer*>& loop, Eigen::VectorXd xyz[3]);
 		double EvaluateSimilarity(Eigen::Matrix3Xd& loop0, Eigen::Matrix3Xd& loop1, double u, int begin_seg);
 		void LeastSquarePlane(Eigen::VectorXd xyz[3], double plane[4]);
 		double EvaluatePlanarity(Eigen::VectorXd xyz[3], double plane[4]);

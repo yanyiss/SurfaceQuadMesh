@@ -1,9 +1,10 @@
 #pragma once
 #include "..\MeshViewer\MeshDefinition.h"
 #include "..\Algorithm\crossField.h"
+#define YYSS_INFINITE 1.0e12
+#define YYSS_FAIRLY_SMALL 1.0e-3
 namespace LoopGen
 {
-	struct VertexLayer { VertexHandle v; int id; VertexLayer() {} VertexLayer(VertexHandle v_, int id_) : v(v_), id(id_) {} };
 	struct HalfedgeLayer 
 	{
 		HalfedgeHandle h; int id; HalfedgeLayer* prev; HalfedgeLayer* next; HalfedgeLayer* oppo; int from; int to; int left; 
@@ -14,7 +15,8 @@ namespace LoopGen
 			prev = prev_; next = next_; oppo = oppo_; from = from_; to = to_; left = left_;
 		}
 	};
-	struct FaceLayer { FaceHandle f; int id; FaceLayer() {} FaceLayer(FaceHandle f_, int id_) :f(f_), id(id_) {} };
+	struct VertexLayer { VertexHandle v; int id; HalfedgeLayer* hl; VertexLayer() {} VertexLayer(VertexHandle v_, int id_) : v(v_), id(id_), hl(nullptr) {} };
+	struct FaceLayer { FaceHandle f; int id; HalfedgeLayer* hl; FaceLayer() {} FaceLayer(FaceHandle f_, int id_) :f(f_), id(id_), hl(nullptr) {} };
 
 	template <int layer>
 	class CoveringSpaceDataStructure
@@ -29,74 +31,76 @@ namespace LoopGen
 		//int layer = 4;
 
 		std::deque<bool> sing_flag;
-		std::vector<VertexLayer> vertices;
-		std::vector<HalfedgeLayer> halfedges;
-		std::vector<FaceLayer> faces;
+		std::vector<int> verticemap;
+		std::vector<VertexLayer> verticelayers;
+		std::vector<HalfedgeLayer> halfedgelayers;
+		std::vector<FaceLayer> facelayers;
+		Eigen::VectorXd weight;
 
 		void set_base(Mesh* mesh_, crossField* cf_) { mesh = mesh_; cf = cf_; }
 		int calc_shift(VertexHandle v, HalfedgeHandle h)
 		{
-			HalfedgeHandle h_begin = mesh->voh_begin(v);
+			HalfedgeHandle h_transfer = mesh->voh_begin(v).handle();
 			int index = 0;
 			auto &matching = cf->getMatching();
-			while (h_begin != h)
+			while (h_transfer != h)
 			{
-				h_begin = mesh->opposite_halfedge_handle(mesh->prev_halfedge_handle(h_begin));
-				index += matching[h_begin.idx()];
+				h_transfer = mesh->opposite_halfedge_handle(mesh->prev_halfedge_handle(h_transfer));
+				index += matching[h_transfer.idx()];
 			}
 			return index % 4;
 		}
 		void update()
 		{
 			int nv = mesh->n_vertices();
-			int ne = mesh->n_edges();
+			int nh = mesh->n_halfedges();
 			int nf = mesh->n_faces();
 
 			sing_flag.resize(nv, false);
 			for (auto sing : cf->getSingularity())
 				sing_flag[sing] = true;
 
-			std::vector<int> verticemap; verticemap.reserve(nv);
+			verticemap.reserve(nv);
 			{
 				//确定顶点列表
-				vertices.reserve(layer * nv - (layer - 1) * cf->getSingularity().size());
+				verticelayers.reserve(layer * nv - (layer - 1) * cf->getSingularity().size());
 				int idcount = 0;
 				for (auto tv : mesh->vertices())
 				{
 					verticemap.push_back(idcount);
 					if (sing_flag[tv.idx()])
 					{
-						vertices.emplace_back(tv, idcount);
+						verticelayers.emplace_back(tv, idcount);
 						++idcount;
 					}
 					else
 					{
 						for (int i = 0; i < layer; ++i)
 						{
-							vertices.emplace_back(tv, idcount);
+							verticelayers.emplace_back(tv, idcount);
 							++idcount;
 						}
 					}
 				}
 				//确定半边列表
-				halfedges.reserve(2 * layer * ne);
+				halfedgelayers.reserve(layer * nh);
 				idcount = 0;
 				for (auto th : mesh->halfedges())
 				{
 					for (int i = 0; i < layer; ++i)
 					{
-						halfedges.emplace_back(th, idcount);
+						halfedgelayers.emplace_back(th, idcount);
 						++idcount;
 					}
 				}
 				//确定面列表
-				faces.reserve(layer * nf);
+				facelayers.reserve(layer * nf);
 				idcount = 0;
 				for (auto tf : mesh->faces())
 				{
 					for (int i = 0; i < layer; ++i)
 					{
-						faces.emplace_back(tf, idcount);
+						facelayers.emplace_back(tf, idcount);
 						++idcount;
 					}
 				}
@@ -105,39 +109,35 @@ namespace LoopGen
 			for (auto tf : mesh->faces())
 			{
 				int fid = tf.idx();
-				std::vector<VertexHandle> vhs; vhs.reserve(3);
-				std::deque<bool> flag;
-				for (auto tfv : mesh->fv_range(tf))
-				{
-					vhs.push_back(tfv);
-					if (sing_flag[tfv.idx()])
-						flag.push_back(true);
-					else
-						flag.push_back(false);
-				}
-				std::swap(vhs[0], vhs[1]);
-				std::swap(flag[0], flag[1]);
-				
-				std::vector<HalfedgeHandle> hhs; hhs.reserve(3);
-				hhs.push_back(mesh->find_halfedge(vhs[0], vhs[1]));
-				hhs.push_back(mesh->find_halfedge(vhs[1], vhs[2]));
-				hhs.push_back(mesh->find_halfedge(vhs[2], vhs[0]));
-				std::vector<int> vshift; hhs.reserve(3);
-				vshift.push_back(calc_shift(vhs[0], hhs[0]));
-				vshift.push_back(calc_shift(vhs[1], hhs[1]));
-				vshift.push_back(calc_shift(vhs[2], hhs[2]));
 
+				std::vector<HalfedgeHandle> hhs(3);
+				std::vector<VertexHandle> vhs(3);
+				std::vector<int> vshift(3);
+				bool flag[3];
+				hhs[0] = mesh->fh_begin(tf).handle();
+				hhs[1] = mesh->next_halfedge_handle(hhs[0]);
+				hhs[2] = mesh->next_halfedge_handle(hhs[1]);
+				for (int i = 0; i < 3; ++i)
+				{
+					vhs[i] = mesh->from_vertex_handle(hhs[i]);
+					vshift[i] = calc_shift(vhs[i], hhs[i]);
+					flag[i] = sing_flag[vhs[i].idx()];
+				}
+				
+
+				std::vector<HalfedgeLayer*> hlx(3);
+				std::vector<int> vmx(3);
 				for (int j = 0; j < layer; ++j)
 				{
-					halfedges[hhs[0].idx() * layer + j].set_info(&halfedges[hhs[2].idx() * layer + j],
-						&halfedges[hhs[1].idx() * layer + j], nullptr, verticemap[vhs[0].idx()] + flag[0] ? (j + vshift[0]) % layer : 0,
-						verticemap[vhs[1].idx()] + flag[1] ? (j + vshift[1]) % layer : 0, fid * layer + j);
-					halfedges[hhs[1].idx() * layer + j].set_info(&halfedges[hhs[0].idx() * layer + j],
-						&halfedges[hhs[2].idx() * layer + j], nullptr, verticemap[vhs[1].idx()] + flag[1] ? (j + vshift[1]) % layer : 0,
-						verticemap[vhs[2].idx()] + flag[2] ? (j + vshift[2]) % layer : 0, fid * layer + j);
-					halfedges[hhs[2].idx() * layer + j].set_info(&halfedges[hhs[1].idx() * layer + j],
-						&halfedges[hhs[0].idx() * layer + j], nullptr, verticemap[vhs[2].idx()] + flag[2] ? (j + vshift[2]) % layer : 0,
-						verticemap[vhs[0].idx()] + flag[0] ? (j + vshift[0]) % layer : 0, fid * layer + j);
+					for (int k = 0; k < 3; ++k)
+					{
+						hlx[k] = &halfedgelayers[hhs[k].idx()*layer + j];
+						vmx[k] = verticemap[vhs[k].idx()] + (flag[k] ? 0 : (j + vshift[k]) % layer);
+					}
+					int left_face = fid * layer + j;
+					hlx[0]->set_info(hlx[2], hlx[1], nullptr, vmx[0], vmx[1], left_face);
+					hlx[1]->set_info(hlx[0], hlx[2], nullptr, vmx[1], vmx[2], left_face);
+					hlx[2]->set_info(hlx[1], hlx[0], nullptr, vmx[2], vmx[0], left_face);
 				}
 			}
 
@@ -152,11 +152,63 @@ namespace LoopGen
 				int shift = matching[h0.idx()];
 				for (int j = 0; j < layer; ++j)
 				{
-					halfedges[h1.idx()*layer + (j + shift) % layer].oppo = &halfedges[h0.idx()*layer + j];
-					halfedges[h0.idx()*layer + j].oppo = &halfedges[h1.idx()*layer + (j + shift) % layer];
+					halfedgelayers[h1.idx()*layer + (j + shift) % layer].oppo = &halfedgelayers[h0.idx()*layer + j];
+					halfedgelayers[h0.idx()*layer + j].oppo = &halfedgelayers[h1.idx()*layer + (j + shift) % layer];
 				}
 			}
 
+			//为顶点和面设定其遍历的第一条半边
+			for (auto &tv : verticelayers)
+			{
+				HalfedgeHandle h = mesh->voh_begin(tv.v).handle();
+				for (int j = 0; j < layer; ++j)
+				{
+					if (halfedgelayers[h.idx() * layer + j].from == tv.id)
+					{
+						tv.hl = &halfedgelayers[h.idx() * layer + j];
+						break;
+					}
+				}
+			}
+			for (auto &tf : facelayers)
+			{
+				HalfedgeHandle h = mesh->fh_begin(tf.f).handle();
+				for (int j = 0; j < layer; ++j)
+				{
+					if (halfedgelayers[h.idx() * layer + j].left == tf.id)
+					{
+						tf.hl = &halfedgelayers[h.idx() * layer + j];
+						break;
+					}
+				}
+			}
+		}
+		void set_weight(double alpha = 900)
+		{
+			auto &crossfield = cf->getCrossField();
+			auto &position = cf->getPosition();
+			auto &normal = cf->getNormal();
+			weight.resize(halfedgelayers.size());
+			double quarterPI = PI * 0.25;
+			//for (auto te : mesh->edges())
+			for (auto th : mesh->halfedges())
+			{
+				HalfedgeHandle h0 = th;
+				for (int j = 0; j < layer; ++j)
+				{
+					HalfedgeLayer& hl = halfedgelayers[h0.idx() * layer + j];
+					auto &fv = crossfield.col(hl.left);
+					auto &gv = crossfield.col(hl.oppo->left);
+					auto ev = position.col(mesh->to_vertex_handle(h0).idx()) - position.col(mesh->from_vertex_handle(h0).idx());
+					double arc0 = atan2(ev.cross(fv).dot(normal.col(hl.left / layer)), ev.dot(fv));
+					double arc1 = atan2(ev.cross(gv).dot(normal.col(hl.oppo->left / layer)), ev.dot(gv));
+					double arc = fabs(atan2(sin(arc0) + sin(arc1), cos(arc0) + cos(arc1)));
+					if (arc < quarterPI)
+						weight(hl.id) = /*ev.norm() * */sqrt(alpha*sin(arc)*sin(arc) + 1);
+					else
+						weight(hl.id) = YYSS_INFINITE;
+				}
+			}
 		}
 	};
 	typedef CoveringSpaceDataStructure<2> M2;

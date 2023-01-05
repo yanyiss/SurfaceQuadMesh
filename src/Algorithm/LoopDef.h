@@ -6,42 +6,40 @@
 
 #include "..\MeshViewer\MeshDefinition.h"
 #include "..\Toolbox\dprint.h"
+#include "covering_space.h"
 
-#define YYSS_INFINITE 1.0e12
-#define YYSS_FAIRLY_SMALL 1.0e-3
 
 namespace LoopGen
 {
-	struct PointOnHalfedge {
-		HalfedgeHandle h;
+	struct PointOnHalfedgeLayer {
+		//HalfedgeHandle h;
+		HalfedgeLayer* hl;
 		double c = 0.0;
-		PointOnHalfedge() {}
-		PointOnHalfedge(HalfedgeHandle h_, double c_) :h(h_), c(c_) {}
+		PointOnHalfedgeLayer() {}
+		PointOnHalfedgeLayer(HalfedgeLayer* hl_, double c_) :hl(hl_), c(c_) {}
+		template <typename MX>
+		OpenMesh::Vec3d point(MX &mx)
+		{
+			return c * mx.mesh->point(mx.verticelayers[hl->from].v)
+				+ (1 - c) * mx.mesh->point(mx.verticelayers[hl->to].v);
+		}
 	};
-	typedef std::vector<PointOnHalfedge> PlaneLoop;
+	typedef std::vector<PointOnHalfedgeLayer> PlaneLoop;
 
 	struct InfoOnVertex {
 		int id;
 		std::map<int, int> mark;//这里的int记录了平行loop的朝向关系，0表示同向，1表示反向
 		//std::map<VertexHandle, InfoOnVertex*> adj;
 		PlaneLoop pl;
-		//double plane[4] = { 0, 0, 0, 0 };
-		double energy = 1.0e12;
-		/*bool operator>(const InfoOnVertex& right) const
-		{
-			return energy > right.energy;
-		}*/
+		double energy = YYSS_INFINITE;
 	};
 
 	struct info_pair
 	{
-		InfoOnVertex* iov = nullptr;
+		VertexLayer* vl = nullptr;
 		double energy = 0;
 		info_pair() {}
-		info_pair(InfoOnVertex* iov_, double e)
-		{
-			iov = iov_; energy = e;
-		}
+		info_pair(VertexLayer* vl_, double e) : vl(vl_), energy(e) { }
 		bool operator>(const info_pair& right) const
 		{
 			return energy > right.energy;

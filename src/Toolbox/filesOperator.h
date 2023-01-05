@@ -25,7 +25,16 @@ namespace LoopGen
 			return false;
 		}
 		int lineNum = 0;
-		for (int i = 0; i < mesh->n_vertices(); ++i)
+		for (auto &iov : InfoOnMesh)
+		{
+			auto &pl = iov.pl;
+			file_writer << pl.size() << "\n";
+			++lineNum;
+			for (auto &plpl : pl)
+				file_writer << plpl.hl->id << " " << plpl.c << "\n";
+			lineNum += pl.size();
+		}
+		/*for (int i = 0; i < mesh->n_vertices(); ++i)
 		{
 			for (int j = 0; j < 2; ++j)
 			{
@@ -34,11 +43,11 @@ namespace LoopGen
 				++lineNum;
 				for (auto& plpl : pl)
 				{
-					file_writer << plpl.h.idx() << " " << plpl.c << "\n";
+					file_writer << plpl.hl->id << " " << plpl.c << "\n";
 				}
 				lineNum += pl.size();
 			}
-		}
+		}*/
 		file_writer.close();
 
 		file_writer.open("..//resource//plane loop//" + model_name + "_pl.txt");
@@ -50,8 +59,8 @@ namespace LoopGen
 		return true;
 	}
 
-	template <typename IOV>
-	bool ReadPlaneLoop(std::vector<IOV>& InfoOnMesh, std::string& model_name, Mesh *mesh)
+	template <typename M2, typename IOV>
+	bool ReadPlaneLoop(M2 &m2, std::vector<IOV>& InfoOnMesh, std::string& model_name, Mesh *mesh)
 	{
 		std::ifstream file_reader;
 		file_reader.open("..//resource//plane loop//" + model_name + "_pl.txt", std::ios::in);
@@ -90,7 +99,7 @@ namespace LoopGen
 			for (int i = 0; i < nn; ++i)
 			{
 				data >> hid >> c;
-				InfoOnMesh[ii].pl.emplace_back(mesh->halfedge_handle(hid), c);
+				InfoOnMesh[ii].pl.emplace_back(&m2.halfedgelayers[hid]/*mesh->halfedge_handle(hid)*/, c);
 			}
 			lineNum -= nn;
 			++ii;
