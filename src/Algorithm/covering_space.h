@@ -7,7 +7,14 @@ namespace LoopGen
 {
 	struct HalfedgeLayer 
 	{
-		HalfedgeHandle h; int id; HalfedgeLayer* prev; HalfedgeLayer* next; HalfedgeLayer* oppo; int from; int to; int left; 
+		HalfedgeHandle h; 
+		int id;
+		HalfedgeLayer* prev; 
+		HalfedgeLayer* next; 
+		HalfedgeLayer* oppo; 
+		int from; 
+		int to; 
+		int left; 
 		HalfedgeLayer(){}
 		HalfedgeLayer(HalfedgeHandle h_, int id_) : h(h_), id(id_), prev(nullptr), next(nullptr), oppo(nullptr) { }
 		void set_info(HalfedgeLayer* prev_, HalfedgeLayer* next_, HalfedgeLayer* oppo_, int from_, int to_, int left_)
@@ -15,8 +22,22 @@ namespace LoopGen
 			prev = prev_; next = next_; oppo = oppo_; from = from_; to = to_; left = left_;
 		}
 	};
-	struct VertexLayer { VertexHandle v; int id; HalfedgeLayer* hl; VertexLayer() {} VertexLayer(VertexHandle v_, int id_) : v(v_), id(id_), hl(nullptr) {} };
-	struct FaceLayer { FaceHandle f; int id; HalfedgeLayer* hl; FaceLayer() {} FaceLayer(FaceHandle f_, int id_) :f(f_), id(id_), hl(nullptr) {} };
+	struct VertexLayer
+	{ 
+		VertexHandle v;
+		int id;
+		HalfedgeLayer* hl; 
+		VertexLayer() {} 
+		VertexLayer(VertexHandle v_, int id_) : v(v_), id(id_), hl(nullptr) {}
+	};
+	struct FaceLayer
+	{
+		FaceHandle f; 
+		int id;
+		HalfedgeLayer* hl; 
+		FaceLayer() {}
+		FaceLayer(FaceHandle f_, int id_) :f(f_), id(id_), hl(nullptr) {}
+	};
 
 	template <int layer>
 	class CoveringSpaceDataStructure
@@ -36,6 +57,8 @@ namespace LoopGen
 		std::vector<HalfedgeLayer> halfedgelayers;
 		std::vector<FaceLayer> facelayers;
 		Eigen::VectorXd weight;
+		//std::vector<int> m4_to_m2id;
+		//std::vector<int> m2_to_m4id;
 
 		void set_base(Mesh* mesh_, crossField* cf_) { mesh = mesh_; cf = cf_; }
 		int calc_shift(VertexHandle v, HalfedgeHandle h)
@@ -64,6 +87,8 @@ namespace LoopGen
 			{
 				//确定顶点列表
 				verticelayers.reserve(layer * nv - (layer - 1) * cf->getSingularity().size());
+				//m4id.reserve(verticelayers.size());
+				//m2id.reserve(layer / 2 * nv - (layer / 2 - 1)*cf->getSingularity().size());
 				int idcount = 0;
 				for (auto tv : mesh->vertices())
 				{
@@ -204,13 +229,13 @@ namespace LoopGen
 					double arc1 = atan2(ev.cross(gv).dot(normal.col(hl.oppo->left / layer)), ev.dot(gv));
 					double arc = fabs(atan2(sin(arc0) + sin(arc1), cos(arc0) + cos(arc1)));
 					if (arc < quarterPI)
-						weight(hl.id) = /*ev.norm() * */sqrt(alpha*sin(arc)*sin(arc) + 1);
+						weight(hl.id) = ev.norm() * sqrt(alpha*sin(arc)*sin(arc) + 1);
 					else
 						weight(hl.id) = YYSS_INFINITE;
 				}
 			}
 		}
 	};
-	typedef CoveringSpaceDataStructure<2> M2;
+	//typedef CoveringSpaceDataStructure<2> M2;
 	typedef CoveringSpaceDataStructure<4> M4;
 }

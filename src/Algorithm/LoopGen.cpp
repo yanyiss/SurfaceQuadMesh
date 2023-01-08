@@ -1,7 +1,7 @@
 #include "LoopGen.h"
 #include <omp.h>
 
-#define COMPUTE_NEW_PLANELOOP 1
+#define COMPUTE_NEW_PLANELOOP 0
 #define COMPUTE_NEW_ENERGY 1
 #define PRINT_DEBUG_INFO 1
 
@@ -293,13 +293,9 @@ namespace LoopGen
 		//		break;*/
 		//}
 
-		auto m4hl_to_m2hl = [&](HalfedgeLayer* m4hl)
-		{
-			return &m2.halfedgelayers[m4hl->id / 2];
-		};
-
+		
 		//planar_loop.push_back(pohl[0]);
-		planar_loop.emplace_back(m4hl_to_m2hl(pohl[0].hl), pohl[0].c);
+		planar_loop.emplace_back(pohl[0].hl, pohl[0].c);
 		hl_transfer = pohl[0].hl;
 		//while (hl_transfer != pohl[1].hl)
 		while (hl_transfer->h != pohl[1].hl->h)
@@ -317,7 +313,7 @@ namespace LoopGen
 				distance[1] = s;
 			}
 			//planar_loop.emplace_back(hl_transfer, distance[0] / (distance[0] - distance[1]));
-			planar_loop.emplace_back(m4hl_to_m2hl(hl_transfer), distance[0] / (distance[0] - distance[1]));
+			planar_loop.emplace_back(hl_transfer, distance[0] / (distance[0] - distance[1]));
 		}
 		if (hl_transfer != pohl[1].hl)
 		{
@@ -341,24 +337,41 @@ namespace LoopGen
 		std::priority_queue<LayerNode, std::vector<LayerNode>, std::greater<LayerNode>> pq;
 
 		int nvl = m4.verticelayers.size();
+		int vid;
 		std::vector<double> distance(nvl, YYSS_INFINITE);
 		std::vector<int> count(nvl, 0);
 		std::vector<HalfedgeLayer*> prev(nvl, nullptr);
+		std::deque<bool> visited(nvl, false);
 
 		HalfedgeLayer* hl_begin = vl->hl;
 		HalfedgeLayer* hl_transfer = hl_begin;
+		//tr.begin("1");
 		do
 		{
 			double w = m4.weight(hl_transfer->id);
-			if (w < YYSS_INFINITE && !m4.sing_flag[m4.verticelayers[hl_transfer->to].v.idx()])
+			if (w < YYSS_INFINITE)
 			{
-				int toid = hl_transfer->to;
-				pq.emplace(toid, w, ++count[toid]);
-				distance[toid] = w;
-				prev[toid] = hl_transfer;
+				vid = m4.verticelayers[hl_transfer->to].v.idx();
+				if (!m4.sing_flag[vid])
+				{
+					int toid = hl_transfer->to;
+					pq.emplace(toid, w, ++count[toid]);
+					distance[toid] = w;
+					prev[toid] = hl_transfer;
+					vid = m4.verticemap[vid];
+					for (int i = 0; i < 4; ++i)
+					{
+						if (vid + i == toid)
+							continue;
+						visited[vid + i] = true;
+					}
+				}
 			}
 			hl_transfer = hl_transfer->prev->oppo;
 		} while (hl_transfer != hl_begin);
+		//tr.end("1");
+		//tr.begin("2");
+		//int siseaae = 0;
 		while (true)
 		{
 			LayerNode ln;
@@ -375,26 +388,41 @@ namespace LoopGen
 				break;
 			}
 
+			//++siseaae;
 			hl_begin = m4.verticelayers[fromid].hl;
 			hl_transfer = hl_begin;
 			do
 			{
 				double w = m4.weight(hl_transfer->id);
-				if (w < YYSS_INFINITE && !m4.sing_flag[m4.verticelayers[hl_transfer->to].v.idx()])
+				if (w < YYSS_INFINITE)
 				{
-					int toid = hl_transfer->to;
-					if (distance[fromid] + w < distance[toid])
+					vid = m4.verticelayers[hl_transfer->to].v.idx();
+					if (!m4.sing_flag[vid] && !visited[vid])
 					{
-						distance[toid] = distance[fromid] + w;
-						pq.emplace(toid, distance[toid], ++count[toid]);
-						prev[toid] = hl_transfer;
+						int toid = hl_transfer->to;
+						if (distance[fromid] + w < distance[toid])
+						{
+							distance[toid] = distance[fromid] + w;
+							pq.emplace(toid, distance[toid], ++count[toid]);
+							prev[toid] = hl_transfer;
+							//visited[vid] = true;
+							vid = m4.verticemap[vid];
+							for (int i = 0; i < 4; ++i)
+							{
+								if (vid + i == toid)
+									continue;
+								visited[vid + i] = true;
+							}
+						}
 					}
 				}
 				hl_transfer = hl_transfer->prev->oppo;
 			} while (hl_transfer != hl_begin);
 		}
+		//dprint("siseaae:", siseaae);
+		//tr.end("2");
+		//tr.begin("3");
 		loop.clear();
-		loop.reserve(200);
 		loop.push_back(vl);
 		VertexLayer* prev_layer = &m4.verticelayers[prev[vl->id]->from];
 		while (prev_layer != vl)
@@ -403,8 +431,11 @@ namespace LoopGen
 			prev_layer = &m4.verticelayers[prev[prev_layer->id]->from];
 		}
 		loop.push_back(vl);
+		//tr.end("3");
+		//tr.begin("4");
 		//dprint(loop.size());
 		std::reverse(loop.begin(), loop.end());
+		//tr.end("4");
 		return true;
 	}
 
@@ -443,144 +474,48 @@ namespace LoopGen
 
 	void LoopGen::InitializePQ()
 	{
-		m2.set_base(mesh, cf); m2.update();
-		timeRecorder tr;
-		
-		m4.set_base(mesh, cf); m4.update(); m4.set_weight();
+		m4.set_base(mesh, cf); 
+		m4.update(); 
+		m4.set_weight();
 		//InfoOnMesh.resize(mesh->n_vertices() * 2);
-		InfoOnMesh.resize(m2.verticelayers.size());
+		InfoOnMesh.resize(m4.verticelayers.size());
 		for (int i = 0; i < InfoOnMesh.size(); ++i)
-			InfoOnMesh[i].id = i;
-		/*for (int i = 0; i < mesh->n_vertices(); ++i)
 		{
-			for (int j = 0; j < 2; ++j)
-			{
-				InfoOnMesh[2 * i + j].id = 2 * i + j;
-			}
-		}*/
-		//int nedges = mesh->n_edges();
+			InfoOnMesh[i].id = i;
+			InfoOnMesh[i].energy = YYSS_INFINITE;
+		}
+		int nv = mesh->n_vertices();
 
 		tr.tog();
-		//if (COMPUTE_NEW_PLANELOOP || !ReadPlaneLoop(m2, InfoOnMesh, model_name, mesh))
+		if (COMPUTE_NEW_PLANELOOP || !ReadPlaneLoop(m4, InfoOnMesh, model_name, mesh))
 		{
-//#pragma omp parallel for
-			for (int i = 0; i < InfoOnMesh.size(); ++i)
-			//int i = 82221;
+#pragma omp parallel for
+			for (int i = 0; i < m4.verticelayers.size(); ++i)
 			{
-				dprint(i);
-				if (i > 10000)
-					break;
-				int vid = m2.verticelayers[i].v.idx();
-				if (m2.sing_flag[vid])
-				{
-					InfoOnMesh[i].energy = YYSS_INFINITE;
+				VertexLayer* vl = &m4.verticelayers[i];
+				if (m4.sing_flag[vl->v.idx()])
 					continue;
-				}
+				auto &iov = InfoOnMesh[i];
 				std::vector<VertexLayer*> loop;
-				if (FieldAligned_PlanarLoop(/*m4, */&m4.verticelayers[m4.verticemap[vid] + (m2.verticemap[vid] == i ? 0 : 1)], loop))
-				{
-					RefineLoopByPlanarity(/*m4, */loop, InfoOnMesh[i].pl);
-				}
+				if (FieldAligned_PlanarLoop(vl, loop))
+					RefineLoopByPlanarity(loop, iov.pl);
 			}
-//#pragma omp parallel for
-//			for (int i = 0; i < mesh->n_vertices(); ++i)
-//			{
-//				for (int j = 0; j < 2; ++j)
-//				{
-//					std::vector<VertexHandle> loop;
-//					if (FieldAligned_PlanarLoop(mesh->vertex_handle(i), loop, j))
-//					{
-//						RefineLoopByPlanarity(loop, InfoOnMesh[2 * i + j].pl, j);
-//					}
-//				}
-//			}
-			dprint("write");
-			//WritePlaneLoop(InfoOnMesh, model_name, mesh);
+			WritePlaneLoop(InfoOnMesh, model_name, mesh);
 		}
 		tr.out("Time of Initializing Planar Loops on All Vertices:");
-		return;
-		auto &crossfield = cf->getCrossField();
-		for (auto &hl : m2.halfedgelayers)
-		{
-			VertexLayer* vl0 = &m2.verticelayers[hl.from];
-			VertexLayer* vl1 = &m2.verticelayers[hl.to];
-			int index = 0;
-			if (!InfoOnMesh[vl0->id].pl.empty() && !InfoOnMesh[vl1->id].pl.empty())
-			{
-				OpenMesh::Vec3d ev0 = InfoOnMesh[vl0->id].pl.front().point(m2) - mesh->point(vl0->v);
-				OpenMesh::Vec3d ev1 = InfoOnMesh[vl1->id].pl.front().point(m2) - mesh->point(vl1->v);
-				auto &fv0 = crossfield.col(InfoOnMesh[vl0->id].pl.front().hl->left);
-				auto &fv1 = crossfield.col(InfoOnMesh[vl1->id].pl.front().hl->left);
-				if ((ev0[0] * fv0(0) + ev0[1] * fv0(1) + ev0[2] * fv0(2))*(ev1[0] * fv1(0) + ev1[1] * fv1(1) + ev1[2] * fv1(2)) < 0)
-					index = 1;
-			}
-			InfoOnMesh[vl0->id].mark.insert(std::make_pair(vl1->id, index));
-			InfoOnMesh[vl1->id].mark.insert(std::make_pair(vl0->id, index));
-		}
 
-		//auto& matching = cf->getMatching();
-		//for (auto eitr = mesh->edges_begin(); eitr != mesh->edges_end(); ++eitr)
-		//{
-		//	int index = 0;
-		//	auto h = mesh->halfedge_handle(eitr.handle(), 0);
-		//	auto fromvert = mesh->from_vertex_handle(h);
-		//	auto tovert = mesh->to_vertex_handle(h);
-		//	auto ht = mesh->voh_begin(fromvert).handle();
-		//	//ÄæÊ±ÕëËÑË÷
-		//	while (ht.idx() != h.idx())
-		//	{
-		//		ht = mesh->opposite_halfedge_handle(mesh->prev_halfedge_handle(ht));
-		//		index += matching[ht.idx()];
-		//	}
-		//	h = mesh->next_halfedge_handle(h);
-		//	ht = mesh->voh_begin(tovert).handle();
-		//	while (ht.idx() != h.idx())
-		//	{
-		//		ht = mesh->opposite_halfedge_handle(mesh->prev_halfedge_handle(ht));
-		//		index += 4 - matching[ht.idx()];
-		//	}
-		//	index %= 4;
-		//	switch (index)
-		//	{
-		//	case 0:
-		//		InfoOnMesh[2 * fromvert.idx()].mark.insert(std::make_pair(2 * tovert.idx(), 0));
-		//		InfoOnMesh[2 * tovert.idx()].mark.insert(std::make_pair(2 * fromvert.idx(), 0));
-		//		InfoOnMesh[2 * fromvert.idx() + 1].mark.insert(std::make_pair(2 * tovert.idx() + 1, 0));
-		//		InfoOnMesh[2 * tovert.idx() + 1].mark.insert(std::make_pair(2 * fromvert.idx() + 1, 0));
-		//		break;
-		//	case 1:
-		//		InfoOnMesh[2 * fromvert.idx()].mark.insert(std::make_pair(2 * tovert.idx() + 1, 1));
-		//		InfoOnMesh[2 * tovert.idx()].mark.insert(std::make_pair(2 * fromvert.idx() + 1, 0));
-		//		InfoOnMesh[2 * fromvert.idx() + 1].mark.insert(std::make_pair(2 * tovert.idx(), 0));
-		//		InfoOnMesh[2 * tovert.idx() + 1].mark.insert(std::make_pair(2 * fromvert.idx(), 1));
-		//		break;
-		//	case 2:
-		//		InfoOnMesh[2 * fromvert.idx()].mark.insert(std::make_pair(2 * tovert.idx(), 1));
-		//		InfoOnMesh[2 * tovert.idx()].mark.insert(std::make_pair(2 * fromvert.idx(), 1));
-		//		InfoOnMesh[2 * fromvert.idx() + 1].mark.insert(std::make_pair(2 * tovert.idx() + 1, 1));
-		//		InfoOnMesh[2 * tovert.idx() + 1].mark.insert(std::make_pair(2 * fromvert.idx() + 1, 1));
-		//		break;
-		//	case 3:
-		//		InfoOnMesh[2 * fromvert.idx()].mark.insert(std::make_pair(2 * tovert.idx() + 1, 0));
-		//		InfoOnMesh[2 * tovert.idx()].mark.insert(std::make_pair(2 * fromvert.idx() + 1, 1));
-		//		InfoOnMesh[2 * fromvert.idx() + 1].mark.insert(std::make_pair(2 * tovert.idx(), 1));
-		//		InfoOnMesh[2 * tovert.idx() + 1].mark.insert(std::make_pair(2 * fromvert.idx(), 0));
-		//		break;
-		//	}
-		//}
-		dprint("plane loop set done");
 
-		auto assembleLoop = [&](Vec3d &start, PlaneLoop &pl, bool if_forward, Eigen::Matrix3Xd & loop)
+		auto assembleLoop = [&](Vec3d &start, PlaneLoop &pl, DIRECTION dir, Eigen::Matrix3Xd & loop)
 		{
 			loop.resize(3, 1 + pl.size());
 			loop.col(0) << start[0], start[1], start[2];
 			int c = 0;
-			if (if_forward)
+			if (dir)
 			{
 				for (auto itr = pl.begin(); itr != pl.end(); ++itr)
 				{
 					//auto pos = mesh->point(mesh->to_vertex_handle(itr->h)) * (1 - itr->c) + mesh->point(mesh->from_vertex_handle(itr->h)) * itr->c;
-					auto pos = itr->point(m2);
+					auto pos = itr->point(m4);
 					loop.col(++c) << pos[0], pos[1], pos[2];
 				}
 			}
@@ -589,32 +524,54 @@ namespace LoopGen
 				for (auto itr = pl.rbegin(); itr != pl.rend(); ++itr)
 				{
 					//auto pos = mesh->point(mesh->to_vertex_handle(itr->h)) * (1 - itr->c) + mesh->point(mesh->from_vertex_handle(itr->h)) * itr->c;
-					auto pos = itr->point(m2);
+					auto pos = itr->point(m4);
 					loop.col(++c) << pos[0], pos[1], pos[2];
 				}
 			}
 		};
 
+		for (int i = 0; i < m4.xyvertices.size(); ++i)
+		{
+			VertexLayer* vl = m4.xyvertices[i];
+			if (m4.sing_flag[vl->v.idx()])
+			{
+				HalfedgeLayer* hl = vl->hl;
+				HalfedgeLayer* hl_transfer = hl;
+				do
+				{
+					int toid = hl_transfer->to;
+					if (vl->id > toid)
+					{
+
+					}
+					hl_transfer = hl_transfer->prev->next;
+				} while (hl_transfer != hl);
+			}
+		}
+
 		tr.tog();
-		//similarity_energy.resize(2 * nedges, YYSS_INFINITE);
-		similarity_energy.resize(m2.halfedgelayers.size(), YYSS_INFINITE);
+		similarity_energy.resize(m4.halfedgelayers.size() / 2, YYSS_INFINITE);
 		if (COMPUTE_NEW_ENERGY || !ReadEnergy(similarity_energy, model_name))
 		{
 #pragma omp parallel for
-			for (int k = 0; k < m2.halfedgelayers.size(); ++k)
+			for (int k = 0; k < m4.halfedgelayers.size(); ++k)
 			{
-				auto &hl = m2.halfedgelayers[k];
-				auto &fl = InfoOnMesh[m2.verticelayers[hl.from].id];
-				auto &tl = InfoOnMesh[m2.verticelayers[hl.to].id];
-				if (fl.pl.empty() || tl.pl.empty())
+				dprint(k);
+				if (k % 4 > 1)
+					continue;
+				auto &hl = m4.halfedgelayers[k];
+				auto &fl = InfoOnMesh[m4.verticelayers[hl.from].id];
+				auto &tl = InfoOnMesh[m4.verticelayers[hl.to].id];
+				//if (fl.pl.empty() || tl.pl.empty())
+				if (pls[fl.plid].empty() || pls[tl.plid].empty())
 				{
-					similarity_energy[hl.id] = YYSS_INFINITE;
+					similarity_energy[k / 2 + k % 2] = YYSS_INFINITE;
 					continue;
 				}
-				int flag = fl.mark[tl.id];
+				//int flag = fl.mark[tl.id];
 				Eigen::Matrix3Xd loop0, loop1;
-				assembleLoop(mesh->point(m2.verticelayers[hl.from].v), fl.pl, true, loop0);
-				assembleLoop(mesh->point(m2.verticelayers[hl.to].v), tl.pl, !flag, loop1);
+				assembleLoop(mesh->point(m4.verticelayers[hl.from].v), pls[fl.plid], fl.dir, loop0);
+				assembleLoop(mesh->point(m4.verticelayers[hl.to].v), pls[tl.plid], tl.dir, loop1);
 				auto& proj_pos = loop0.col(0);
 				int id = -1;
 				int cols = loop1.cols();
@@ -644,94 +601,24 @@ namespace LoopGen
 					id = 0;
 				similarity_energy[hl.id] = EvaluateSimilarity(loop0, loop1, u0, id);
 			}
-
-//#pragma omp parallel for
-//			for (int k = 0; k < nedges; ++k)
-//			{
-//				auto h = mesh->halfedge_handle(k * 2);
-//				auto fromvert = mesh->from_vertex_handle(h);
-//				auto tovert = mesh->to_vertex_handle(h);
-//				for (int i = 0; i < 2; ++i)
-//				{
-//					auto& fl = InfoOnMesh[2 * fromvert.idx() + i];
-//					//dprint(fl.mark.find(&InfoOnMesh[2 * tovert.idx() + i]) != fl.mark.end());
-//					auto& tl = fl.mark.find(2 * tovert.idx() + i) != fl.mark.end() ?
-//						InfoOnMesh[2 * tovert.idx() + i] : InfoOnMesh[2 * tovert.idx() + ((i + 1) % 2)];
-//					if (fl.pl.empty() || tl.pl.empty())
-//					{
-//						similarity_energy[2 * k + i] = YYSS_INFINITE;
-//						continue;
-//					}
-//					int flag = fl.mark[tl.id];
-//					Eigen::Matrix3Xd loop0, loop1;
-//					assembleLoop(mesh->point(fromvert), fl.pl, true, loop0);
-//					assembleLoop(mesh->point(tovert), tl.pl, !flag, loop1);
-//					auto& proj_pos = loop0.col(0);
-//					int id = -1;
-//					int cols = loop1.cols();
-//					double u0 = 0;
-//					for (int j = 0; j < 2; ++j)
-//					{
-//						Eigen::Vector3d pos0 = loop1.col(j + 1) - loop1.col(j);
-//						double dot0 = pos0.dot(proj_pos - loop1.col(j));
-//						double dot1 = pos0.dot(proj_pos - loop1.col(j + 1));
-//						if (dot0 > 0 && dot1 < 0)
-//						{
-//							id = j;
-//							u0 = dot0 / (dot0 - dot1) * pos0.norm();
-//							break;
-//						}
-//						pos0 = loop1.col((cols - j) % cols) - loop1.col(cols - j - 1);
-//						dot0 = pos0.dot(proj_pos - loop1.col(cols - j - 1));
-//						dot1 = pos0.dot(proj_pos - loop1.col((cols - j) % cols));
-//						if (dot0 > 0 && dot1 < 0)
-//						{
-//							id = cols - j - 1;
-//							u0 = dot0 / (dot0 - dot1) * pos0.norm();
-//							break;
-//						}
-//					}
-//					if (id == -1)
-//						id = 0;
-//					similarity_energy[2 * k + i] = EvaluateSimilarity(loop0, loop1, u0, id);
-//					//dprint(k, i, "similarity energy:", e);
-//				}
-//			}
-//			WriteEnergy(similarity_energy, model_name);
 		}
 		tr.out("time of computing similarity energy:");
 
 		tr.tog();
 		for (auto &iov : InfoOnMesh)
 			iov.energy = 0;
-		for (auto &hl : m2.halfedgelayers)
+		for (auto &hl : m4.halfedgelayers)
 		{
-			auto &fl = InfoOnMesh[m2.verticelayers[hl.from].id];
-			auto &tl = InfoOnMesh[m2.verticelayers[hl.to].id];
+			if (hl.id % 4 > 1)
+				continue;
+			auto &fl = InfoOnMesh[m4.verticelayers[hl.from].id];
+			auto &tl = InfoOnMesh[m4.verticelayers[hl.to].id];
 			fl.energy += similarity_energy[hl.id];
 			tl.energy += similarity_energy[hl.id];
 		}
 		for (auto &iov : InfoOnMesh)
-			iov.energy /= mesh->valence(m2.verticelayers[iov.id].v);
+			iov.energy /= mesh->valence(m4.verticelayers[iov.id].v);
 		tr.out("time of setting vertex energy:");
-		/*for (int i = 0; i < InfoOnMesh.size(); ++i)
-			InfoOnMesh[i].energy = 0;
-		for (int i = 0; i < nedges; ++i)
-		{
-			auto h = mesh->halfedge_handle(i * 2);
-			int fromid2 = mesh->from_vertex_handle(h).idx() * 2;
-			int toid2 = mesh->to_vertex_handle(h).idx() * 2;
-			for (int j = 0; j < 2; ++j)
-			{
-				auto& fl = InfoOnMesh[fromid2 + j];
-				auto& tl = fl.mark.find(toid2 + j) != fl.mark.end() ?
-					InfoOnMesh[toid2 + j] : InfoOnMesh[toid2 + ((j + 1) % 2)];
-				fl.energy += similarity_energy[i * 2 + j];
-				tl.energy += similarity_energy[i * 2 + j];
-			}
-		}
-		for (int i = 0; i < InfoOnMesh.size(); ++i)
-			InfoOnMesh[i].energy /= mesh->valence(mesh->vertex_handle(i / 2));*/
 	}
 #pragma endregion 
 

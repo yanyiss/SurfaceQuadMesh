@@ -24,11 +24,13 @@ namespace LoopGen
 		Mesh* mesh;
 		//模型加工信息
 		crossField* cf = nullptr;
-		M2 m2;
+		//M2 m2;
 		M4 m4;
+		timeRecorder tr;
 		
 		//初始化阶段变量
 		std::vector<InfoOnVertex> InfoOnMesh;
+		//PLS pls;
 
 		//基础函数
 		void SetModelName(std::string& name) { model_name = name; truncateFileName(model_name); }
@@ -55,7 +57,7 @@ namespace LoopGen
 		Eigen::VectorXd uv_para[2];
 		std::vector<double> similarity_energy;
 		std::vector<int> idmap;
-		std::vector<PlaneLoop> all_plane_loop;
+		//std::vector<PlaneLoop> all_plane_loop;
 		//std::vector<Vec3d> u0point5;
 		std::vector<VertexHandle> seed_vertex;
 		std::vector<VertexHandle> cut_vertex;

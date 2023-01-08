@@ -25,11 +25,24 @@ namespace LoopGen
 		}
 	};
 	typedef std::vector<PointOnHalfedgeLayer> PlaneLoop;
+	typedef std::vector<PlaneLoop> PLS;
 
-	struct InfoOnVertex {
+	//struct InfoOnVertex {
+	//	int id;
+	//	std::map<int, int> mark;//这里的int记录了平行loop的朝向关系，0表示同向，1表示反向
+	//	//std::map<VertexHandle, InfoOnVertex*> adj;
+	//	//PlaneLoop pl;
+
+	//	double energy = YYSS_INFINITE;
+	//};
+	enum DIRECTION {
+		Reverse,
+		Forward
+	};
+	struct InfoOnVertex
+	{
 		int id;
-		std::map<int, int> mark;//这里的int记录了平行loop的朝向关系，0表示同向，1表示反向
-		//std::map<VertexHandle, InfoOnVertex*> adj;
+		std::map<int, int> mark;
 		PlaneLoop pl;
 		double energy = YYSS_INFINITE;
 	};

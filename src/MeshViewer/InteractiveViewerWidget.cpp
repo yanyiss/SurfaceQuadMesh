@@ -720,10 +720,13 @@ void InteractiveViewerWidget::showLoop()
 	if (!loop_gen_init)
 	{
 		loop_gen_init = true;
-		//lg->m2.set_base(&mesh, lg->cf); lg->m2.update();
-		//lg->m4.set_base(&mesh, lg->cf); lg->m4.update(); lg->m4.set_weight();
+
+#if 0
+		lg->m4.set_base(&mesh, lg->cf); lg->m4.update(); lg->m4.set_weight();
+#else
 		lg->InitializePQ();
 		//lg->OptimizeLoop();
+#endif
 		/*std::ifstream file_reader;
 		file_reader.open("..//resource//energy//vase.energy", std::ios::in);
 		char line[1024] = { 0 };
@@ -749,7 +752,7 @@ void InteractiveViewerWidget::showLoop()
 	if (selectedVertex.empty())
 		return;
 #else
-	selectedVertex.push_back(34236);
+	selectedVertex.push_back(28585);
 #endif
 	selectedVertex = { selectedVertex.back() };
 	selectedEdge.clear();
@@ -1014,7 +1017,7 @@ void InteractiveViewerWidget::draw_submesh()
 		glEnd();
 		
 		//画出区域点，附加生长方向
-#if 1
+#if 0
 		glPointSize(8);
 		glBegin(GL_POINTS);
 		glColor3d(0.1, 0.5, 0.6);
@@ -1034,7 +1037,7 @@ void InteractiveViewerWidget::draw_submesh()
 #endif
 
 		//画区域边界
-#if 1
+#if 0
 		glLineWidth(6);
 		glColor3d(1.0, 1.0, 1.0);
 		glBegin(GL_LINES);
@@ -1047,7 +1050,7 @@ void InteractiveViewerWidget::draw_submesh()
 		glEnd();
 #endif
 		//画出区域的面
-#if 1
+#if 0
 		glBegin(GL_TRIANGLES);
 		glColor3d(0.2, 0.3, 0.9);
 		for (auto f : mesh.faces())
@@ -1082,6 +1085,7 @@ void InteractiveViewerWidget::draw_submesh()
 		}
 		glEnd();*/
 
+#if 0
 		//画出cut
 		glLineWidth(12);
 		glBegin(GL_LINES);
@@ -1095,10 +1099,11 @@ void InteractiveViewerWidget::draw_submesh()
 			}
 		}
 		glEnd();
+#endif
 
 
 		//画出种子点
-#if 1
+#if 0
 		glPointSize(16);
 		glBegin(GL_POINTS);
 		glColor3d(0.3, 1.0, 0.3);
@@ -1119,27 +1124,40 @@ void InteractiveViewerWidget::draw_submesh()
 		glEnd();*/
 #if 1
 		//画loop
+		dprint("loop");
 		glLineWidth(3);
 		glBegin(GL_LINES);
 		glColor3d(0.8, 0.2, 0.1);
 		int nv = mesh.n_vertices();
-		for (int j = 0; j < lg->all_plane_loop.size(); ++j)
+		for (int j = 0; j < lg->pls.size(); ++j)
 		{
 			if (j % 10 != 0)
 				continue;
-			auto& pl = lg->all_plane_loop[j];
+			auto& pl = lg->pls[j];
 			int nn = pl.size();
-			auto poin = mesh.point(mesh.vertex_handle(j % nv));
+			if (nn < 1)
+				continue;
+			auto poin = pl.front().point(lg->m4);
 			glVertex3dv(poin.data());
-			for (int i = 0; i < nn; ++i)
+			for (int i = 1; i < nn - 1; ++i)
 			{
-				//poin = (1 - pl[i].c) * mesh.point(mesh.to_vertex_handle(pl[i].h)) + pl[i].c * mesh.point(mesh.from_vertex_handle(pl[i].h));
-				poin = pl[i].point(lg->m2);
+				poin = pl[i].point(lg->m4);
 				glVertex3dv(poin.data());
 				glVertex3dv(poin.data());
 			}
-			poin = mesh.point(mesh.vertex_handle(j % nv));
+			poin = pl.back().point(lg->m4);
 			glVertex3dv(poin.data());
+			//auto poin = mesh.point(mesh.vertex_handle(j % nv));
+			//glVertex3dv(poin.data());
+			//for (int i = 0; i < nn; ++i)
+			//{
+			//	//poin = (1 - pl[i].c) * mesh.point(mesh.to_vertex_handle(pl[i].h)) + pl[i].c * mesh.point(mesh.from_vertex_handle(pl[i].h));
+			//	poin = pl[i].point(lg->m4);
+			//	glVertex3dv(poin.data());
+			//	glVertex3dv(poin.data());
+			//}
+			//poin = mesh.point(mesh.vertex_handle(j % nv));
+			//glVertex3dv(poin.data());
 		}
 		glEnd();
 #else
@@ -1238,8 +1256,8 @@ void InteractiveViewerWidget::draw_planeloop()
 			auto& ps = plane_loop[i][j + 1];
 			//glVertex3dv(((1 - pl.c) * mesh.point(mesh.to_vertex_handle(pl.h)) + pl.c * mesh.point(mesh.from_vertex_handle(pl.h))).data());
 			//glVertex3dv(((1 - ps.c) * mesh.point(mesh.to_vertex_handle(ps.h)) + ps.c * mesh.point(mesh.from_vertex_handle(ps.h))).data());
-			glVertex3dv(pl.point(lg->m2).data());
-			glVertex3dv(ps.point(lg->m2).data());
+			glVertex3dv(pl.point(lg->m4).data());
+			glVertex3dv(ps.point(lg->m4).data());
 		}
 	}
 	glEnd();
