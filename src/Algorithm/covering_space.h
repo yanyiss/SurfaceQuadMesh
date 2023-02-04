@@ -227,6 +227,11 @@ namespace LoopGen
 			} while (hl_transfer != hl_begin);
 			return nullptr;
 		}
+		VertexLayer* conj_vl(VertexLayer* vl, int layer_plus)
+		{
+			int id = verticemap[vl->v.idx()];
+			return &verticelayers[id + (vl->id - id + layer_plus) % 4];
+		}
 		void set_weight(double alpha = 900)
 		{
 			auto &crossfield = cf->getCrossField();

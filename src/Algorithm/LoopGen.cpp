@@ -705,12 +705,13 @@ namespace LoopGen
 				do
 				{
 					int toid = hl_transfer->to;
-					if (visited_vl[toid])
-						continue;
-					if (InfoOnMesh[toid].energy > energy_threshold)
-						goto target0;
-					visited_vl[toid] = true;
-					hierarchy.push_back(toid);
+					if (!visited_vl[toid])
+					{
+						if (InfoOnMesh[toid].energy > energy_threshold)
+							goto target0;
+						visited_vl[toid] = true;
+						hierarchy.push_back(toid);
+					}
 					hl_transfer = hl_transfer->prev->oppo;
 				} while (hl_transfer != hl_begin);
 			}
@@ -729,12 +730,13 @@ namespace LoopGen
 				do
 				{
 					int toid = hl_transfer->to;
-					if (visited_vl[toid])
-						continue;
-					if (InfoOnMesh[toid].energy > energy_threshold)
-						goto target1;
-					visited_vl[toid] = true;
-					hierarchy.push_back(toid);
+					if (!visited_vl[toid])
+					{
+						if (InfoOnMesh[toid].energy > energy_threshold)
+							goto target1;
+						visited_vl[toid] = true;
+						hierarchy.push_back(toid);
+					}
 					hl_transfer = hl_transfer->prev->oppo;
 				} while (hl_transfer != hl_begin);
 			}
@@ -785,20 +787,21 @@ namespace LoopGen
 			do
 			{
 				int vf_id = hl_transfer->left;
-				if (regionf_flag[vf_id] || newf_flag[vf_id])
-					continue;
-				HalfedgeLayer* hb = m4.facelayers[vf_id].hl;
-				HalfedgeLayer* ht = hb;
-				do
+				if (!(regionf_flag[vf_id] || newf_flag[vf_id]))
 				{
-					if (!(regionv_flag[ht->to] || newv_flag[ht->to]))
-						goto target2;
-					ht = ht->prev->oppo;
-				} while (ht != hb);
-				new_face.push_back(&m4.facelayers[vf_id]);
-				newf_flag[vf_id] = true;
-				hl_transfer = hl_transfer->prev->oppo;
+					HalfedgeLayer* hb = m4.facelayers[vf_id].hl;
+					HalfedgeLayer* ht = hb;
+					do
+					{
+						if (!(regionv_flag[ht->to] || newv_flag[ht->to]))
+							goto target2;
+						ht = ht->prev->oppo;
+					} while (ht != hb);
+					new_face.push_back(&m4.facelayers[vf_id]);
+					newf_flag[vf_id] = true;
+				}
 			target2:;
+				hl_transfer = hl_transfer->prev->oppo;
 			} while (hl_transfer != hl_begin);
 		}
 
@@ -839,10 +842,11 @@ namespace LoopGen
 			do
 			{
 				auto oppo_f = hl_transfer->oppo->left;
-				if (searched[oppo_f] || !newf_flag[oppo_f])
-					continue;
-				searched[oppo_f] = true;
-				face_tree.push(&m4.facelayers[oppo_f]);
+				if (!(searched[oppo_f] || !newf_flag[oppo_f]))
+				{
+					searched[oppo_f] = true;
+					face_tree.push(&m4.facelayers[oppo_f]);
+				}
 				hl_transfer = hl_transfer->prev->oppo;
 			} while (hl_transfer != hl_begin);
 		}
@@ -1150,11 +1154,12 @@ namespace LoopGen
 			do
 			{
 				int vvid = hl_transfer->to;
-				if (regionv_flag[vvid] || newv_flag[vvid])
-					continue;
-				newv_flag[vvid] = true;
-				new_vertex.push_back(&m4.verticelayers[vvid]);
-				grow_dir[vvid] = growid;
+				if (!(regionv_flag[vvid] || newv_flag[vvid]))
+				{
+					newv_flag[vvid] = true;
+					new_vertex.push_back(&m4.verticelayers[vvid]);
+					grow_dir[vvid] = growid;
+				}
 				hl_transfer = hl_transfer->prev->oppo;
 			} while (hl_transfer != hl_begin);
 		}
@@ -1181,11 +1186,12 @@ namespace LoopGen
 				do
 				{
 					int vvid = hl_transfer->to;
-					if (regionv_flag[vvid] || newv_flag[vvid])
-						continue;
-					newv_flag[vvid] = true;
-					new_vertex.push_back(&m4.verticelayers[vvid]);
-					grow_dir[vvid] = growid;
+					if (!(regionv_flag[vvid] || newv_flag[vvid]))
+					{
+						newv_flag[vvid] = true;
+						new_vertex.push_back(&m4.verticelayers[vvid]);
+						grow_dir[vvid] = growid;
+					}
 					hl_transfer = hl_transfer->prev->oppo;
 				} while (hl_transfer != hl_begin);
 			}
@@ -1216,20 +1222,20 @@ namespace LoopGen
 			do
 			{
 				int vfid = hl_transfer->left;
-				if (regionf_flag[vfid] || newf_flag[vfid])
-					continue;
-
-				auto hb = m4.facelayers[vfid].hl;
-				auto ht = hb;
-				do
+				if (!(regionf_flag[vfid] || newf_flag[vfid]))
 				{
-					if (!regionv_flag[hl_transfer->to] && !newv_flag[hl_transfer->to])
-						goto target2;
-					ht = ht->prev->oppo;
-				} while (ht != hb);
-				newf_flag[vfid] = true;
-				new_face.push_back(&m4.facelayers[vfid]);
-			target2:;
+					auto hb = m4.facelayers[vfid].hl;
+					auto ht = hb;
+					do
+					{
+						if (!regionv_flag[hl_transfer->to] && !newv_flag[hl_transfer->to])
+							goto target2;
+						ht = ht->prev->oppo;
+					} while (ht != hb);
+					newf_flag[vfid] = true;
+					new_face.push_back(&m4.facelayers[vfid]);
+				target2:;
+				}
 				hl_transfer = hl_transfer->prev->oppo;
 			} while (hl_transfer != hl_begin);
 		}
@@ -1273,37 +1279,39 @@ namespace LoopGen
 			auto hl_transfer = hl_begin;
 			do
 			{
-				if (mesh->is_boundary(hl_transfer->h))
-					continue;
-				int gid = mesh->face_handle(hl_transfer->oppo->h).idx();
-				int glid = hl_transfer->oppo->left;
-				if (!(opt_flag[glid] || constraint_flag[glid]) || (opt_flag[glid] && flid < glid))
-					continue;
-				auto ev = (position.col(mesh->to_vertex_handle(hl_transfer->h).idx()) - 
-					position.col(mesh->from_vertex_handle(hl_transfer->h).idx())).normalized();
-				COMPLEX e_f = COMPLEX(ev.dot(faceBase.col(fid * 2)), -ev.dot(faceBase.col(fid * 2 + 1)));
-				COMPLEX e_g = COMPLEX(ev.dot(faceBase.col(gid * 2)), -ev.dot(faceBase.col(gid * 2 + 1)));
-				if (opt_face[flid])
+				if (!mesh->is_boundary(hl_transfer->h))
 				{
-					triple.emplace_back(count, idmap[flid], e_f);
+					int gid = mesh->face_handle(hl_transfer->oppo->h).idx();
+					int glid = hl_transfer->oppo->left;
+					if (!(!(opt_flag[glid] || constraint_flag[glid]) || (opt_flag[glid] && flid < glid)))
+					{
+						auto ev = (position.col(mesh->to_vertex_handle(hl_transfer->h).idx()) -
+							position.col(mesh->from_vertex_handle(hl_transfer->h).idx())).normalized();
+						COMPLEX e_f = COMPLEX(ev.dot(faceBase.col(fid * 2)), -ev.dot(faceBase.col(fid * 2 + 1)));
+						COMPLEX e_g = COMPLEX(ev.dot(faceBase.col(gid * 2)), -ev.dot(faceBase.col(gid * 2 + 1)));
+						if (opt_face[flid])
+						{
+							triple.emplace_back(count, idmap[flid], e_f);
+						}
+						else
+						{
+							COMPLEX dir = COMPLEX(x_axis.col(fid).dot(faceBase.col(2 * fid)), x_axis.col(fid).dot(faceBase.col(2 * fid + 1)));
+							//COMPLEX dir = COMPLEX(crossfield.col(flid).dot(faceBase.col(fid * 2)), crossfield.col(flid).dot(faceBase.col(fid * 2 + 1)));
+							b(count) -= e_f * dir;
+						}
+						if (opt_flag[glid])
+						{
+							triple.emplace_back(count, idmap[glid], -e_g);
+						}
+						else
+						{
+							COMPLEX dir = COMPLEX(x_axis.col(gid).dot(faceBase.col(2 * gid)), x_axis.col(gid).dot(faceBase.col(2 * gid + 1)));
+							//COMPLEX dir = COMPLEX(crossfield.col(glid).dot(faceBase.col(gid * 2)), crossfield.col(glid).dot(faceBase.col(gid * 2 + 1)));
+							b(count) = +e_g * dir;
+						}
+						++count;
+					}
 				}
-				else
-				{
-					COMPLEX dir = COMPLEX(x_axis.col(fid).dot(faceBase.col(2 * fid)), x_axis.col(fid).dot(faceBase.col(2 * fid + 1)));
-					//COMPLEX dir = COMPLEX(crossfield.col(flid).dot(faceBase.col(fid * 2)), crossfield.col(flid).dot(faceBase.col(fid * 2 + 1)));
-					b(count) -= e_f * dir;
-				}
-				if (opt_flag[glid])
-				{
-					triple.emplace_back(count, idmap[glid], -e_g);
-				}
-				else
-				{
-					COMPLEX dir = COMPLEX(x_axis.col(gid).dot(faceBase.col(2 * gid)), x_axis.col(gid).dot(faceBase.col(2 * gid + 1)));
-					//COMPLEX dir = COMPLEX(crossfield.col(glid).dot(faceBase.col(gid * 2)), crossfield.col(glid).dot(faceBase.col(gid * 2 + 1)));
-					b(count) = +e_g * dir;
-				}
-				++count;
 				hl_transfer = hl_transfer->prev->oppo;
 			} while (hl_transfer != hl_begin);
 			/*for (auto fh = mesh->fh_begin(f); fh != mesh->fh_end(f); ++fh)
@@ -1363,7 +1371,8 @@ namespace LoopGen
 	bool LoopGen::ConstructRegionCut(VertexLayer* vl, std::deque<bool>& visited, std::vector<VertexLayer*>& cut)
 	{
 		cut.clear();
-
+		cut.push_back(vl);
+		vl = m4.conj_vl(vl, 1);
 		HalfedgeLayer* hl_begin = vl->hl;
 		HalfedgeLayer* hl_transfer = hl_begin;
 		while (true)
@@ -1381,9 +1390,10 @@ namespace LoopGen
 			} while (hl_transfer != hl_begin);
 			if (!hl_mark)
 				return false;
-			if (!visited[hl_mark->to])
+			if (!visited[m4.conj_vl(&m4.verticelayers[hl_mark->to], 3)->id])
 				break;
-			cut.push_back(&m4.verticelayers[hl_mark->to]);
+			//dprint(hl_mark->to);
+			cut.push_back(m4.conj_vl(&m4.verticelayers[hl_mark->to], 3));
 			hl_begin = hl_mark->oppo;
 			hl_transfer = hl_begin;
 		}
@@ -1391,7 +1401,6 @@ namespace LoopGen
 
 		hl_begin = vl->hl;
 		hl_transfer = hl_begin;
-		cut.push_back(vl);
 		while (true)
 		{
 			double w = YYSS_INFINITE;
@@ -1405,52 +1414,13 @@ namespace LoopGen
 				}
 				hl_transfer = hl_transfer->prev->oppo;
 			} while (hl_transfer != hl_begin);
-			if (!visited[hl_mark->to])
+			if (!visited[m4.conj_vl(&m4.verticelayers[hl_mark->to], 3)->id])
 				break;
-			cut.push_back(&m4.verticelayers[hl_mark->to]);
+			//cut.push_back(&m4.verticelayers[hl_mark->to]);
+			cut.push_back(m4.conj_vl(&m4.verticelayers[hl_mark->to], 3));
 			hl_begin = hl_mark->oppo;
 			hl_transfer = hl_begin;
 		}
-
-
-
-		//const auto& matching = cf->getMatching();
-		//int shift = iov != &InfoOnMesh[iov->v.idx() * 2] ? 2 : 1;
-		//int shift = (iov->id % 2) + 1;
-		/*int itertimes = 0;
-		for (int s = shift; itertimes < 2; shift += 2, s = shift % 4, ++itertimes)
-		{
-			HalfedgeHandle prevhe; prevhe.invalidate();
-			int smark = s;
-			HalfedgeHandle hb = mesh->voh_begin(mesh->vertex_handle(iov->id / 2));
-			int hb_idx = hb.idx();
-			while (true)
-			{
-				double w = YYSS_INFINITE;
-				do
-				{
-					if (cf->weight(s, hb.idx()) < w)
-					{
-						w = cf->weight(s, hb.idx());
-						prevhe = hb;
-						smark = s;
-					}
-					s += matching[hb.idx()]; s %= 4;
-					hb = mesh->next_halfedge_handle(mesh->opposite_halfedge_handle(hb));
-				} while (hb.idx() != hb_idx);
-				if (!prevhe.is_valid())
-				{
-					return false;
-				}
-				if (!visited[mesh->to_vertex_handle(prevhe).idx()])
-					break;
-				cut.push_back(mesh->to_vertex_handle(prevhe));
-				hb_idx = mesh->opposite_halfedge_handle(prevhe).idx();
-				s = smark;
-				hb = mesh->next_halfedge_handle(prevhe);
-			}
-			std::reverse(cut.begin(), cut.end());
-		}*/
 #if PRINT_DEBUG_INFO
 		dprint("¼ÆËãcut");
 #endif
@@ -1523,6 +1493,8 @@ namespace LoopGen
 				//int cid = c->v.idx() * 2;
 				//ifset_flag[c == &InfoOnMesh[cid] ? cid : cid + 1] = true;
 				ifset_flag[c->id] = true;
+				int vb = m4.verticemap[c->v.idx()];
+				ifset_flag[vb + (c->id - vb + 2) % 4] = true;
 				/*for (const auto& iov_nei : c->mark)
 				{
 					if (rvf[iov_nei.first / 2] && !if_visited[iov_nei.first / 2])
@@ -1839,32 +1811,36 @@ namespace LoopGen
 				if (pl.empty())
 					continue;
 				double sum = iov.energy;
-				int fromid = pl.front().hl->from;
-				int toid = pl.front().hl->to;
-				InfoOnVertex* iov_transfer = &InfoOnMesh[fromid];
-				double e[2];
-				e[0] = iov_transfer->energy;
-				iov_transfer = &InfoOnMesh[toid];
-				e[1] = iov_transfer->energy;
-				sum += pl.front().c * e[0] + (1 - pl.front().c) * e[1];
-				for (int k = 1; k < pl.size(); ++k)
+				for (auto pohl : pl)
 				{
-					int from = pl[k].hl->from;
-					if (from == fromid)
-					{
-						toid = pl[k].hl->to;
-						iov_transfer = &InfoOnMesh[toid];
-						e[1] = iov_transfer->energy;
-					}
-					else
-					{
-						fromid = from;
-						iov_transfer = &InfoOnMesh[fromid];
-						e[0] = iov_transfer->energy;
-					}
-					sum += pl[k].c * e[0] + (1 - pl[k].c) * e[1];
-					//sum += iov.pl[j].c * e[0] + (1 - iov.pl[j].c) * e[1];
+					sum += pohl.c * InfoOnMesh[pohl.hl->from].energy + (1 - pohl.c) * InfoOnMesh[pohl.hl->to].energy;
 				}
+				//int fromid = pl.front().hl->from;
+				//int toid = pl.front().hl->to;
+				//InfoOnVertex* iov_transfer = &InfoOnMesh[fromid];
+				//double e[2];
+				//e[0] = iov_transfer->energy;
+				//iov_transfer = &InfoOnMesh[toid];
+				//e[1] = iov_transfer->energy;
+				//sum += pl.front().c * e[0] + (1 - pl.front().c) * e[1];
+				//for (int k = 1; k < pl.size(); ++k)
+				//{
+				//	int from = pl[k].hl->from;
+				//	if (from == fromid)
+				//	{
+				//		toid = pl[k].hl->to;
+				//		iov_transfer = &InfoOnMesh[toid];
+				//		e[1] = iov_transfer->energy;
+				//	}
+				//	else
+				//	{
+				//		fromid = from;
+				//		iov_transfer = &InfoOnMesh[fromid];
+				//		e[0] = iov_transfer->energy;
+				//	}
+				//	sum += pl[k].c * e[0] + (1 - pl[k].c) * e[1];
+				//	//sum += iov.pl[j].c * e[0] + (1 - iov.pl[j].c) * e[1];
+				//}
 				pq.emplace(vl, sum / (1 + pl.size()));
 			}
 		}
@@ -1976,22 +1952,23 @@ namespace LoopGen
 			auto hl_transfer = hl_begin;
 			do
 			{
-				if (fs_flag[hl_transfer->left])
-					continue;
-				bool flag = true;
-				HalfedgeLayer* hb = m4.facelayers[hl_transfer->left].hl;
-				auto ht = hl_begin;
-				do
+				if (!fs_flag[hl_transfer->left])
 				{
-					if (!vs_flag[ht->from])
+					bool flag = true;
+					HalfedgeLayer* hb = m4.facelayers[hl_transfer->left].hl;
+					auto ht = hl_begin;
+					do
 					{
-						flag = false;
-						break;
-					}
-					ht = ht->prev->oppo;
-				} while (ht != hb);
-				if (flag)
-					fs_flag[hl_transfer->left] = true;
+						if (!vs_flag[ht->from])
+						{
+							flag = false;
+							break;
+						}
+						ht = ht->prev->oppo;
+					} while (ht != hb);
+					if (flag)
+						fs_flag[hl_transfer->left] = true;
+				}
 				hl_transfer = hl_transfer->prev->oppo;
 			} while (hl_transfer != hl_begin);
 
@@ -2011,7 +1988,8 @@ namespace LoopGen
 			{
 				if (!vs_flag[hl_transfer->to])
 				{
-					bv_flag[vl->id] = true; break;
+					bv_flag[vl->id] = true;
+					break;
 				}
 				hl_transfer = hl_transfer->prev->oppo;
 			} while (hl_transfer != hl_begin);
@@ -2030,12 +2008,12 @@ namespace LoopGen
 			auto hl_transfer = hl_begin;
 			do
 			{
-
-				if (!vs_flag[hl_transfer->to])
-					continue;
-				HalfedgeLayer* hl_ = m4.find_halfedge_layer(vl, &m4.verticelayers[hl_transfer->to]);
-				if (!fs_flag[hl_->left] && !fs_flag[hl_->oppo->left])
-					return false;
+				if (vs_flag[hl_transfer->to])
+				{
+					HalfedgeLayer* hl_ = m4.find_halfedge_layer(vl, &m4.verticelayers[hl_transfer->to]);
+					if (!fs_flag[hl_->left] && !fs_flag[hl_->oppo->left])
+						return false;
+				}
 				hl_transfer = hl_transfer->prev->oppo;
 			} while (hl_transfer != hl_begin);
 		}

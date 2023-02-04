@@ -5,6 +5,7 @@ namespace LoopGen
 	class LocalParametrization
 	{
 	public:
+		LocalParametrization() {};
 		LocalParametrization(M4& m4_, VertexLayer* vl_);
 		~LocalParametrization() {};
 	public:

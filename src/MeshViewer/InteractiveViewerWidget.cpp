@@ -1015,6 +1015,19 @@ void InteractiveViewerWidget::draw_submesh()
 #else
 		
 		
+#if 0
+		glPointSize(10);
+		glColor3d(1, 0, 0);
+		glBegin(GL_POINTS);
+		for (auto tv : lg->newvv)
+		{
+			glVertex3dv(mesh.point(tv->v).data());
+		}
+		glPointSize(10);
+		glColor3d(0, 1, 0);
+		glVertex3dv(mesh.point(mesh.vertex_handle(4019)).data());
+		glEnd();
+#endif
 		
 #endif
 		Eigen::VectorXd* uv = lg->uv_para;
@@ -1167,7 +1180,7 @@ void InteractiveViewerWidget::draw_submesh()
 			glVertex3dv(lg->u0point5[i + 1].data());
 		}
 		glEnd();*/
-#if 1
+#if 0
 		//»­loop
 		dprint("loop");
 		glLineWidth(3);
@@ -1205,7 +1218,8 @@ void InteractiveViewerWidget::draw_submesh()
 			//glVertex3dv(poin.data());
 		}
 		glEnd();
-#else
+#endif
+#if 0
 		std::vector<OpenMesh::VertexHandle> vhs;
 		vhs.push_back(mesh.vertex_handle(9935));
 		vhs.push_back(mesh.vertex_handle(36412));

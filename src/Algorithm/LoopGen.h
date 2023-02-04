@@ -69,7 +69,7 @@ namespace LoopGen
 
 		//优化阶段变量
 		cylinder_set cset;
-
+		std::vector<VertexLayer*> newvv;
 		//优化阶段函数
 		void AssembleSimilarityAngle(VertexLayer* vl, Eigen::VectorXd& sa, LocalParametrization& lp, int loop_fragment_num);
 		bool RefineLoopByParametrization(VertexLayer* vl, LocalParametrization& lp, std::deque<bool>& visited_v, std::deque<bool>& visited_f);
