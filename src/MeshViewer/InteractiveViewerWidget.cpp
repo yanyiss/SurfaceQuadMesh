@@ -303,6 +303,11 @@ void InteractiveViewerWidget::pick_vertex(int x,int y)
 	//printf("Select Vertex : %d\n", r);
 	dprint("Select Vertex:", r, mesh.voh_begin(mesh.vertex_handle(r)).handle().idx() / 2);
 	dprint("Vertex Position:", mesh.point(mesh.vertex_handle(r)));
+	if (lg)
+	{
+		dprint("pl info:", lg->m4.sing_flag[r], lg->pls[lg->InfoOnMesh[lg->m4.verticemap[r]].plid].size(),
+			lg->m4.sing_flag[r] ? -1 : lg->pls[lg->InfoOnMesh[lg->m4.verticemap[r] + 1].plid].size());
+	}
 	//dprint("uv para:", lg->uv_para[0](lg->idmap[r]), lg->uv_para[1](lg->idmap[r]));
 
 	std::vector<int>::iterator it;
@@ -340,6 +345,7 @@ void InteractiveViewerWidget::pick_edge(int x,int y)
 	if(desiredEdge < 0) return;
 	lastestEdge = desiredEdge;
 	dprint("Select Edge:", lastestEdge);
+	dprint("Energy:", lg->similarity_energy[lastestEdge * 8], lg->similarity_energy[lastestEdge * 8 + 1]);
 	//if(lg->similarity_energy.empty())
 	//	dprint("Select Edge :", desiredEdge);// , "similarity energy:", std::min(lg->similarity_energy[desiredEdge * 2], lg->similarity_energy[desiredEdge * 2 + 1]));
 	//else
@@ -621,6 +627,11 @@ void InteractiveViewerWidget::draw_field()
 			glVertex3dv(dd.data()); glVertex3dv(crossfield.col(i + 3).data());
 #endif
 		}
+
+		glLineWidth(5);
+		glColor3d(0.1, 0.1, 0.1);
+		glVertex3dv(mesh.point(mesh.from_vertex_handle(mesh.halfedge_handle(2 * 75815))).data());
+		glVertex3dv(mesh.point(mesh.to_vertex_handle(mesh.halfedge_handle(2 * 75815))).data());
 		glEnd();
 
 		auto& sing = lg->cf->getSingularity();
@@ -637,7 +648,7 @@ void InteractiveViewerWidget::draw_field()
 		glPointSize(12);
 		glBegin(GL_POINTS);
 		glColor3d(0.7, 0.1, 0.0);
-		glVertex3dv(mesh.point(mesh.vertex_handle(22373)).data());
+		//glVertex3dv(mesh.point(mesh.vertex_handle(2836)).data());
 		/*glColor3d(0.0, 0.7, 0.60);
 		glVertex3dv(mesh.point(mesh.vertex_handle(37644)).data());
 		glVertex3dv(mesh.point(mesh.vertex_handle(34504)).data());
@@ -725,7 +736,7 @@ void InteractiveViewerWidget::showLoop()
 		lg->m4.set_base(&mesh, lg->cf); lg->m4.update(); lg->m4.set_weight();
 #else
 		lg->InitializePQ();
-		//lg->OptimizeLoop();
+		lg->OptimizeLoop();
 #endif
 		/*std::ifstream file_reader;
 		file_reader.open("..//resource//energy//vase.energy", std::ios::in);
@@ -752,7 +763,7 @@ void InteractiveViewerWidget::showLoop()
 	if (selectedVertex.empty())
 		return;
 #else
-	selectedVertex.push_back(28585);
+	selectedVertex.push_back(601);//2836
 #endif
 	selectedVertex = { selectedVertex.back() };
 	selectedEdge.clear();
@@ -787,7 +798,8 @@ void InteractiveViewerWidget::showLoop()
 		}
 	}
 #endif
-
+	//plane_loop[0] = lg->pls[79180];
+	//plane_loop[1] = lg->pls[80522];
 
 	updateGL();
 }
@@ -885,15 +897,21 @@ void InteractiveViewerWidget::draw_energy()
 	
 
 #else
-	double max_e = 0.2;
+	double max_e = 0.25;
 	double step_e =1.0/max_e;
 	if (loop_gen_init)
 	{
+#if 0
 		glLineWidth(10);
 		glBegin(GL_LINES);
-		for(int i=0;i<lg->similarity_energy.size()/2;++i)
+		//for(int i=0;i<lg->similarity_energy.size()/8;++i)
+		for(int i=0;i<mesh.n_edges();++i)
 		{
-			double t = std::min(lg->similarity_energy[2 * i], lg->similarity_energy[2 * i + 1]);
+			double t = std::min(lg->similarity_energy[8 * i], lg->similarity_energy[8 * i + 1]);
+			if (i == 75717)
+			{
+				//dprint("ee", 8*i, lg->similarity_energy[8 * i], lg->similarity_energy[8 * i + 1]);
+			}
 			if (t > max_e)
 				glColor3d(0, 1, 0);
 			else
@@ -905,6 +923,33 @@ void InteractiveViewerWidget::draw_energy()
 			glVertex3dv(mesh.point(mesh.from_vertex_handle(h)).data());
 			glVertex3dv(mesh.point(mesh.to_vertex_handle(h)).data());
 		}
+#else
+		glBegin(GL_POINTS);
+		/*for (int i = 0; i < lg->m4.verticelayers.size(); ++i)
+		{
+			if (lg->pls[lg->InfoOnMesh[i].plid].empty())
+			{
+				glColor3d(0, 0, 0);
+				glVertex3dv(mesh.point(lg->m4.verticelayers[i].v).data());
+			}
+		}*/
+		for (int i = 0; i < mesh.n_vertices(); ++i)
+		{
+			int ee = lg->m4.verticemap[i];
+			//dprint(mesh.n_vertices(), lg->m4.sing_flag[ee], lg->InfoOnMesh[ee].plid, lg->pls.size());
+			if (lg->m4.sing_flag[i])
+				continue;
+			
+			//if (lg->pls[lg->InfoOnMesh[ee].plid].empty() && lg->pls[lg->InfoOnMesh[ee + 1].plid].empty()
+				//&& lg->pls[lg->InfoOnMesh[ee+2].plid].empty() && lg->pls[lg->InfoOnMesh[ee + 3].plid].empty())
+			if (lg->InfoOnMesh[lg->m4.verticemap[i]].energy < 0.25||
+				lg->InfoOnMesh[lg->m4.verticemap[i] + 1].energy < 0.25)
+				glColor3d(0, 1, 0);
+			else
+				glColor3d(1, 0, 0);
+			glVertex3dv(mesh.point(mesh.vertex_handle(i)).data());
+		}
+#endif
 		glEnd();
 	}
 

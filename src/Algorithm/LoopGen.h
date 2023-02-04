@@ -30,7 +30,7 @@ namespace LoopGen
 		
 		//初始化阶段变量
 		std::vector<InfoOnVertex> InfoOnMesh;
-		//PLS pls;
+		PLS pls;
 
 		//基础函数
 		void SetModelName(std::string& name) { model_name = name; truncateFileName(model_name); }
@@ -57,10 +57,10 @@ namespace LoopGen
 		Eigen::VectorXd uv_para[2];
 		std::vector<double> similarity_energy;
 		std::vector<int> idmap;
-		//std::vector<PlaneLoop> all_plane_loop;
+		std::vector<PlaneLoop> all_plane_loop;
 		//std::vector<Vec3d> u0point5;
-		std::vector<VertexHandle> seed_vertex;
-		std::vector<VertexHandle> cut_vertex;
+		std::vector<VertexLayer*> seed_vertex;
+		std::vector<VertexLayer*> cut_vertex;
 		std::vector<int> growDIR;
 
 		//算法重要参数
@@ -71,16 +71,16 @@ namespace LoopGen
 		cylinder_set cset;
 
 		//优化阶段函数
-		void AssembleSimilarityAngle(VertexHandle v, Eigen::VectorXd& sa, LocalParametrization& lp, int loop_fragment_num);
-		bool RefineLoopByParametrization(VertexHandle v, LocalParametrization& lp, std::deque<bool>& visited_v, std::deque<bool>& visited_f);
-		void ResetLocalField(LocalParametrization &lp, std::vector<FaceHandle>& opt_face, std::deque<bool>& opt_flag, std::deque<bool>& constraint_flag);
-		double LoopLenGrad(std::vector<VertexHandle> &vertex_set, LocalParametrization &lp, std::deque<bool> &vertex_flag, int growDir);
+		void AssembleSimilarityAngle(VertexLayer* vl, Eigen::VectorXd& sa, LocalParametrization& lp, int loop_fragment_num);
+		bool RefineLoopByParametrization(VertexLayer* vl, LocalParametrization& lp, std::deque<bool>& visited_v, std::deque<bool>& visited_f);
+		void ResetLocalField(LocalParametrization &lp, std::vector<FaceLayer*>& opt_face, std::deque<bool>& opt_flag, std::deque<bool>& constraint_flag);
+		double LoopLenGrad(std::vector<VertexLayer*> &vertex_set, LocalParametrization &lp, std::deque<bool> &vertex_flag, int growDir);
 		void AssembleIOVLoopEnergy(info_pair_pq &pq);
-		bool CheckTopology(std::vector<VertexHandle>& vertex_set, std::deque<bool> &set_flag, std::vector<int> &grow_dir);
+		bool CheckTopology(std::vector<VertexLayer*>& vertex_set, std::deque<bool> &set_flag, std::vector<int> &grow_dir);
 
 		void ConstructInitialRegion(InfoOnVertex* iov, LocalParametrization &lp);
 		bool SpreadSubRegion(LocalParametrization& lp, bool grow_flag[2]);
-		bool ConstructRegionCut(InfoOnVertex* iov, std::deque<bool>& visited, std::vector<VertexHandle>& cut);
+		bool ConstructRegionCut(VertexLayer* vl, std::deque<bool>& visited, std::vector<VertexLayer*>& cut);
 		void UpdateIOM();
 		void ProcessOverlap();
 		void LookForCrossingLoop();

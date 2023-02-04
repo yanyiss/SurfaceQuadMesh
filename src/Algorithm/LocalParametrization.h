@@ -5,7 +5,7 @@ namespace LoopGen
 	class LocalParametrization
 	{
 	public:
-		LocalParametrization(Mesh& mesh_, VertexHandle v);
+		LocalParametrization(M4& m4_, VertexLayer* vl_);
 		~LocalParametrization() {};
 	public:
 		inline double GetRegularU(int vid) { return uv[0](vidmap[vid]) - std::floor(uv[0](vidmap[vid])); }
@@ -16,13 +16,13 @@ namespace LoopGen
 
 
 		//private:
-		Mesh* mesh;
+		M4* m4;
 
-		std::vector<VertexHandle> new_vertex;
-		std::vector<FaceHandle> new_face;
-		std::vector<VertexHandle> region_vertex;
-		std::vector<FaceHandle> region_face;
-		std::vector<VertexHandle> cut;
+		std::vector<VertexLayer*> new_vertex;
+		std::vector<FaceLayer*> new_face;
+		std::vector<VertexLayer*> region_vertex;
+		std::vector<FaceLayer*> region_face;
+		std::vector<VertexLayer*> cut;
 
 		std::deque<bool> new_f_flag;
 		std::deque<bool> new_v_flag;
@@ -39,7 +39,6 @@ namespace LoopGen
 		Eigen::VectorXd uv[2];
 		Eigen::VectorXd normal_similarity_angle;
 		bool has_nsa = false;
-		InfoOnVertex* iov;
 
 		void run(const Eigen::Matrix3Xd &normal);
 	};

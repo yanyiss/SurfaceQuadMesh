@@ -8,6 +8,7 @@ namespace LoopGen
 	struct HalfedgeLayer 
 	{
 		HalfedgeHandle h; 
+		//int layer;
 		int id;
 		HalfedgeLayer* prev; 
 		HalfedgeLayer* next; 
@@ -16,7 +17,7 @@ namespace LoopGen
 		int to; 
 		int left; 
 		HalfedgeLayer(){}
-		HalfedgeLayer(HalfedgeHandle h_, int id_) : h(h_), id(id_), prev(nullptr), next(nullptr), oppo(nullptr) { }
+		HalfedgeLayer(HalfedgeHandle h_, /*int layer_, */int id_) : h(h_), /*layer(layer_), */id(id_), prev(nullptr), next(nullptr), oppo(nullptr) { }
 		void set_info(HalfedgeLayer* prev_, HalfedgeLayer* next_, HalfedgeLayer* oppo_, int from_, int to_, int left_)
 		{
 			prev = prev_; next = next_; oppo = oppo_; from = from_; to = to_; left = left_;
@@ -25,18 +26,20 @@ namespace LoopGen
 	struct VertexLayer
 	{ 
 		VertexHandle v;
+		//int layer;
 		int id;
 		HalfedgeLayer* hl; 
 		VertexLayer() {} 
-		VertexLayer(VertexHandle v_, int id_) : v(v_), id(id_), hl(nullptr) {}
+		VertexLayer(VertexHandle v_, /*int layer_, */int id_) : v(v_), /*layer(layer_), */id(id_), hl(nullptr) {}
 	};
 	struct FaceLayer
 	{
 		FaceHandle f; 
+		//int layer;
 		int id;
 		HalfedgeLayer* hl; 
 		FaceLayer() {}
-		FaceLayer(FaceHandle f_, int id_) :f(f_), id(id_), hl(nullptr) {}
+		FaceLayer(FaceHandle f_, /*int layer_, */int id_) :f(f_), /*layer(layer_), */id(id_), hl(nullptr) {}
 	};
 
 	template <int layer>
@@ -95,14 +98,14 @@ namespace LoopGen
 					verticemap.push_back(idcount);
 					if (sing_flag[tv.idx()])
 					{
-						verticelayers.emplace_back(tv, idcount);
+						verticelayers.emplace_back(tv, /*0, */idcount);
 						++idcount;
 					}
 					else
 					{
 						for (int i = 0; i < layer; ++i)
 						{
-							verticelayers.emplace_back(tv, idcount);
+							verticelayers.emplace_back(tv, /*i, */idcount);
 							++idcount;
 						}
 					}
@@ -114,7 +117,7 @@ namespace LoopGen
 				{
 					for (int i = 0; i < layer; ++i)
 					{
-						halfedgelayers.emplace_back(th, idcount);
+						halfedgelayers.emplace_back(th, /*i, */idcount);
 						++idcount;
 					}
 				}
@@ -125,7 +128,9 @@ namespace LoopGen
 				{
 					for (int i = 0; i < layer; ++i)
 					{
-						facelayers.emplace_back(tf, idcount);
+						facelayers.emplace_back(tf, /*i, */idcount);
+						//facelayers.emplace_back(tf, i, idcount);
+						//facelayers.emplace_back(tf, i, idcount);
 						++idcount;
 					}
 				}
@@ -207,6 +212,20 @@ namespace LoopGen
 					}
 				}
 			}
+		}
+		HalfedgeLayer* find_halfedge_layer(VertexLayer* vl0, VertexLayer* vl1)
+		{
+			auto hl_begin = vl0->hl;
+			auto hl_transfer = hl_begin;
+			do
+			{
+				if (hl_transfer->to == vl1->id)
+				{
+					return hl_transfer;
+				}
+				hl_transfer = hl_transfer->prev->oppo;
+			} while (hl_transfer != hl_begin);
+			return nullptr;
 		}
 		void set_weight(double alpha = 900)
 		{

@@ -36,14 +36,16 @@ namespace LoopGen
 	//	double energy = YYSS_INFINITE;
 	//};
 	enum DIRECTION {
-		Reverse,
-		Forward
+		Forward,
+		Reverse
 	};
 	struct InfoOnVertex
 	{
 		int id;
-		std::map<int, int> mark;
-		PlaneLoop pl;
+		//std::map<int, int> mark;
+		//PlaneLoop pl;
+		int plid;
+		DIRECTION dir;
 		double energy = YYSS_INFINITE;
 	};
 

@@ -16,8 +16,8 @@ void truncateFileName(std::string& file);
 #include "..//MeshViewer/MeshDefinition.h"
 namespace LoopGen
 {
-	template <typename IOV>
-	bool WritePlaneLoop(std::vector<IOV>& InfoOnMesh, std::string& model_name, Mesh *mesh)
+	template <typename PlaneLoop>
+	bool WritePlaneLoop(std::vector<PlaneLoop> &pls, std::string& model_name, Mesh *mesh)
 	{
 		std::ofstream file_writer;
 		file_writer.open("..//resource//plane loop//" + model_name + ".pl");
@@ -25,7 +25,18 @@ namespace LoopGen
 			return false;
 		}
 		int lineNum = 0;
-		for (int i = 0; i < mesh->n_vertices(); ++i)
+		for (int i = 0; i < pls.size(); ++i)
+		{
+			auto& pl = pls[i];
+			file_writer << pl.size() << "\n";
+			++lineNum;
+			for (auto& plpl : pl)
+			{
+				file_writer << plpl.hl->id << " " << plpl.c << "\n";
+			}
+			lineNum += pl.size();
+		}
+		/*for (int i = 0; i < mesh->n_vertices(); ++i)
 		{
 			for (int j = 0; j < 2; ++j)
 			{
@@ -38,7 +49,7 @@ namespace LoopGen
 				}
 				lineNum += pl.size();
 			}
-		}
+		}*/
 		file_writer.close();
 
 		file_writer.open("..//resource//plane loop//" + model_name + "_pl.txt");
@@ -50,8 +61,8 @@ namespace LoopGen
 		return true;
 	}
 
-	template <typename M4, typename IOV>
-	bool ReadPlaneLoop(M4 &m4, std::vector<IOV>& InfoOnMesh, std::string& model_name, Mesh *mesh)
+	template <typename M4, typename PlaneLoop>
+	bool ReadPlaneLoop(M4 &m4, std::vector<PlaneLoop>& pls, std::string& model_name, Mesh *mesh)
 	{
 		std::ifstream file_reader;
 		file_reader.open("..//resource//plane loop//" + model_name + "_pl.txt", std::ios::in);
@@ -85,18 +96,35 @@ namespace LoopGen
 			int nn;
 			data >> nn;
 			--lineNum;
-			InfoOnMesh[ii].pl.clear();
-			InfoOnMesh[ii].pl.reserve(nn);
+			pls[ii].clear();
+			pls[ii].reserve(nn);
 			for (int i = 0; i < nn; ++i)
 			{
 				data >> hid >> c;
-				InfoOnMesh[ii].pl.emplace_back(&m4.halfedges[hid]/*mesh->halfedge_handle(hid)*/, c);
+				pls[ii].emplace_back(&m4.halfedgelayers[hid], c);
 			}
 			lineNum -= nn;
 			++ii;
 			if (lineNum <= 0)
-				break;
+				break;  
 		}
+		//while (true)
+		//{
+		//	int nn;
+		//	data >> nn;
+		//	--lineNum;
+		//	InfoOnMesh[ii].pl.clear();
+		//	InfoOnMesh[ii].pl.reserve(nn);
+		//	for (int i = 0; i < nn; ++i)
+		//	{
+		//		data >> hid >> c;
+		//		InfoOnMesh[ii].pl.emplace_back(&m4.halfedges[hid]/*mesh->halfedge_handle(hid)*/, c);
+		//	}
+		//	lineNum -= nn;
+		//	++ii;
+		//	if (lineNum <= 0)
+		//		break;
+		//}
 		fclose(fp);
 		return true;
 	}
