@@ -685,10 +685,16 @@ namespace LoopGen
 		visited_vl[iov->id] = true;
 		for (auto& pohl : pl)
 		{
-			hierarchy_vertex[0].push_back(pohl.hl->from);
-			hierarchy_vertex[1].push_back(pohl.hl->to);
-			visited_vl[pohl.hl->from] = true;
-			visited_vl[pohl.hl->to] = true;
+			if (!visited_vl[pohl.hl->from])
+			{
+				hierarchy_vertex[0].push_back(pohl.hl->from);
+				visited_vl[pohl.hl->from] = true;
+			}
+			if (!visited_vl[pohl.hl->to])
+			{
+				hierarchy_vertex[1].push_back(pohl.hl->to);
+				visited_vl[pohl.hl->to] = true;
+			}
 		}
 		advancing_front[0].push_back(std::move(hierarchy_vertex[0]));
 		advancing_front[1].push_back(std::move(hierarchy_vertex[1]));
@@ -795,7 +801,8 @@ namespace LoopGen
 					{
 						if (!(regionv_flag[ht->to] || newv_flag[ht->to]))
 							goto target2;
-						ht = ht->prev->oppo;
+						//ht = ht->prev->oppo;
+						ht = ht->next;
 					} while (ht != hb);
 					new_face.push_back(&m4.facelayers[vf_id]);
 					newf_flag[vf_id] = true;
@@ -805,17 +812,29 @@ namespace LoopGen
 			} while (hl_transfer != hl_begin);
 		}
 
-#if 1
-		std::queue<FaceLayer*> face_tree;
+
+		auto& x_axis = lp.x_axis;
+		auto& y_axis = lp.y_axis;
+		auto& crossfield = cf->getCrossField();
+		//for (auto vl : new_vertex)
+		for (auto fl : new_face)
+		{
+			int flid = fl->id;
+			int fid = m4.facelayers[flid].f.idx();
+			x_axis.col(fid) = crossfield.col(flid);
+			y_axis.col(fid) = crossfield.col(fid * 4 + (flid + 1) % 4);
+		}
+#if 0
+		//std::queue<FaceLayer*> face_tree;
 		//face_tree.push(mesh->face_handle(mesh->voh_begin(mesh->vertex_handle(iov->id / 2)).handle()));
-		face_tree.push(&m4.facelayers[m4.verticelayers[iov->id].hl->left]);
+		//face_tree.push(&m4.facelayers[m4.verticelayers[iov->id].hl->left]);
 		//std::vector<int> ff_id(nfl, -1);
 		//ff_id[face_tree.front().idx()] = iov == &InfoOnMesh[iov->v.idx() * 2] ? 0 : 1;
 		//ff_id[face_tree.front().idx()] = iov->id % 2;
 		//auto& matching = cf->getMatching();
 		auto& crossfield = cf->getCrossField();
-		std::deque<bool> searched(nfl, false);
-		searched[face_tree.front()->id] = true;
+		//std::deque<bool> searched(nfl, false);
+		//searched[face_tree.front()->id] = true;
 		
 		auto& x_axis = lp.x_axis; 
 		auto& y_axis = lp.y_axis; 
@@ -982,7 +1001,7 @@ namespace LoopGen
 		}
 		if (vertex_cache.empty())
 			return false;
-
+		dprint("ÍØÆË¼ì²é");
 		auto& regionv_flag = lp.region_v_flag;
 		auto& regionf_flag = lp.region_f_flag;
 		auto& grow_dir = lp.grow_dir;
@@ -1001,7 +1020,7 @@ namespace LoopGen
 		std::deque<bool> if_similarity_energy_low;
 		if (lp.region_vertex.size() > 1)
 		{
-			if_similarity_energy_low.resize(mesh->n_vertices(), false);
+			if_similarity_energy_low.resize(m4.verticelayers.size(), false);
 			int exceed[2] = { 0,0 };
 
 			static omp_lock_t lock;
@@ -1060,7 +1079,7 @@ namespace LoopGen
 			}
 	    }
 		else
-			if_similarity_energy_low.resize(mesh->n_vertices(), true);
+			if_similarity_energy_low.resize(m4.verticelayers.size(), true);
 		//dprint("grow_flag", grow_flag[0], grow_flag[1]);
 		//grow_flag[1] = false;
 		for (int i = 0; i < 2; ++i)
@@ -1106,7 +1125,8 @@ namespace LoopGen
 			{
 				if (!regionv_flag[hl_transfer->to])
 					goto target1;
-				hl_transfer = hl_transfer->prev->oppo;
+				//hl_transfer = hl_transfer->prev->oppo;
+				hl_transfer = hl_transfer->next;
 			} while (hl_transfer != hl_begin);
 			/*for (auto fv = mesh->fv_begin(new_f); fv != mesh->fv_end(new_f); ++fv)
 			{
@@ -1230,7 +1250,8 @@ namespace LoopGen
 					{
 						if (!regionv_flag[hl_transfer->to] && !newv_flag[hl_transfer->to])
 							goto target2;
-						ht = ht->prev->oppo;
+						//ht = ht->prev->oppo;
+						ht = ht->next;
 					} while (ht != hb);
 					newf_flag[vfid] = true;
 					new_face.push_back(&m4.facelayers[vfid]);
@@ -1312,7 +1333,8 @@ namespace LoopGen
 						++count;
 					}
 				}
-				hl_transfer = hl_transfer->prev->oppo;
+				//hl_transfer = hl_transfer->prev->oppo;
+				hl_transfer = hl_transfer->next;
 			} while (hl_transfer != hl_begin);
 			/*for (auto fh = mesh->fh_begin(f); fh != mesh->fh_end(f); ++fh)
 			{
@@ -1463,6 +1485,9 @@ namespace LoopGen
 
 			LocalParametrization lp(m4, ip.vl);
 			ConstructInitialRegion(&InfoOnMesh[ip.vl->id], lp);
+			xxaxis = lp.y_axis;
+			newvv = lp.new_vertex;
+			newff = lp.new_face;
 			bool grow_flag[2] = { true, true };
 			do
 			{
@@ -1471,6 +1496,8 @@ namespace LoopGen
 					visited_v[ver->id] = true;
 				if (!ConstructRegionCut(ip.vl, visited_v, lp.cut))
 					break;
+				cutvv = lp.cut;
+				//return;
 				lp.run(cf->getNormal());
 			} while (SpreadSubRegion(lp, grow_flag));
 
@@ -1956,7 +1983,7 @@ namespace LoopGen
 				{
 					bool flag = true;
 					HalfedgeLayer* hb = m4.facelayers[hl_transfer->left].hl;
-					auto ht = hl_begin;
+					auto ht = hb;
 					do
 					{
 						if (!vs_flag[ht->from])
@@ -1964,7 +1991,8 @@ namespace LoopGen
 							flag = false;
 							break;
 						}
-						ht = ht->prev->oppo;
+						//ht = ht->prev->oppo;
+						ht = ht->next;
 					} while (ht != hb);
 					if (flag)
 						fs_flag[hl_transfer->left] = true;

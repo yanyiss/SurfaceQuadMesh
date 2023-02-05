@@ -1014,18 +1014,71 @@ void InteractiveViewerWidget::draw_submesh()
 		
 #else
 		
+#if 1
+		glColor3d(0, 1, 0);
+		glBegin(GL_TRIANGLES);
+		for (auto tf : lg->newff)
+		{
+			auto itr = mesh.fv_begin(tf->f);
+			glVertex3dv(mesh.point(itr.handle()).data()); ++itr;
+			glVertex3dv(mesh.point(itr.handle()).data()); ++itr;
+			glVertex3dv(mesh.point(itr.handle()).data());
+		}
+		glEnd();
+		auto avgl = 0.2 * calc_mesh_ave_edge_length(&mesh);
+		glColor3d(1, 0, 0);
+		glBegin(GL_LINES);
+		for (auto tf: lg->newff)
+		{
+			auto c = mesh.calc_face_centroid(tf->f);
+			Eigen::Vector3d vc(c[0], c[1], c[2]);
+			Eigen::Vector3d topoint = vc + lg->xxaxis.col(tf->f.idx()) * avgl;//lg->cf->getCrossField().col(tf->id) * avgl;
+			glVertex3dv(vc.data());
+			glVertex3dv(topoint.data());
+		}
+		glEnd();
+#endif
 		
 #if 0
-		glPointSize(10);
-		glColor3d(1, 0, 0);
+		/*glPointSize(5);
+		glColor3d(0, 0, 1);
 		glBegin(GL_POINTS);
 		for (auto tv : lg->newvv)
 		{
 			glVertex3dv(mesh.point(tv->v).data());
 		}
+		glEnd();
+
 		glPointSize(10);
-		glColor3d(0, 1, 0);
-		glVertex3dv(mesh.point(mesh.vertex_handle(4019)).data());
+		glColor3d(0, 0, 1);
+		glBegin(GL_POINTS);
+		for (auto tv : lg->cutvv)
+		{
+			glVertex3dv(mesh.point(tv->v).data());
+		}
+		glEnd();*/
+
+		auto avgll = 0.2 * calc_mesh_ave_edge_length(&mesh);
+		glColor3d(1, 0, 0);
+		glBegin(GL_LINES);
+		/*for (auto tv : lg->newvv)
+		{
+			auto &fl = lg->m4.facelayers[tv->hl->left];
+			auto c = mesh.calc_face_centroid(fl.f);
+			Eigen::Vector3d vc(c[0], c[1], c[2]);
+			Eigen::Vector3d topoint = vc + lg->cf->getCrossField().col(fl.id)*avgl;
+			glVertex3dv(vc.data());
+			glVertex3dv(topoint.data());
+		}*/
+		for (auto tv : lg->cutvv)
+		{
+			auto& fl = lg->m4.facelayers[tv->hl->left];
+			auto c = mesh.calc_face_centroid(fl.f);
+			Eigen::Vector3d vc(c[0], c[1], c[2]);
+			Eigen::Vector3d topoint = vc + lg->cf->getCrossField().col(fl.id) * avgll;
+			glVertex3dv(vc.data());
+			glVertex3dv(topoint.data());
+		}
 		glEnd();
 #endif
 		

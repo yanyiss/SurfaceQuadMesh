@@ -184,8 +184,6 @@ namespace LoopGen
 					int vf_id = vfl_id / 4;
 					uv[0](vm) += x_axis.col(vf_id).dot(R);// * size_ratio[vf_id];
 					uv[1](vm) += y_axis.col(vf_id).dot(R);// *size_ratio[vf_id];
-					//uv[0](vm) += crossfield.col(vf_id).dot(R) * size_ratio[vf_id];
-					//uv[1](vm) += crossfield.col(vf_id % 4 == 3 ? vf_id - 3 : vf_id + 1).dot(R) * size_ratio[vf_id];
 				}
 				hl_transfer = hl_transfer->prev->oppo;
 			} while (hl_transfer != hl_begin);
