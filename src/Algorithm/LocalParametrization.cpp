@@ -4,32 +4,32 @@ namespace LoopGen
 	LocalParametrization::LocalParametrization(M4& m4_, VertexLayer* vl_)
 	{
 		m4 = &m4_;
-		int nf = m4->facelayers.size();
-		int nv = m4->verticelayers.size();
-		region_f_flag.resize(nf, false);
-		region_v_flag.resize(nv, false);
+		int nfl = m4->facelayers.size();
+		int nvl = m4->verticelayers.size();
+		region_f_flag.resize(nfl, false);
+		region_v_flag.resize(nvl, false);
 		region_vertex.push_back(vl_);
 		region_v_flag[vl_->id] = true;
 		uv[0].resize(1); uv[0].setZero();
 		uv[1].resize(1); uv[1].setZero();
-		all_pl.resize(nv);
-		vidmap.resize(nv); vidmap[vl_->id] = 0;
-		x_axis.resize(3, m4->mesh->n_faces());
-		y_axis.resize(3, m4->mesh->n_faces());
-		grow_dir.resize(nv, -1);
+		all_pl.resize(nvl);
+		vidmap.resize(nvl, -1); vidmap[vl_->id] = 0;
+		x_axis.resize(3, m4->mesh->n_faces()); x_axis.setZero();
+		y_axis.resize(3, m4->mesh->n_faces()); y_axis.setZero();
+		grow_dir.resize(nvl, -1);
 
 	}
 
 	void LocalParametrization::run(const Eigen::Matrix3Xd& normal)
 	{
 		//int nf = mesh->n_faces();
-		int nf = m4->facelayers.size();
+		int nfl = m4->facelayers.size();
 
 		//标记与cut相关的顶点和面，计算装配矩阵需要的数据
-		int nv = m4->verticelayers.size();
-		cutv_flag.resize(nv, false);
-		cutf_flag.resize(nf, false);
-		std::vector<std::map<VertexLayer*, std::pair<bool, Eigen::Vector3d>>> info(nf);
+		int nvl = m4->verticelayers.size();
+		cutv_flag.resize(nvl, false);
+		cutf_flag.resize(nfl, false);
+		std::vector<std::map<VertexLayer*, std::pair<bool, Eigen::Vector3d>>> info(nfl);
 		{
 			for (auto c : cut)
 				cutv_flag[c->id] = true;
@@ -43,15 +43,15 @@ namespace LoopGen
 				double inv_area = 1.0 / (2 * mesh->calc_face_area(fl->f));
 				auto vi = hl->to;
 				auto ev = mesh->calc_edge_vector(mesh->prev_halfedge_handle(hl->h));
-				info[flid].insert(std::make_pair(&m4->verticelayers[vi], 
+				info[flid].insert(std::make_pair(&m4->verticelayers[vi],
 					std::make_pair(flag && cutv_flag[vi], normal.col(fid).cross(Eigen::Vector3d(ev[0], ev[1], ev[2])) * inv_area)));
 				vi = hl->next->to;
 				ev = mesh->calc_edge_vector(hl->h);
-				info[flid].insert(std::make_pair(&m4->verticelayers[vi], 
+				info[flid].insert(std::make_pair(&m4->verticelayers[vi],
 					std::make_pair(flag && cutv_flag[vi], normal.col(fid).cross(Eigen::Vector3d(ev[0], ev[1], ev[2])) * inv_area)));
 				vi = hl->from;
 				ev = mesh->calc_edge_vector(mesh->next_halfedge_handle(hl->h));
-				info[flid].insert(std::make_pair(&m4->verticelayers[vi], 
+				info[flid].insert(std::make_pair(&m4->verticelayers[vi],
 					std::make_pair(flag && cutv_flag[vi], normal.col(fid).cross(Eigen::Vector3d(ev[0], ev[1], ev[2])) * inv_area)));
 			};
 
@@ -129,6 +129,7 @@ namespace LoopGen
 				calc_vector(false);
 			}
 		}
+
 #if PRINT_DEBUG_INFO
 		dprint("标记与cut相关的顶点和面，计算装配矩阵需要的数据");
 #endif
@@ -146,7 +147,7 @@ namespace LoopGen
 		int new_vertex_size = new_vertex.size();
 		int new_face_size = new_face.size();
 		std::vector<Eigen::Triplet<double>> triple;
-		std::vector<double> w(nv, 0);
+		std::vector<double> w(nvl, 0);
 		//std::vector<double> size_ratio(nf, 1.0);
 		uv[0].conservativeResize(region_vertex_size + new_vertex_size); uv[0].tail(new_vertex_size).setZero();
 		uv[1].conservativeResize(region_vertex_size + new_vertex_size); uv[1].tail(new_vertex_size).setZero();
@@ -187,32 +188,6 @@ namespace LoopGen
 				}
 				hl_transfer = hl_transfer->prev->oppo;
 			} while (hl_transfer != hl_begin);
-			//for (auto vf = mesh->vf_begin(v); vf != mesh->vf_end(v); ++vf)
-			//{
-			//	int vf_id = vf->idx();
-			//	if (!new_f_flag[vf_id])
-			//		continue;
-			//	Eigen::Vector3d& R = info[vf_id][v].second;
-			//	for (const auto& f_info : info[vf_id])
-			//	{
-			//		double dot_ = R.dot(f_info.second.second);
-			//		int fvid = f_info.first.idx();
-			//		if (f_info.second.first)
-			//			uv[0](vm) -= dot_;
-			//		//right[0](vm) -= dot_;
-			//		if (!new_v_flag[fvid])
-			//		{
-			//			uv[0](vm) -= dot_ * GetU(fvid);
-			//			uv[1](vm) -= dot_ * GetV(fvid);
-			//			//right[0](vm) -= dot_ * GetU(fvid);
-			//			//right[1](vm) -= dot_ * GetV(fvid);
-			//		}
-			//		else
-			//			w[fvid] += dot_;
-			//	}
-			//	uv[0](vm) += x_axis.col(vf_id).dot(R) * size_ratio[vf_id];
-			//	uv[1](vm) += y_axis.col(vf_id).dot(R) * size_ratio[vf_id];
-			//}
 			triple.emplace_back(vm - region_vertex_size, vm - region_vertex_size, w[vlid]);
 			w[vlid] = 0;
 
@@ -227,14 +202,6 @@ namespace LoopGen
 				}
 				hl_transfer = hl_transfer->prev->oppo;
 			} while (hl_transfer != hl_begin);
-			/*for (auto vv = mesh->vv_begin(v); vv != mesh->vv_end(v); ++vv)
-			{
-				int vvid = vv->idx();
-				if (!new_v_flag[vvid])
-					continue;
-				triple.emplace_back(vm - region_vertex_size, vidmap[vvid] - region_vertex_size, w[vvid]);
-				w[vvid] = 0;
-			}*/
 		}
 
 		Eigen::SparseMatrix<double> A(new_vertex_size, new_vertex_size);
@@ -243,6 +210,8 @@ namespace LoopGen
 		solver.compute(A);
 		uv[0].tail(new_vertex_size) = solver.solve(uv[0].tail(new_vertex_size));
 		uv[1].tail(new_vertex_size) = solver.solve(uv[1].tail(new_vertex_size));
+
+
 #if PRINT_DEBUG_INFO
 		dprint("计算参数化");
 #endif

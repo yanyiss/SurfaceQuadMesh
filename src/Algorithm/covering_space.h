@@ -54,7 +54,7 @@ namespace LoopGen
 		crossField* cf;
 		//int layer = 4;
 
-		std::deque<bool> sing_flag;
+		BoolVector sing_flag;
 		std::vector<int> verticemap;
 		std::vector<VertexLayer> verticelayers;
 		std::vector<HalfedgeLayer> halfedgelayers;

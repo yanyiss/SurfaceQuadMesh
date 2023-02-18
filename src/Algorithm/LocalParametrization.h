@@ -1,5 +1,6 @@
 #include "crossField.h"
 #include "LoopDef.h"
+#define PRINT_DEBUG_INFO 0
 namespace LoopGen
 {
 	class LocalParametrization
@@ -9,9 +10,16 @@ namespace LoopGen
 		LocalParametrization(M4& m4_, VertexLayer* vl_);
 		~LocalParametrization() {};
 	public:
-		inline double GetRegularU(int vid) { return uv[0](vidmap[vid]) - std::floor(uv[0](vidmap[vid])); }
-		inline double GetU(int vid) { return uv[0](vidmap[vid]); }
-		inline double GetV(int vid) { return uv[1](vidmap[vid]); }
+		inline double GetRegularU(int vlid) { return uv[0](vidmap[vlid]) - std::floor(uv[0](vidmap[vlid])); }
+		inline double GetU(int vlid) { return uv[0](vidmap[vlid]); }
+		inline double GetV(int vlid) {
+			if (vidmap[vlid] >= int(uv[1].size()))
+			{
+				dprint(vlid, vidmap[vlid], vidmap.size(), uv[1].size());
+				dprint(new_v_flag[vlid], region_v_flag[vlid]);
+				int p = 0;
+			}
+			return uv[1](vidmap[vlid]); }
 		inline Eigen::VectorXd& GetU() { return uv[0]; }
 		inline Eigen::VectorXd& GetV() { return uv[1]; }
 
@@ -25,12 +33,18 @@ namespace LoopGen
 		std::vector<FaceLayer*> region_face;
 		std::vector<VertexLayer*> cut;
 
-		std::deque<bool> new_f_flag;
+		/*std::deque<bool> new_f_flag;
 		std::deque<bool> new_v_flag;
 		std::deque<bool> region_f_flag;
 		std::deque<bool> region_v_flag;
 		std::deque<bool> cutv_flag;
-		std::deque<bool> cutf_flag;
+		std::deque<bool> cutf_flag;*/
+		BoolVector new_f_flag;
+		BoolVector new_v_flag;
+		BoolVector region_f_flag;
+		BoolVector region_v_flag;
+		BoolVector cutv_flag;
+		BoolVector cutf_flag;
 		std::vector<int> grow_dir;
 
 		std::vector<PlaneLoop> all_pl;

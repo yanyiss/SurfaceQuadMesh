@@ -200,7 +200,7 @@ namespace LoopGen
 		mesh->remove_property(f0);
 	}
 
-	void crossField::setOuterConstraint(std::deque<bool>& cons_flag, Eigen::Matrix3Xd& cons_direction)
+	void crossField::setOuterConstraint(BoolVector& cons_flag, Eigen::Matrix3Xd& cons_direction)
 	{
 		int count = 0;
 		for (int i = 0; i < mesh->n_faces(); ++i)
@@ -521,4 +521,13 @@ namespace LoopGen
 
 		file_writer.close();
 	}
+
+	/*double crossField::axisDif(HalfedgeHandle hh)
+	{
+		Eigen::Vector3d ev = position.col(mesh->to_vertex_handle(hh).idx()) - position.col(mesh->from_vertex_handle(hh).idx());
+		int fid = mesh->face_handle(hh).idx();
+		int gid = mesh->opposite_face_handle(hh).idx();
+		double theta0 = std::atan2(ev.dot(faceBase.col(fid * 2 + 1)), ev.dot(faceBase.col(fid * 2)));
+		double theta1 = std::atan2(ev.dot(faceBase.col(gid * 2 + 1)), ev.dot(faceBase.col(gid * 2)));
+	}*/
 }

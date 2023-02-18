@@ -5,6 +5,7 @@
 #include "..\Toolbox\mathFunctions.h"
 #include "..\Toolbox\dprint.h"
 #include "..\Toolbox\filesOperator.h"
+#include "..\Toolbox\BoolVector.h"
 //#include "LoopDef.h"
 #include "StatisticsMostValues.h"
 /*
@@ -38,7 +39,7 @@ namespace LoopGen
 		std::vector<int> constraintId;
 		Eigen::Matrix3Xd constraintVector;
 		void setCurvatureConstraint();
-		void setOuterConstraint(std::deque<bool>& cons_flag, Eigen::Matrix3Xd& cons_direction);
+		void setOuterConstraint(BoolVector& cons_flag, Eigen::Matrix3Xd& cons_direction);
 
 		Eigen::Matrix3Xd crossfield;  Eigen::Matrix3Xd& getCrossField() { return crossfield; }   void setField();
 
@@ -49,6 +50,8 @@ namespace LoopGen
 
 		void read_field();
 		void write_field();
+
+		double axisDif(HalfedgeHandle hh);
 	};
 }
 //class crossField

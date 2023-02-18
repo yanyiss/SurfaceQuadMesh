@@ -1,6 +1,5 @@
 #pragma once
 #include <vector>
-#include <deque>
 #include <map>
 #include <queue>
 
@@ -65,6 +64,28 @@ namespace LoopGen
 	struct cylinder
 	{
 		int id = -1;
+		std::vector<VertexLayer*> vertices;
+		std::vector<FaceLayer*> faces;
+		std::vector<VertexLayer*> cut;
+		std::vector<std::vector<HalfedgeLayer*>> bounds;
+
+		BoolVector vertice_flag;
+		BoolVector face_flag;
+		BoolVector cutv_flag;
+		BoolVector cutf_flag;
+		std::vector<int> bound_flag;
+
+		std::vector<int> vidmap;
+		Eigen::VectorXd uv[2];
+
+		cylinder::cylinder() {}
+		cylinder::~cylinder() {}
+		void set_bound();
+	};
+
+	/*struct cylinder
+	{
+		int id = -1;
 		Mesh* mesh = nullptr;
 		std::vector<VertexHandle> vertices;
 		std::vector<std::vector<HalfedgeHandle>> bounds;
@@ -83,7 +104,7 @@ namespace LoopGen
 		void SetBound();
 		OpenMesh::Vec3d GetUGrad(FaceHandle fh);
 		OpenMesh::Vec3d GetVGrad(FaceHandle fh);
-	};
+	};*/
 	struct cylinder_set
 	{
 		std::vector<cylinder> cylinders;
