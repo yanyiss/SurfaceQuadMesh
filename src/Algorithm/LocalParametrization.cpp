@@ -216,4 +216,50 @@ namespace LoopGen
 		dprint("计算参数化");
 #endif
 	}
+
+	void LocalParametrization::modify_cut()
+	{
+		if (cut.size() < 3)
+			return;
+
+		int first = 0;
+		while (true)
+		{
+			HalfedgeLayer* hl_begin = cut[first]->hl;
+			HalfedgeLayer* hl_transfer = hl_begin;
+			do
+			{
+				if (region_f_flag[hl_transfer->left])
+					goto goto0;
+				hl_transfer = hl_transfer->prev->oppo;
+			} while (hl_transfer != hl_begin);
+			++first;
+		}
+	goto0:;
+
+		int last = cut.size() - 1;
+		while (true)
+		{
+			HalfedgeLayer* hl_begin = cut[last]->hl;
+			HalfedgeLayer* hl_transfer = hl_begin;
+			do
+			{
+				if (region_f_flag[hl_transfer->left])
+					goto goto1;
+				hl_transfer = hl_transfer->prev->oppo;
+			} while (hl_transfer != hl_begin);
+			--last;
+		}
+	goto1:;
+
+		for (int i = 0; i < first; ++i)
+			cutv_flag[cut[i]->id] = false;
+		for (int i = cut.size() - 1; i > last; --i)
+			cutv_flag[cut[i]->id] = false;
+
+		std::vector<VertexLayer*> cut_temp;
+		for (int i = first; i <= last; ++i)
+			cut_temp.push_back(cut[i]);
+		cut = std::move(cut_temp);
+	}
 }

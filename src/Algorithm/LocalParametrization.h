@@ -56,5 +56,6 @@ namespace LoopGen
 		bool has_nsa = false;
 
 		void run(const Eigen::Matrix3Xd &normal);
+		void modify_cut();
 	};
 }

@@ -307,7 +307,7 @@ void InteractiveViewerWidget::pick_vertex(int x,int y)
 	{/*
 		dprint("pl info:", lg->m4.sing_flag[r], lg->pls[lg->InfoOnMesh[lg->m4.verticemap[r]].plid].size(),
 			lg->m4.sing_flag[r] ? -1 : lg->pls[lg->InfoOnMesh[lg->m4.verticemap[r] + 1].plid].size());*/
-		dprint("vertex layer:", r*4);
+		dprint("vertex layer:", lg->m4.verticemap[r]);
 	}
 	//dprint("uv para:", lg->uv_para[0](lg->idmap[r]), lg->uv_para[1](lg->idmap[r]));
 
@@ -737,8 +737,9 @@ void InteractiveViewerWidget::showLoop()
 #if 0
 		lg->m4.set_base(&mesh, lg->cf); lg->m4.update(); lg->m4.set_weight();
 #else
-		lg->InitializePQ();
-		lg->OptimizeLoop();
+		//lg->InitializePQ();
+		//lg->OptimizeLoop();
+		lg->ReLoop();
 #endif
 		/*std::ifstream file_reader;
 		file_reader.open("..//resource//energy//vase.energy", std::ios::in);
@@ -771,8 +772,7 @@ void InteractiveViewerWidget::showLoop()
 	selectedEdge.clear();
 	Eigen::VectorXd xyz[3];
 	VertexHandle vnow = mesh.vertex_handle(selectedVertex.back());
-	//LoopGen::VertexLayer* vl = &lg->m4.verticelayers[lg->m4.verticemap[vnow.idx()]];
-	LoopGen::VertexLayer* vl = &lg->m4.verticelayers[vnow.idx() * 4];
+	LoopGen::VertexLayer* vl = &lg->m4.verticelayers[lg->m4.verticemap[vnow.idx()]];
 	if (!lg->m4.sing_flag[vnow.idx()])
 	{
 		for (int i = 0; i < 2; ++i, ++vl)
@@ -938,17 +938,15 @@ void InteractiveViewerWidget::draw_energy()
 		}*/
 		for (int i = 0; i < mesh.n_vertices(); ++i)
 		{
-			//int ee = lg->m4.verticemap[i];
-			int ee = i * 4;
+			int ee = lg->m4.verticemap[i];
 			//dprint(mesh.n_vertices(), lg->m4.sing_flag[ee], lg->InfoOnMesh[ee].plid, lg->pls.size());
 			if (lg->m4.sing_flag[i])
 				continue;
 			
 			//if (lg->pls[lg->InfoOnMesh[ee].plid].empty() && lg->pls[lg->InfoOnMesh[ee + 1].plid].empty()
 				//&& lg->pls[lg->InfoOnMesh[ee+2].plid].empty() && lg->pls[lg->InfoOnMesh[ee + 3].plid].empty())
-			//if (lg->InfoOnMesh[lg->m4.verticemap[i]].energy < 0.25||
-			//	lg->InfoOnMesh[lg->m4.verticemap[i] + 1].energy < 0.25)
-			if (lg->InfoOnMesh[i * 4].energy < 0.25 || lg->InfoOnMesh[i * 4 + 1].energy < 0.25)
+			if (lg->InfoOnMesh[lg->m4.verticemap[i]].energy < 0.25||
+				lg->InfoOnMesh[lg->m4.verticemap[i] + 1].energy < 0.25)
 				glColor3d(0, 1, 0);
 			else
 				glColor3d(1, 0, 0);
@@ -991,25 +989,19 @@ void InteractiveViewerWidget::draw_submesh()
 #endif
 
 #if 0
-	glLineWidth(8);
-	glColor3d(1, 1, 0);
-	glBegin(GL_LINES);
-
-	std::ifstream file_reader;
-	file_reader.open("C:\\Users\\123\\Desktop\\eid.txt");
-	char line[1024] = { 0 };
-	int ii = 0;
-	int hid;
-	while (file_reader.getline(line, sizeof(line)))
+	static std::vector<std::vector<int>> vh_set;
+	if(vh_set.empty())
+	LoopGen::ReadRegion(vh_set, std::string("vase"));
+	glColor3d(1, 0, 0);
+	glPointSize(8);
+	glBegin(GL_POINTS);
+	for (auto &vhs : vh_set)
 	{
-		std::stringstream num(line);
-		num >> hid;
-		HalfedgeHandle h = mesh.halfedge_handle(2 * hid);
-		glVertex3dv(mesh.point(mesh.from_vertex_handle(h)).data());
-		glVertex3dv(mesh.point(mesh.to_vertex_handle(h)).data());
-		++ii;
+		for (auto &vh : vhs)
+		{
+			glVertex3dv(mesh.point(mesh.vertex_handle(vh)).data());
+		}
 	}
-	file_reader.close();
 	glEnd();
 #endif
 
@@ -1080,20 +1072,127 @@ void InteractiveViewerWidget::draw_submesh()
 		glEnd();
 #endif
 
-		//画区域边界
-#if 0
-		glLineWidth(3);
+		//画所有柱体区域边界
+#if 1
+		glLineWidth(6);
 		glBegin(GL_LINES);
 		for (auto &cy : lg->cset.cylinders)
 		{
 			for (int i = 0; i < 2; ++i)
 			{
 				glColor3d(i, i, 1 - i);
+				if (cy.bounds[i].empty())
+					continue;
 				for (auto hl : cy.bounds[i])
 				{
 					glVertex3dv(mesh.point(mesh.to_vertex_handle(hl->h)).data());
 					glVertex3dv(mesh.point(mesh.from_vertex_handle(hl->h)).data());
 				}
+			}
+		}
+		glEnd();
+#endif
+
+		//画所有柱体顶点
+#if 0
+		glColor3d(0, 1, 1);
+		glPointSize(5);
+		glBegin(GL_POINTS);
+		for (auto &cy : lg->cset.cylinders)
+		{
+			for (auto vl : cy.vertices)
+			{
+				glVertex3dv(mesh.point(vl->v).data());
+			}
+		}
+		glEnd();
+#endif
+		
+		//画所有柱体的面
+#if 0
+		glColor3d(0, 0.8, 0);
+		glBegin(GL_TRIANGLES);
+		for (auto &cy : lg->cset.cylinders)
+		{
+			for (auto fl : cy.faces)
+			{
+				auto hl = fl->hl;
+				glVertex3dv(mesh.point(lg->m4.verticelayers[hl->to].v).data());
+				glVertex3dv(mesh.point(lg->m4.verticelayers[hl->next->to].v).data());
+				glVertex3dv(mesh.point(lg->m4.verticelayers[hl->from].v).data());
+			}
+		}
+		glEnd();
+#endif
+
+		//画所有柱体的cut
+#if 1
+		glColor3d(1, 0, 0);
+		glBegin(GL_LINES);
+		for (auto &cy : lg->cset.cylinders)
+		{
+			for (int i = 0; i < cy.cut.size() - 1; ++i)
+			{
+				glVertex3dv(mesh.point(cy.cut[i]->v).data());
+				glVertex3dv(mesh.point(cy.cut[i + 1]->v).data());
+			}
+		}
+		glEnd();
+#endif
+
+		//画所有柱体的seed
+#if 1
+		glColor3d(0, 1, 0);
+		glPointSize(7);
+		glBegin(GL_POINTS);
+		for (auto &cy : lg->cset.cylinders)
+		{
+			glVertex3dv(mesh.point(cy.vertices.front()->v).data());
+		}
+		glEnd();
+#endif
+
+		//画所有柱体的u参数化
+#if 1
+		glPointSize(5);
+		glBegin(GL_POINTS);
+		for (auto &cy : lg->cset.cylinders)
+		{
+			for (auto vl : cy.vertices)
+			{
+				double c = cy.uv[0](cy.vidmap[vl->id]);
+				c -= std::floor(c);
+				glColor3d(c, c, c);
+				glVertex3dv(mesh.point(vl->v).data());
+			}
+		}
+		glEnd();
+#endif
+
+		//画所有柱体的v参数化
+#if 0
+		double vmi = 1.0e12;
+		double vma = -1.0e12;
+		for (auto &cy : lg->cset.cylinders)
+		{
+			for (auto vl : cy.vertices)
+			{
+				double c = cy.uv[1](cy.vidmap[vl->id]);
+				vmi = std::min(vmi, c);
+				vma = std::max(vma, c);
+			}
+		}
+		vma = 1.0 / (vma - vmi);
+		glPointSize(5);
+		glBegin(GL_POINTS);
+		for (auto &cy : lg->cset.cylinders)
+		{
+			for (auto vl : cy.vertices)
+			{
+				double c = cy.uv[1](cy.vidmap[vl->id]);
+				c = (c - vmi)*vma;
+				glColor3d(c, c, c);
+				glVertex3dv(mesh.point(vl->v).data());
 			}
 		}
 		glEnd();
@@ -1216,7 +1315,7 @@ void InteractiveViewerWidget::draw_submesh()
 #endif
 
 		//画loop
-#if 1
+#if 0
 		glLineWidth(3);
 		glBegin(GL_LINES);
 		glColor3d(0.8, 0.2, 0.1);

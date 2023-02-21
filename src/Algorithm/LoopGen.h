@@ -88,11 +88,11 @@ namespace LoopGen
 		void ConstructInitialRegion(InfoOnVertex* iov, LocalParametrization &lp);
 		bool SpreadSubRegion(LocalParametrization& lp, bool grow_flag[2]);
 		bool ConstructRegionCut(VertexLayer* vl, BoolVector& visited, std::vector<VertexLayer*>& cut);
-		void UpdateIOM();
-		void ProcessOverlap();
-		void LookForCrossingLoop();
+		void ProcessOverlap(std::vector<std::vector<int>> &region_index);
 		void OptimizeLoop();
 
+		//Loopµü´ú½×¶Î
+		void ReLoop();
 
 		//void SetUParaLine(InfoOnVertex& iov, LocalParametrization& lp, std::deque<bool>& visited_v, std::deque<bool>& visited_f);
 	};

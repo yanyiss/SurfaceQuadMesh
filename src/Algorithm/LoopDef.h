@@ -68,12 +68,8 @@ namespace LoopGen
 		std::vector<FaceLayer*> faces;
 		std::vector<VertexLayer*> cut;
 		std::vector<std::vector<HalfedgeLayer*>> bounds;
-
 		BoolVector vertice_flag;
-		BoolVector face_flag;
-		BoolVector cutv_flag;
-		BoolVector cutf_flag;
-		std::vector<int> bound_flag;
+		BoolVector face_flag; 
 
 		std::vector<int> vidmap;
 		Eigen::VectorXd uv[2];
@@ -81,6 +77,7 @@ namespace LoopGen
 		cylinder::cylinder() {}
 		cylinder::~cylinder() {}
 		void set_bound();
+		void parametrize(M4 &m4, const Eigen::Matrix3Xd& normal);
 	};
 
 	/*struct cylinder
@@ -108,8 +105,6 @@ namespace LoopGen
 	struct cylinder_set
 	{
 		std::vector<cylinder> cylinders;
-		std::deque<bool> set_vertice_flag;
-		std::vector<std::vector<int>> iov_cylinder_map;
 		//void push_back(cylinder& cy);
 
 	};

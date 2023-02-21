@@ -86,6 +86,7 @@ namespace LoopGen
 			for (auto sing : cf->getSingularity())
 				sing_flag[sing] = true;
 
+			verticemap.clear();
 			verticemap.reserve(nv);
 			{
 				//确定顶点列表
@@ -93,6 +94,7 @@ namespace LoopGen
 				//m4id.reserve(verticelayers.size());
 				//m2id.reserve(layer / 2 * nv - (layer / 2 - 1)*cf->getSingularity().size());
 				int idcount = 0;
+				verticelayers.clear();
 				for (auto tv : mesh->vertices())
 				{
 					verticemap.push_back(idcount);
@@ -111,6 +113,7 @@ namespace LoopGen
 					}
 				}
 				//确定半边列表
+				halfedgelayers.clear();
 				halfedgelayers.reserve(layer * nh);
 				idcount = 0;
 				for (auto th : mesh->halfedges())
@@ -122,6 +125,7 @@ namespace LoopGen
 					}
 				}
 				//确定面列表
+				facelayers.clear();
 				facelayers.reserve(layer * nf);
 				idcount = 0;
 				for (auto tf : mesh->faces())

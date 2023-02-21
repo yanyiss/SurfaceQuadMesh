@@ -22,11 +22,17 @@ public:
 	BoolVector(BoolVector& right_)
 	{
 		if (right_.size() == 0)
-			return;
-		n = right_.size();
-		vec = new bool[n];
-		for (int i = 0; i < n; ++i)
-			vec[i] = right_[i];
+		{
+			n = 0;
+			vec = nullptr;
+		}
+		else
+		{
+			n = right_.size();
+			vec = new bool[n];
+			for (int i = 0; i < n; ++i)
+				vec[i] = right_[i];
+		}
 	}
 	BoolVector& operator=(BoolVector &right_)
 	{

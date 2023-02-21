@@ -89,4 +89,36 @@ namespace LoopGen
 		file_reader.close();
 		return true;
 	}
+
+	bool ReadRegion(std::vector<std::vector<int>> &vh_set, std::vector<OpenMesh::Vec3d> &dir, std::string& model_name)
+	{
+		std::ifstream file_reader;
+		file_reader.open("..//resource//region//" + model_name + ".region", std::ios::in);
+		if (!file_reader.good())
+			return false;
+		char line[1024] = { 0 };
+		int n = 0;
+		vh_set.clear();
+		while (file_reader.getline(line, sizeof(line)))
+		{
+			std::stringstream num0(line);
+			num0 >> n;
+			std::vector<int> vhs(n);
+
+			file_reader.getline(line, sizeof(line));
+			std::stringstream num1(line);
+			dir.push_back(OpenMesh::Vec3d());
+			num1 >> dir.back()[0] >> dir.back()[1] >> dir.back()[2];
+
+			for (int i = 0; i < n; ++i)
+			{
+				file_reader.getline(line, sizeof(line));
+				std::stringstream num2(line);
+				num2 >> vhs[i];
+			}
+			vh_set.push_back(std::move(vhs));
+		}
+		file_reader.close();
+		return true;
+	}
 }
