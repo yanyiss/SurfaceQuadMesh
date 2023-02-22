@@ -93,6 +93,7 @@ namespace LoopGen
 
 		//Loopµü´ú½×¶Î
 		void ReLoop();
+		void LocalOpt();
 
 		//void SetUParaLine(InfoOnVertex& iov, LocalParametrization& lp, std::deque<bool>& visited_v, std::deque<bool>& visited_f);
 	};

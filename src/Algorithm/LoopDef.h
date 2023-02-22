@@ -80,33 +80,11 @@ namespace LoopGen
 		void parametrize(M4 &m4, const Eigen::Matrix3Xd& normal);
 	};
 
-	/*struct cylinder
-	{
-		int id = -1;
-		Mesh* mesh = nullptr;
-		std::vector<VertexHandle> vertices;
-		std::vector<std::vector<HalfedgeHandle>> bounds;
-		std::vector<FaceHandle> faces;
-		std::deque<bool> vertice_flag;
-		std::deque<bool> info_on_region;
-		std::deque<bool> bound_flag;
-		std::deque<bool> face_flag;
-		std::deque<bool> cut_v_flag;
-		std::deque<bool> cut_f_flag;
-		std::vector<int> vidmap;
-		Eigen::VectorXd uv[2];
-
-		cylinder() {}
-		cylinder(cylinder&& rhs);
-		void SetBound();
-		OpenMesh::Vec3d GetUGrad(FaceHandle fh);
-		OpenMesh::Vec3d GetVGrad(FaceHandle fh);
-	};*/
 	struct cylinder_set
 	{
 		std::vector<cylinder> cylinders;
-		//void push_back(cylinder& cy);
-
+		std::vector<PlaneLoop> all_path;
+		BoolVector bound_flag;
 	};
 
 }

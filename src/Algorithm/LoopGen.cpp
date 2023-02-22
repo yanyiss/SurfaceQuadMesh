@@ -1416,7 +1416,7 @@ namespace LoopGen
 #endif
 			//break;
 		}
-
+		//return;
 		ProcessOverlap(region_index);
 		WriteRegion(cset.cylinders, cf->crossfield, model_name);
 
@@ -1961,7 +1961,8 @@ namespace LoopGen
 		cset.cylinders.swap(std::vector<cylinder>());
 		cset.cylinders.resize(size);
 		double halfSquare2 = sqrt(2)*0.5;
-		cset.bound_flag.resize(m4.halfedgelayers.size(), false);
+		//cset.bound_flag.resize(m4.halfedgelayers.size(), false);
+		cset.bound_flag.resize(mesh->n_edges(), false);
 		//恢复柱体数据
 		for (int i = 0; i < size; ++i)
 		{
@@ -2035,8 +2036,9 @@ namespace LoopGen
 			{
 				for (auto hl : bound)
 				{
-					cset.bound_flag[hl->id] = true;
-					cset.bound_flag[hl->id + ((hl->id % 4) > 1 ? -2 : 2)] = true;
+					//cset.bound_flag[hl->id] = true;
+					//cset.bound_flag[hl->id + ((hl->id % 4) > 1 ? -2 : 2)] = true;
+					cset.bound_flag[hl->id / 8] = true;
 				}
 			}
 
@@ -2044,103 +2046,88 @@ namespace LoopGen
 			cset.cylinders[i].parametrize(m4, cf->getNormal());
 		}
 
+#if 1
 		//从柱体边界出发搜索路径
-		/*cset.all_path.resize(m4.verticelayers.size());
+		const auto &normal = cf->getNormal();
+		const auto &crossfield = cf->getCrossField();
+		cset.all_path.resize(m4.verticelayers.size());
+		Eigen::Vector4d plane;
+		double fromdis = 0;
+		double todis = 0;
+		auto sign_dist = [&](OpenMesh::Vec3d &p)
+		{
+			return plane(0)*p[0] + plane(1)*p[1] + plane(2)*p[2] + plane(3);
+		};
 		for (int i = 0; i < size; ++i)
 		{
 			for (int j = 0; j < 2; ++j)
 			{
+				dprint(i, j);
+				static int es = 0;
+				++es;
+				//if (es > 10)
+				//	return;
 				auto &bound = cset.cylinders[i].bounds[j];
 				int shift = j == 0 ? 3 : 1;
 				for (auto hl : bound)
 				{
 					VertexLayer* vl = m4.conj_vl(&m4.verticelayers[hl->to], shift);
-					PlaneLoop pl;
 					HalfedgeLayer* hl_begin = vl->hl;
 					HalfedgeLayer* hl_transfer = hl_begin;
 					do
 					{
-
+						plane.head(3) = crossfield.col(hl_transfer->left).cross(normal.col(hl_transfer->left / 4));
+						auto &pos = mesh->point(vl->v);
+						plane(3) = -(pos[0] * plane(0) + pos[1] * plane(1) + pos[2] * plane(2));
+						auto &frompos = mesh->point(m4.verticelayers[hl_transfer->to].v);
+						auto &topos = mesh->point(m4.verticelayers[hl_transfer->next->to].v);
+						fromdis = sign_dist(frompos);
+						todis = sign_dist(topos);
+						if (fromdis > 0 && todis < 0)
+						{
+							hl_transfer = hl_transfer->next;
+							break;
+						}
 						hl_transfer = hl_transfer->prev->oppo;
 					} while (hl_transfer != hl_begin);
-					while (true)
+					auto &path = cset.all_path[vl->id];//注意此顶点已经不是region上的顶点了
+					path.emplace_back(hl_transfer, todis / (todis - fromdis));
+					int itertimes = 0;
+					while (!cset.bound_flag[hl_transfer->id / 8])
 					{
-
+						hl_transfer = hl_transfer->oppo;
+						plane.head(3) = crossfield.col(hl_transfer->left).cross(normal.col(hl_transfer->left / 4));
+						auto pos = path.back().point(m4);
+						plane(3) = -(pos[0] * plane(0) + pos[1] * plane(1) + pos[2] * plane(2));
+						double dis = sign_dist(mesh->point(m4.verticelayers[hl_transfer->next->to].v));
+						if (dis > 0)
+						{
+							fromdis = dis;
+							hl_transfer = hl_transfer->prev;
+							todis = sign_dist(mesh->point(m4.verticelayers[hl_transfer->to].v));
+							path.emplace_back(hl_transfer, todis / (todis - fromdis));
+						}
+						else
+						{
+							todis = dis;
+							hl_transfer = hl_transfer->next;
+							fromdis = sign_dist(mesh->point(m4.verticelayers[hl_transfer->from].v));
+							path.emplace_back(hl_transfer, todis / (todis - fromdis));
+						}
+						if (++itertimes > 1000)
+						{
+							path.clear();
+							break;
+						}
 					}
 				}
 			}
-		}*/
-	}
-
-#if 0
-	void LoopGen::SetUParaLine(InfoOnVertex& iov, LocalParametrization& lp, std::deque<bool>& visited_v, std::deque<bool>& visited_f)
-	{
-		iov.pl.clear();
-		double u_para = lp.GetRegularU(iov.v.idx());
-		if (u_para < 0.1 || u_para > 0.9)
-			return;
-		iov.pl.clear();
-		auto hitr = mesh->voh_begin(iov.v);
-		if (!visited_f[hitr.handle().face().idx()])
-			return;
-		double s0 = lp.GetRegularU(mesh->to_vertex_handle(mesh->next_halfedge_handle(hitr.handle())).idx()) - u_para;
-		double distance[2];
-		PointOnHalfedge poh[2];
-		int id[2] = { 0,0 };
-		for (; hitr != mesh->voh_end(iov.v); ++hitr)
-		{
-			double s1 = lp.GetRegularU(mesh->to_vertex_handle(hitr.handle()).idx()) - u_para;
-			if (visited_f[hitr.handle().face().idx()])
-			{
-				if (s0 * s1 < 0)
-				{
-					if (s0 > 0)
-					{
-						poh[0].h = mesh->next_halfedge_handle(hitr.handle());
-						poh[0].c = s0 / (s0 - s1);
-						distance[0] = s0; distance[1] = s1;
-						++id[0];
-					}
-					else
-					{
-						poh[1].h = mesh->opposite_halfedge_handle(mesh->next_halfedge_handle(hitr.handle()));
-						poh[1].c = s1 / (s1 - s0);
-						++id[1];
-					}
-				}
-			}
-			s0 = s1;
 		}
-		if (id[0] != 1 || id[1] != 1)
-			return;
-
-		auto &planar_loop = iov.pl;
-		planar_loop.push_back(poh[0]);
-		auto h = poh[0].h;
-		while (h.idx() != poh[1].h.idx())
-		{
-			int vid = mesh->from_vertex_handle(mesh->prev_halfedge_handle(mesh->opposite_halfedge_handle(h))).idx();
-			/*if (il == 9030)
-			{
-				dprint(vid);
-				dprint("halfedge:", h.idx() / 2);
-			}*/
-			if (!visited_v[vid])
-				return;
-			double s = lp.GetRegularU(vid) - u_para;
-			if (s > 0)
-			{
-				h = mesh->next_halfedge_handle(mesh->opposite_halfedge_handle(h));
-				distance[0] = s;
-			}
-			else
-			{
-				h = mesh->prev_halfedge_handle(mesh->opposite_halfedge_handle(h));
-				distance[1] = s;
-			}
-			planar_loop.emplace_back(h, distance[0] / (distance[0] - distance[1]));
-		}
-	}
 #endif
+	}
 
+	void LoopGen::LocalOpt()
+	{
+
+	}
 }
