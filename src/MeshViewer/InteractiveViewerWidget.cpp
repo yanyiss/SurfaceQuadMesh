@@ -307,7 +307,8 @@ void InteractiveViewerWidget::pick_vertex(int x,int y)
 	{/*
 		dprint("pl info:", lg->m4.sing_flag[r], lg->pls[lg->InfoOnMesh[lg->m4.verticemap[r]].plid].size(),
 			lg->m4.sing_flag[r] ? -1 : lg->pls[lg->InfoOnMesh[lg->m4.verticemap[r] + 1].plid].size());*/
-		dprint("vertex layer:", lg->m4.verticemap[r]);
+		//dprint("vertex layer:", lg->m4.verticemap[r]);
+		dprint("vertex layer:", r * 4);
 	}
 	//dprint("uv para:", lg->uv_para[0](lg->idmap[r]), lg->uv_para[1](lg->idmap[r]));
 
@@ -737,7 +738,7 @@ void InteractiveViewerWidget::showLoop()
 #if 0
 		lg->m4.set_base(&mesh, lg->cf); lg->m4.update(); lg->m4.set_weight();
 #else
-#if 1
+#if 0
 		lg->InitializePQ();
 		lg->OptimizeLoop();
 #else
@@ -775,7 +776,8 @@ void InteractiveViewerWidget::showLoop()
 	selectedEdge.clear();
 	Eigen::VectorXd xyz[3];
 	VertexHandle vnow = mesh.vertex_handle(selectedVertex.back());
-	LoopGen::VertexLayer* vl = &lg->m4.verticelayers[lg->m4.verticemap[vnow.idx()]];
+	//LoopGen::VertexLayer* vl = &lg->m4.verticelayers[lg->m4.verticemap[vnow.idx()]];
+	LoopGen::VertexLayer* vl = &lg->m4.verticelayers[vnow.idx() * 4];
 	if (!lg->m4.sing_flag[vnow.idx()])
 	{
 		for (int i = 0; i < 2; ++i, ++vl)
@@ -827,82 +829,6 @@ void InteractiveViewerWidget::showDebugTest()
 
 void InteractiveViewerWidget::draw_energy()
 {
-#if 0
-	//double ie = DBL_MAX;
-	//double ae = 0;
-	//static bool ff = true;
-	//static double ll = 0;
-	//if (loop_gen_init && ff)
-	//{
-	//	ff = false;
-	//	for (auto e : lg->eov)
-	//	{
-	//		if (e > 10e10)
-	//			continue;
-	//		ie = std::min(ie, e);
-	//		ae = std::max(ae, e);
-	//	}
-	//	ll = 1.0 / (ae - ie);
-	//}
-	//if (loop_gen_init)
-	//{
-	//	ie = 0.00030153500000000002;
-	//	ae = 0.22753200000000001;
-	//	ll = 1.0 / (ae - ie);
-	//	//double c = 0;
-	//	/*glPointSize(5);
-	//	for (auto v : mesh.vertices())
-	//	{
-	//		if (lg->eov[v.idx()] > 10e10)
-	//		{
-	//			glColor3d(0, 1, 0);
-	//			glBegin(GL_POINTS);
-	//			glVertex3dv(mesh.point(v).data());
-	//			glEnd();
-	//		}
-	//		else
-	//		{
-	//			c = pow((lg->eov[v.idx()] - ie) * ll, 0.4);
-	//			glColor3d(c, 0, 1 - c);
-	//			glBegin(GL_POINTS);
-	//			glVertex3dv(mesh.point(v).data());
-	//			glEnd();
-	//		}
-	//	}*/
-	//	for (auto f : mesh.faces())
-	//	{
-	//		double c = 0; VertexHandle v[3];
-	//		auto fv = mesh.fv_begin(f); /*c += pow((lg->eov[fv->idx()] - ie) * ll, 0.4);*/ v[0] = fv.handle();
-	//		++fv; /*c += pow((lg->eov[fv->idx()] - ie) * ll, 0.4);*/ v[1] = fv.handle();
-	//		++fv; /*c += pow((lg->eov[fv->idx()] - ie) * ll, 0.4);*/ v[2] = fv.handle();
-	//		for (int i = 0; i < 3; ++i)
-	//		{
-	//			if (lg->eov[v[i].idx()] > 10e10)
-	//			{
-	//				c = 10e11;
-	//				break;
-	//			}
-	//			c += pow((lg->eov[v[i].idx()] - ie) * ll, 0.4);
-	//		}
-	//		if (c > 10e10)
-	//		{
-	//			glColor3d(0, 1, 0);
-	//		}
-	//		else
-	//		{
-	//			c *= 0.33333333333333333333;
-	//			glColor3d(c, 0.2, 1 - c);
-	//		}
-	//		glBegin(GL_TRIANGLES);
-	//		glVertex3dv(mesh.point(v[0]).data());
-	//		glVertex3dv(mesh.point(v[2]).data());
-	//		glVertex3dv(mesh.point(v[1]).data());
-	//		glEnd();
-	//	}
-	//}
-	
-
-#else
 	double max_e = 0.25;
 	double step_e =1.0/max_e;
 	if (loop_gen_init)
@@ -941,15 +867,15 @@ void InteractiveViewerWidget::draw_energy()
 		}*/
 		for (int i = 0; i < mesh.n_vertices(); ++i)
 		{
-			int ee = lg->m4.verticemap[i];
+			//int ee = lg->m4.verticemap[i];
+			int ee = i * 4;
 			//dprint(mesh.n_vertices(), lg->m4.sing_flag[ee], lg->InfoOnMesh[ee].plid, lg->pls.size());
 			if (lg->m4.sing_flag[i])
 				continue;
 			
-			//if (lg->pls[lg->InfoOnMesh[ee].plid].empty() && lg->pls[lg->InfoOnMesh[ee + 1].plid].empty()
-				//&& lg->pls[lg->InfoOnMesh[ee+2].plid].empty() && lg->pls[lg->InfoOnMesh[ee + 3].plid].empty())
-			if (lg->InfoOnMesh[lg->m4.verticemap[i]].energy < 0.25||
-				lg->InfoOnMesh[lg->m4.verticemap[i] + 1].energy < 0.25)
+			//if (lg->InfoOnMesh[lg->m4.verticemap[i]].energy < 0.25||
+			//	lg->InfoOnMesh[lg->m4.verticemap[i] + 1].energy < 0.25)
+			if(lg->InfoOnMesh[i*4].energy<0.25||lg->InfoOnMesh[i*4+1].energy<0.25)
 				glColor3d(0, 1, 0);
 			else
 				glColor3d(1, 0, 0);
@@ -959,7 +885,6 @@ void InteractiveViewerWidget::draw_energy()
 		glEnd();
 	}
 
-#endif
 }
 
 void InteractiveViewerWidget::draw_submesh()
@@ -1002,7 +927,7 @@ void InteractiveViewerWidget::draw_submesh()
 #endif
 
 		//画区域的面
-#if 0
+#if 1
 		glColor3d(0, 1, 0);
 		glBegin(GL_TRIANGLES);
 		for (int i = 0; i < lg->old_face_flag.size(); ++i)
@@ -1051,7 +976,7 @@ void InteractiveViewerWidget::draw_submesh()
 #endif
 
 		//画所有柱体区域边界
-#if 0
+#if 1
 		glLineWidth(6);
 		glBegin(GL_LINES);
 		for (auto &cy : lg->cset.cylinders)
@@ -1104,7 +1029,7 @@ void InteractiveViewerWidget::draw_submesh()
 #endif
 
 		//画所有柱体的cut
-#if 1
+#if 0
 		glColor3d(1, 0, 0);
 		glBegin(GL_LINES);
 		for (auto &cy : lg->cset.cylinders)

@@ -17,7 +17,7 @@ namespace LoopGen
 		PointOnHalfedgeLayer() {}
 		PointOnHalfedgeLayer(HalfedgeLayer* hl_, double c_) :hl(hl_), c(c_) {}
 		template <typename MX>
-		OpenMesh::Vec3d point(MX &mx)
+		inline OpenMesh::Vec3d point(MX &mx)
 		{
 			return c * mx.mesh->point(mx.verticelayers[hl->from].v)
 				+ (1 - c) * mx.mesh->point(mx.verticelayers[hl->to].v);

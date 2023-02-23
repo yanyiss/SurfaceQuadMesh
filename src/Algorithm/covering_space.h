@@ -52,16 +52,12 @@ namespace LoopGen
 	public:
 		Mesh* mesh;
 		crossField* cf;
-		//int layer = 4;
 
 		BoolVector sing_flag;
-		std::vector<int> verticemap;
 		std::vector<VertexLayer> verticelayers;
 		std::vector<HalfedgeLayer> halfedgelayers;
 		std::vector<FaceLayer> facelayers;
 		Eigen::VectorXd weight;
-		//std::vector<int> m4_to_m2id;
-		//std::vector<int> m2_to_m4id;
 
 		void set_base(Mesh* mesh_, crossField* cf_) { mesh = mesh_; cf = cf_; }
 		int calc_shift(VertexHandle v, HalfedgeHandle h)
@@ -76,74 +72,54 @@ namespace LoopGen
 			}
 			return index % 4;
 		}
-		void update()
+		void init()
 		{
-			int nv = mesh->n_vertices();
-			int nh = mesh->n_halfedges();
-			int nf = mesh->n_faces();
-
-			sing_flag.resize(nv, false);
-			for (auto sing : cf->getSingularity())
-				sing_flag[sing] = true;
-
-			verticemap.clear();
-			verticemap.reserve(nv);
+			//确定顶点列表
+			verticelayers.clear();
+			verticelayers.reserve(layer*mesh->n_vertices());
+			int idcount = 0;
+			for (auto tv : mesh->vertices())
 			{
-				//确定顶点列表
-				verticelayers.reserve(layer * nv - (layer - 1) * cf->getSingularity().size());
-				//m4id.reserve(verticelayers.size());
-				//m2id.reserve(layer / 2 * nv - (layer / 2 - 1)*cf->getSingularity().size());
-				int idcount = 0;
-				verticelayers.clear();
-				for (auto tv : mesh->vertices())
+				for (int i = 0; i < layer; ++i)
 				{
-					verticemap.push_back(idcount);
-					if (sing_flag[tv.idx()])
-					{
-						verticelayers.emplace_back(tv, /*0, */idcount);
-						++idcount;
-					}
-					else
-					{
-						for (int i = 0; i < layer; ++i)
-						{
-							verticelayers.emplace_back(tv, /*i, */idcount);
-							++idcount;
-						}
-					}
-				}
-				//确定半边列表
-				halfedgelayers.clear();
-				halfedgelayers.reserve(layer * nh);
-				idcount = 0;
-				for (auto th : mesh->halfedges())
-				{
-					for (int i = 0; i < layer; ++i)
-					{
-						halfedgelayers.emplace_back(th, /*i, */idcount);
-						++idcount;
-					}
-				}
-				//确定面列表
-				facelayers.clear();
-				facelayers.reserve(layer * nf);
-				idcount = 0;
-				for (auto tf : mesh->faces())
-				{
-					for (int i = 0; i < layer; ++i)
-					{
-						facelayers.emplace_back(tf, /*i, */idcount);
-						//facelayers.emplace_back(tf, i, idcount);
-						//facelayers.emplace_back(tf, i, idcount);
-						++idcount;
-					}
+					verticelayers.emplace_back(tv, idcount);
+					++idcount;
 				}
 			}
+			//确定半边列表
+			halfedgelayers.clear();
+			halfedgelayers.reserve(layer * mesh->n_halfedges());
+			idcount = 0;
+			for (auto th : mesh->halfedges())
+			{
+				for (int i = 0; i < layer; ++i)
+				{
+					halfedgelayers.emplace_back(th, idcount);
+					++idcount;
+				}
+			}
+			//确定面列表
+			facelayers.clear();
+			facelayers.reserve(layer * mesh->n_faces());
+			idcount = 0;
+			for (auto tf : mesh->faces())
+			{
+				for (int i = 0; i < layer; ++i)
+				{
+					facelayers.emplace_back(tf, idcount);
+					++idcount;
+				}
+			}
+		}
+		void update()
+		{
+			sing_flag.resize(mesh->n_vertices(), false);
+			for (auto sing : cf->getSingularity())
+				sing_flag[sing] = true;
 
 			for (auto tf : mesh->faces())
 			{
 				int fid = tf.idx();
-
 				std::vector<HalfedgeHandle> hhs(3);
 				std::vector<VertexHandle> vhs(3);
 				std::vector<int> vshift(3);
@@ -158,7 +134,6 @@ namespace LoopGen
 					flag[i] = sing_flag[vhs[i].idx()];
 				}
 				
-
 				std::vector<HalfedgeLayer*> hlx(3);
 				std::vector<int> vmx(3);
 				for (int j = 0; j < layer; ++j)
@@ -166,7 +141,7 @@ namespace LoopGen
 					for (int k = 0; k < 3; ++k)
 					{
 						hlx[k] = &halfedgelayers[hhs[k].idx()*layer + j];
-						vmx[k] = verticemap[vhs[k].idx()] + (flag[k] ? 0 : (j + vshift[k]) % layer);
+						vmx[k] = vhs[k].idx() * 4 + (flag[k] ? 0 : ((j + vshift[k]) % layer));
 					}
 					int left_face = fid * layer + j;
 					hlx[0]->set_info(hlx[2], hlx[1], nullptr, vmx[0], vmx[1], left_face);
@@ -233,7 +208,8 @@ namespace LoopGen
 		}
 		VertexLayer* conj_vl(VertexLayer* vl, int layer_plus)
 		{
-			int id = verticemap[vl->v.idx()];
+			//int id = verticemap[vl->v.idx()];
+			int id = vl->v.idx() * 4;
 			return &verticelayers[id + (vl->id - id + layer_plus) % 4];
 		}
 		void set_weight(double alpha = 900)
