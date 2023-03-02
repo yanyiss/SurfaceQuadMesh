@@ -19,8 +19,11 @@ namespace LoopGen
 		template <typename MX>
 		inline OpenMesh::Vec3d point(MX &mx)
 		{
-			return c * mx.mesh->point(mx.verticelayers[hl->from].v)
-				+ (1 - c) * mx.mesh->point(mx.verticelayers[hl->to].v);
+			if (hl)
+				return c * mx.mesh->point(mx.verticelayers[hl->from].v) +
+				(1 - c) * mx.mesh->point(mx.verticelayers[hl->to].v);
+			else
+				return mx.mesh->point(mx.mesh->vertex_handle(c));
 		}
 	};
 	typedef std::vector<PointOnHalfedgeLayer> PlaneLoop;
@@ -48,18 +51,18 @@ namespace LoopGen
 		double energy = YYSS_INFINITE;
 	};
 
-	struct info_pair
+	struct vl_pair
 	{
 		VertexLayer* vl = nullptr;
-		double energy = 0;
-		info_pair() {}
-		info_pair(VertexLayer* vl_, double e) : vl(vl_), energy(e) { }
-		bool operator>(const info_pair& right) const
+		double data = 0;
+		vl_pair() {}
+		vl_pair(VertexLayer* vl_, double e) : vl(vl_), data(e) { }
+		bool operator>(const vl_pair& right) const
 		{
-			return energy > right.energy;
+			return data > right.data;
 		}
 	};
-	typedef std::priority_queue<info_pair, std::vector<info_pair>, std::greater<info_pair>> info_pair_pq;
+	typedef std::priority_queue<vl_pair, std::vector<vl_pair>, std::greater<vl_pair>> vl_pair_pq;
 
 	struct cylinder
 	{
@@ -84,7 +87,43 @@ namespace LoopGen
 	{
 		std::vector<cylinder> cylinders;
 		std::vector<PlaneLoop> all_path;
-		BoolVector bound_flag;
+		BoolVector bound_edge_flag;
+		std::vector<std::pair<int, int>> vertex_bound_index;
+		BoolVector has_vertex;
+		std::vector<BoolVector> tangential_intersection;
 	};
 
+	struct temp_name
+	{
+		std::vector<VertexHandle> new_vertex;
+		std::vector<FaceHandle> new_face;
+		std::vector<VertexHandle> region_vertex;
+		std::vector<FaceHandle> region_face;
+
+		BoolVector new_f_flag;
+		BoolVector new_v_flag;
+		BoolVector region_f_flag;
+		BoolVector region_v_flag;
+		BoolVector constraint_f_flag;
+		std::vector<int> grow_dir;
+
+		std::vector<PlaneLoop> all_pl;
+		Eigen::Matrix3Xd x_axis;
+		Eigen::Matrix3Xd y_axis;
+		std::vector<int> vidmap;
+		Eigen::VectorXd uv[2];
+
+		std::pair<int, int> from_bound;
+		std::pair<int, int> to_bound;
+
+		Eigen::VectorXd normal_similarity_angle;
+		double umx[2] = { 0, 0 };
+		double length[3] = { YYSS_INFINITE, -YYSS_INFINITE, -YYSS_INFINITE };
+		bool has_nsa = false;
+
+		inline double GetU(int vid) { return uv[0](vidmap[vid]); }
+		inline double GetV(int vid) { return uv[1](vidmap[vid]); }
+		inline Eigen::VectorXd& GetU() { return uv[0]; }
+		inline Eigen::VectorXd& GetV() { return uv[1]; }
+	};
 }

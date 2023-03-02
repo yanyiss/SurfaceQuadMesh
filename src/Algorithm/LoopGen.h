@@ -73,6 +73,7 @@ namespace LoopGen
 
 		//算法重要参数
 		double energy_threshold = 0.2;
+		double disk_e = 0.1;
 		int extend_layer = 3;
 
 		//优化阶段变量
@@ -82,7 +83,7 @@ namespace LoopGen
 		bool RefineLoopByParametrization(VertexLayer* vl, LocalParametrization& lp, BoolVector& visited_v, BoolVector& visited_f);
 		void ResetLocalField(LocalParametrization &lp, std::vector<FaceLayer*>& opt_face, BoolVector& opt_flag, BoolVector& constraint_flag);
 		double LoopLenGrad(std::vector<VertexLayer*> &vertex_set, LocalParametrization &lp, BoolVector &vertex_flag, int growDir);
-		void AssembleIOVLoopEnergy(info_pair_pq &pq);
+		void AssembleIOVLoopEnergy(vl_pair_pq &pq);
 		bool CheckTopology(std::vector<VertexLayer*>& vertex_set, BoolVector &set_flag, std::vector<int> &grow_dir);
 
 		void ConstructInitialRegion(InfoOnVertex* iov, LocalParametrization &lp);
@@ -93,7 +94,16 @@ namespace LoopGen
 
 		//Loop迭代阶段
 		void ReLoop();
-		void LocalOpt();
+#if 1
+		void ConstructInitialRegion(VertexLayer* vl, temp_name &tn);
+		void set_one_field(temp_name &tn);
+		void parame(temp_name &tn);
+		bool RefinePathByParametrization(VertexHandle v, temp_name &tn, BoolVector &visited_v, BoolVector &visited_f);
+		double AssembleSimilarityAngle(VertexHandle v, Eigen::VectorXd& sa, temp_name &tn, int path_fragment_num);
+		bool SpreadSubRegion(temp_name &tn, bool grow_flag[2]);
+		void OptimizeDisk(vl_pair_pq &path_pq);
+		std::vector<PlaneLoop> all_path;
+#endif
 
 		//void SetUParaLine(InfoOnVertex& iov, LocalParametrization& lp, std::deque<bool>& visited_v, std::deque<bool>& visited_f);
 	};

@@ -12,14 +12,7 @@ namespace LoopGen
 	public:
 		inline double GetRegularU(int vlid) { return uv[0](vidmap[vlid]) - std::floor(uv[0](vidmap[vlid])); }
 		inline double GetU(int vlid) { return uv[0](vidmap[vlid]); }
-		inline double GetV(int vlid) {
-			if (vidmap[vlid] >= int(uv[1].size()))
-			{
-				dprint(vlid, vidmap[vlid], vidmap.size(), uv[1].size());
-				dprint(new_v_flag[vlid], region_v_flag[vlid]);
-				int p = 0;
-			}
-			return uv[1](vidmap[vlid]); }
+		inline double GetV(int vlid) { return uv[1](vidmap[vlid]); }
 		inline Eigen::VectorXd& GetU() { return uv[0]; }
 		inline Eigen::VectorXd& GetV() { return uv[1]; }
 
