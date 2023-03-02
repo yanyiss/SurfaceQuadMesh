@@ -892,32 +892,16 @@ void InteractiveViewerWidget::draw_energy()
 void InteractiveViewerWidget::draw_submesh()
 {
 	//画某个点
-#if 0
+#if 1
 	glColor3d(1, 0, 0);
 	glPointSize(15);
 	glBegin(GL_POINTS);
-	glVertex3dv(mesh.point(mesh.vertex_handle(20076)).data());
-	glVertex3dv(mesh.point(mesh.vertex_handle(17565)).data());
-	glVertex3dv(mesh.point(mesh.vertex_handle(27116)).data());
-	glVertex3dv(mesh.point(mesh.vertex_handle(32205)).data());
-	glVertex3dv(mesh.point(mesh.vertex_handle(35096)).data());
-	glVertex3dv(mesh.point(mesh.vertex_handle(31002)).data());
-	glVertex3dv(mesh.point(mesh.vertex_handle(24620)).data());
-	glVertex3dv(mesh.point(mesh.vertex_handle(30844)).data());
-	glVertex3dv(mesh.point(mesh.vertex_handle(40563)).data());
-
-	glVertex3dv(mesh.point(mesh.vertex_handle(27040)).data());
-	glVertex3dv(mesh.point(mesh.vertex_handle(39615)).data());
-	glVertex3dv(mesh.point(mesh.vertex_handle(20390)).data());
-	glVertex3dv(mesh.point(mesh.vertex_handle(10425)).data());
-	glVertex3dv(mesh.point(mesh.vertex_handle(24090)).data());
-	glVertex3dv(mesh.point(mesh.vertex_handle(30519)).data());
-	glVertex3dv(mesh.point(mesh.vertex_handle(39664)).data());
+	glVertex3dv(mesh.point(mesh.vertex_handle(119321/4)).data());
 	glEnd();
 #endif
 
 	//画某条线
-#if 0
+#if 1
 	glLineWidth(3);
 	glBegin(GL_LINES);
 	glColor3d(0.8, 0.2, 0.1);
@@ -950,7 +934,7 @@ void InteractiveViewerWidget::draw_submesh()
 #endif
 
 	//画u参数
-#if 1
+#if 0
 	double vmi = 1.0e12;
 	double vma = -1.0e12;
 	for (int i = 0; i < lg->old_vert_flag.size(); ++i)
@@ -1008,13 +992,13 @@ void InteractiveViewerWidget::draw_submesh()
 #endif
 
 	//画方向
-#if 0
+#if 1
 	double avgl = 0.2*calc_mesh_ave_edge_length(&mesh);
 	glColor3d(1, 0, 0);
 	glBegin(GL_LINES);
-	for (int i = 0; i < lg->old_face_flag.size(); ++i)
+	for (int i = 0; i < lg->new_face_flag.size(); ++i)
 	{
-		if (lg->old_face_flag[i])
+		if (lg->new_face_flag[i])
 		{
 			auto c = mesh.calc_face_centroid(mesh.face_handle(i));
 			Eigen::Vector3d vc(c[0], c[1], c[2]);
@@ -1027,7 +1011,7 @@ void InteractiveViewerWidget::draw_submesh()
 #endif
 
 	//画区域顶点
-#if 0
+#if 1
 	glColor3d(1, 1, 1);
 	glPointSize(5);
 	glBegin(GL_POINTS);
@@ -1042,7 +1026,7 @@ void InteractiveViewerWidget::draw_submesh()
 #endif
 
 	//画区域的面
-#if 0
+#if 1
 	glColor3d(0, 1, 0);
 	glBegin(GL_TRIANGLES);
 	for (int i = 0; i < lg->new_face_flag.size(); ++i)

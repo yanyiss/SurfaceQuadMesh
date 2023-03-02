@@ -73,7 +73,7 @@ namespace LoopGen
 
 		//算法重要参数
 		double energy_threshold = 0.2;
-		double disk_e = 0.1;
+		double disk_e = 0.05;
 		int extend_layer = 3;
 
 		//优化阶段变量

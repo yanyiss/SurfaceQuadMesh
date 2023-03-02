@@ -76,6 +76,7 @@ namespace LoopGen
 
 		std::vector<int> vidmap;
 		Eigen::VectorXd uv[2];
+		std::vector<int> handle_to_layer;
 
 		cylinder::cylinder() {}
 		cylinder::~cylinder() {}
