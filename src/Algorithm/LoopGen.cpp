@@ -1821,6 +1821,8 @@ namespace LoopGen
 						hl_transfer = hl_transfer->prev->oppo;
 					} while (hl_transfer != hl_begin);
 					auto &path = cset.all_path[vl->id];//注意此顶点已经不是region上的顶点了
+					if (cset.has_vertex[hl_transfer->from / 4] && cset.has_vertex[hl_transfer->to / 4])
+						continue;
 					path.emplace_back(hl_transfer, todis / (todis - fromdis));
 
 					int itertimes = 0;
@@ -1869,9 +1871,17 @@ namespace LoopGen
 		for (auto &cy : cset.cylinders)
 		{
 			cy.handle_to_layer.resize(mesh->n_vertices(), -1);
-			for (auto vl : cy.vertices)
+			/*for (auto vl : cy.vertices)
 			{
 				cy.handle_to_layer[vl->v.idx()] = vl->id;
+			}*/
+			for (int i = 0; i < 2; ++i)
+			{
+				int shift = i == 0 ? 3 : 1;
+				for (auto hl : cy.bounds[i])
+				{
+					cy.handle_to_layer[hl->to / 4] = m4.conj_vl(&m4.verticelayers[hl->to], shift)->id;
+				}
 			}
 		}
 
@@ -1891,7 +1901,7 @@ namespace LoopGen
 
 		BoolVector constraint_flag(mesh->n_faces(), false);
 		Eigen::Matrix3Xd constraint_dir(3, mesh->n_faces());
-		all_path.resize(mesh->n_vertices());
+		all_vertice_path.resize(mesh->n_vertices());
 		while (true)
 		{
 			vl_pair ip;
@@ -1907,8 +1917,9 @@ namespace LoopGen
 				to_bound = cset.vertex_bound_index[cset.all_path[ip.vl->id].back().hl->to / 4];
 			}
 			flag[from_bound.first][to_bound.first] = true;
+			flag[to_bound.first][from_bound.first] = true;
 			dprint(ip.vl->id, path_pq.size(), from_bound.first, to_bound.first);
-#if 1
+#if 0
 			static double min_l = ip.data;
 			if (ip.data > min_l * 5.0)
 				break;
@@ -1921,12 +1932,13 @@ namespace LoopGen
 
 			ConstructInitialRegion(ip.vl, tn);
 			set_one_field(tn);
-			if (ip.vl->id == 10591)
+			if (ip.vl->id == 149107)
 			{
+				//continue;
 				int fe = 0;
 				//break;
 			}
-			//else
+			else
 			{
 				while (true)
 				{
@@ -1934,7 +1946,7 @@ namespace LoopGen
 					if (!SpreadSubRegion(tn, grow_flag))
 						break;
 
-					if (ip.vl->id == 10591)
+					if (ip.vl->id == 143946)
 					{
 						//break;
 					}
@@ -1955,14 +1967,14 @@ namespace LoopGen
 			new_face_flag = tn.new_f_flag;
 			old_face_flag = tn.region_f_flag;
 			xaxis = tn.x_axis;
-			if (ip.vl->id == 10591)
+			if (ip.vl->id == 149107)
 			{
-				//break;
+				break;
 			}
 			/*static int se = 0;
 			++se;
 			if (se > 4)*/
-				//break;
+			//	break;
 		}
 	goto0:;
 		return;
@@ -1991,7 +2003,10 @@ namespace LoopGen
 		/*dprint("vl:", vl->id / 4);
 		for (auto hh : pl)
 			dprint(hh.hl->id / 8);*/
-
+		if (vl->id == 155440)
+		{
+			int p = 0;
+		}
 		int nv = mesh->n_vertices();
 		int nf = mesh->n_faces();
 		std::vector<std::vector<int>> advancing_front[2];
@@ -2036,6 +2051,33 @@ namespace LoopGen
 					visited_vl[vv.idx()] = true;
 				}
 			}
+			if (itertimes == 2)
+			{
+				//dprint("\n\nhierarchy0");
+				for (int id : hierarchy)
+				{
+					if (cset.vertex_bound_index[id] == tn.from_bound)
+					{
+						auto &path_temp = cset.all_path[cset.cylinders[tn.from_bound.first].handle_to_layer[id]];
+						if (path_temp.empty())
+							continue;
+						if (cset.vertex_bound_index[path_temp.back().hl->to / 4] == tn.to_bound)
+						{
+							--itertimes; break;
+						}
+					}
+					else if (cset.vertex_bound_index[id] == tn.to_bound)
+					{
+						auto &path_temp = cset.all_path[cset.cylinders[tn.to_bound.first].handle_to_layer[id]];
+						if (path_temp.empty())
+							continue;
+						if (cset.vertex_bound_index[path_temp.back().hl->to / 4] == tn.from_bound)
+						{
+							--itertimes; break;
+						}
+					}
+				}
+			}
 			advancing_front[0].push_back(std::move(hierarchy));
 		}
 
@@ -2057,8 +2099,37 @@ namespace LoopGen
 					visited_vl[vv.idx()] = true;
 				}
 			}
+			if (itertimes == 2)
+			{
+				//dprint("\n\nhierarchy1");
+				for (int id : hierarchy)
+				{
+					if (cset.vertex_bound_index[id] == tn.from_bound)
+					{
+						auto &path_temp = cset.all_path[cset.cylinders[tn.from_bound.first].handle_to_layer[id]];
+						if (path_temp.empty())
+							continue;
+						if (cset.vertex_bound_index[path_temp.back().hl->to / 4] == tn.to_bound)
+						{
+							--itertimes; break;
+						}
+					}
+					else if (cset.vertex_bound_index[id] == tn.to_bound)
+					{
+						auto &path_temp = cset.all_path[cset.cylinders[tn.to_bound.first].handle_to_layer[id]];
+						if (path_temp.empty())
+							continue;
+						if (cset.vertex_bound_index[path_temp.back().hl->to / 4] == tn.from_bound)
+						{
+							--itertimes; break;
+						}
+					}
+				}
+			}
 			advancing_front[1].push_back(std::move(hierarchy));
 		}
+
+
 		
 		auto &new_vertex = tn.new_vertex;
 		auto &newv_flag = tn.new_v_flag;
@@ -2475,7 +2546,7 @@ namespace LoopGen
 				planar_path.emplace_back(hl_transfer, distance[1] / (distance[1] - distance[0]));
 			}
 		}
-		all_path[v.idx()] = std::move(planar_path);
+		all_vertice_path[v.idx()] = std::move(planar_path);
 		//lp.all_pl[vl->id] = std::move(planar_loop);
 		return true;
 	}
@@ -2504,13 +2575,13 @@ namespace LoopGen
 			ev.normalize();
 			for (int i = u0 + 1; i <= u1; ++i) fragment.col(i) << ev[0], ev[1], ev[2];
 		};
-		frompos = all_path[v.idx()].front().point(m4);
-		pohl = all_path[v.idx()].front();
+		frompos = all_vertice_path[v.idx()].front().point(m4);
+		pohl = all_vertice_path[v.idx()].front();
 		if (pohl.hl) fromu = pohl.c*tn.GetU(pohl.hl->from / 4) + (1 - pohl.c)*tn.GetU(pohl.hl->to / 4);
 		else fromu = tn.GetU(pohl.c);
-		for (int i = 1; i < all_path[v.idx()].size(); ++i)
+		for (int i = 1; i < all_vertice_path[v.idx()].size(); ++i)
 		{
-			pohl = all_path[v.idx()][i];
+			pohl = all_vertice_path[v.idx()][i];
 			topos = pohl.point(m4);
 			if (pohl.hl) tou = pohl.c*tn.GetU(pohl.hl->from / 4) + (1 - pohl.c)*tn.GetU(pohl.hl->to / 4);
 			else tou = tn.GetU(pohl.c);
@@ -2596,7 +2667,7 @@ namespace LoopGen
 
 		//检测相似性能量
 		auto& normal_similarity_angle = tn.normal_similarity_angle;
-		int path_fragment_num = all_path[region_vertex.front().idx()].size();
+		int path_fragment_num = all_vertice_path[region_vertex.front().idx()].size();
 		if (path_fragment_num == 0)
 			return false;
 		//auto& all_pl = lp.all_pl;
@@ -2605,7 +2676,7 @@ namespace LoopGen
 		{
 			tn.has_nsa = true;
 			tn.umx[0] = tn.GetU(region_vertex.front().idx());
-			auto pohl = all_path[region_vertex.front().idx()].back();
+			auto pohl = all_vertice_path[region_vertex.front().idx()].back();
 			tn.umx[1] = pohl.c*tn.GetU(pohl.hl->from / 4) + (1 - pohl.c)*tn.GetU(pohl.hl->to / 4);
 			double len = AssembleSimilarityAngle(region_vertex.front(), normal_similarity_angle, tn, path_fragment_num);
 			tn.length[0] = std::min(tn.length[0], len);
@@ -2635,7 +2706,7 @@ namespace LoopGen
 				}
 				tn.length[0] = std::min(tn.length[0], len);
 				tn.length[grow_id + 1] = std::max(tn.length[grow_id + 1], len);
-				if (sum < disk_e * similarity_angle.size() && tn.length[0] * 1.5 > tn.length[grow_id + 1])
+				if (sum < disk_e * similarity_angle.size()/* && tn.length[0] * 1.5 > tn.length[grow_id + 1]*/)
 				{
 					if_similarity_energy_low[new_id] = true;
 				}

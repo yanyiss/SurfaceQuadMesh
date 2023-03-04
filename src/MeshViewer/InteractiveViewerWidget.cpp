@@ -311,6 +311,8 @@ void InteractiveViewerWidget::pick_vertex(int x,int y)
 		dprint("vertex layer:", r * 4);
 		if (lg->uv_para[0].size()!=0 && lg->vertexidmap.size() != 0)
 			dprint("uv para:", lg->uv_para[0](lg->vertexidmap[r]));
+		if (!lg->cset.vertex_bound_index.empty())
+			dprint("vertex bound index:", lg->cset.vertex_bound_index[r].first, lg->cset.vertex_bound_index[r].second);
 	}
 	//dprint("uv para:", lg->uv_para[0](lg->idmap[r]), lg->uv_para[1](lg->idmap[r]));
 
@@ -349,12 +351,7 @@ void InteractiveViewerWidget::pick_edge(int x,int y)
 	if(desiredEdge < 0) return;
 	lastestEdge = desiredEdge;
 	dprint("Select Edge:", lastestEdge);
-	//if (lg)
-	//	dprint("Energy:", lg->similarity_energy[lastestEdge * 8], lg->similarity_energy[lastestEdge * 8 + 1]);
-	//if(lg->similarity_energy.empty())
-	//	dprint("Select Edge :", desiredEdge);// , "similarity energy:", std::min(lg->similarity_energy[desiredEdge * 2], lg->similarity_energy[desiredEdge * 2 + 1]));
-	//else
-	//	dprint("Select Edge :", desiredEdge, "similarity energy:", std::min(lg->similarity_energy[desiredEdge * 2], lg->similarity_energy[desiredEdge * 2 + 1]));
+
 	std::vector<int>::iterator it;
 	if( (it = std::find(selectedEdge.begin(),selectedEdge.end(),desiredEdge)) == selectedEdge.end() )
 	{
@@ -896,7 +893,7 @@ void InteractiveViewerWidget::draw_submesh()
 	glColor3d(1, 0, 0);
 	glPointSize(15);
 	glBegin(GL_POINTS);
-	glVertex3dv(mesh.point(mesh.vertex_handle(119321/4)).data());
+	glVertex3dv(mesh.point(mesh.vertex_handle(143946 /4)).data());
 	glEnd();
 #endif
 
@@ -906,7 +903,7 @@ void InteractiveViewerWidget::draw_submesh()
 	glBegin(GL_LINES);
 	glColor3d(0.8, 0.2, 0.1);
 
-	for (auto &path : lg->all_path)
+	for (auto &path : lg->all_vertice_path)
 	{
 		if (path.size() < 2)
 			continue;
@@ -1037,6 +1034,25 @@ void InteractiveViewerWidget::draw_submesh()
 			glVertex3dv(mesh.point(itr.handle()).data()); ++itr;
 			glVertex3dv(mesh.point(itr.handle()).data()); ++itr;
 			glVertex3dv(mesh.point(itr.handle()).data());
+		}
+		}
+	glEnd();
+#endif
+
+	//»­±ß½çËÑË÷Â·¾¶
+#if 1
+	glLineWidth(3);
+	glBegin(GL_LINES);
+	glColor3d(0.8, 0.2, 0.1);
+	int nv = mesh.n_vertices();
+	for (auto &path : lg->all_vertice_path)
+	{
+		if (path.size() < 2)
+			continue;
+		for (int i = 0; i < path.size() - 1; ++i)
+		{
+			glVertex3dv(path[i].point(lg->m4).data());
+			glVertex3dv(path[i + 1].point(lg->m4).data());
 		}
 		}
 	glEnd();

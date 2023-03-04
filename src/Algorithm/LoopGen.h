@@ -102,7 +102,7 @@ namespace LoopGen
 		double AssembleSimilarityAngle(VertexHandle v, Eigen::VectorXd& sa, temp_name &tn, int path_fragment_num);
 		bool SpreadSubRegion(temp_name &tn, bool grow_flag[2]);
 		void OptimizeDisk(vl_pair_pq &path_pq);
-		std::vector<PlaneLoop> all_path;
+		std::vector<PlaneLoop> all_vertice_path;
 #endif
 
 		//void SetUParaLine(InfoOnVertex& iov, LocalParametrization& lp, std::deque<bool>& visited_v, std::deque<bool>& visited_f);
