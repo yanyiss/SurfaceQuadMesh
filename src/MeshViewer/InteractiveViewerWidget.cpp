@@ -637,7 +637,7 @@ void InteractiveViewerWidget::draw_field()
 		glEnd();
 
 		auto& sing = lg->cf->getSingularity();
-		glPointSize(6);
+		glPointSize(10);
 		glColor3d(0.1, 0.1, 0.1);
 		glBegin(GL_POINTS);
 		for (auto& s : sing)
@@ -893,18 +893,22 @@ void InteractiveViewerWidget::draw_submesh()
 	glColor3d(1, 0, 0);
 	glPointSize(15);
 	glBegin(GL_POINTS);
-	glVertex3dv(mesh.point(mesh.vertex_handle(143946 /4)).data());
+	glVertex3dv(mesh.point(mesh.vertex_handle(117546 /4)).data());
 	glEnd();
 #endif
 
 	//»­Ä³ÌõÏß
-#if 1
+#if 0
 	glLineWidth(3);
 	glBegin(GL_LINES);
 	glColor3d(0.8, 0.2, 0.1);
 
-	for (auto &path : lg->all_vertice_path)
+	//for (auto &path : lg->all_vertice_path)
+	for (int i = 0; i < lg->all_vertice_path.size(); ++i)
 	{
+		auto &path = lg->all_vertice_path[i];
+		//if (i % 10 != 0)
+		//	continue;
 		if (path.size() < 2)
 			continue;
 
@@ -992,6 +996,7 @@ void InteractiveViewerWidget::draw_submesh()
 #if 1
 	double avgl = 0.2*calc_mesh_ave_edge_length(&mesh);
 	glColor3d(1, 0, 0);
+	glLineWidth(3);
 	glBegin(GL_LINES);
 	for (int i = 0; i < lg->new_face_flag.size(); ++i)
 	{
@@ -1012,9 +1017,9 @@ void InteractiveViewerWidget::draw_submesh()
 	glColor3d(1, 1, 1);
 	glPointSize(5);
 	glBegin(GL_POINTS);
-	for (int i = 0; i < lg->new_vert_flag.size(); ++i)
+	for (int i = 0; i < lg->old_vert_flag.size(); ++i)
 	{
-		if (lg->new_vert_flag[i])
+		if (lg->old_vert_flag[i])
 		{
 			glVertex3dv(mesh.point(mesh.vertex_handle(i)).data());
 		}
@@ -1026,9 +1031,9 @@ void InteractiveViewerWidget::draw_submesh()
 #if 1
 	glColor3d(0, 1, 0);
 	glBegin(GL_TRIANGLES);
-	for (int i = 0; i < lg->new_face_flag.size(); ++i)
+	for (int i = 0; i < lg->old_face_flag.size(); ++i)
 	{
-		if (lg->new_face_flag[i])
+		if (lg->old_face_flag[i])
 		{
 			auto itr = mesh.fv_begin(mesh.face_handle(i));
 			glVertex3dv(mesh.point(itr.handle()).data()); ++itr;
@@ -1040,7 +1045,7 @@ void InteractiveViewerWidget::draw_submesh()
 #endif
 
 	//»­±ß½çËÑË÷Â·¾¶
-#if 1
+#if 0
 	glLineWidth(3);
 	glBegin(GL_LINES);
 	glColor3d(0.8, 0.2, 0.1);
@@ -1414,10 +1419,9 @@ void InteractiveViewerWidget::draw_submesh()
 #endif
 
 #if 1
-		static bool pe = false;
-		if (!pe)
+		if (lg->cf->updateField)
 		{
-			pe = true;
+			lg->cf->updateField = false;
 			crossfield = lg->cf->getCrossField();
 			avgLen = 0.2 * calc_mesh_ave_edge_length(&mesh);
 			for (auto tf : mesh.faces())

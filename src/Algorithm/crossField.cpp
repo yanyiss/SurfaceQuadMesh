@@ -438,6 +438,7 @@ namespace LoopGen
 	{
 		setMatching();
 		setSingularity();
+		updateField = true;
 		//setWeight();
 	}
 

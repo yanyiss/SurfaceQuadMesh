@@ -3,7 +3,7 @@
 
 #define COMPUTE_NEW_PLANELOOP 1
 #define COMPUTE_NEW_ENERGY 1
-
+#define HASFACE 1
 namespace LoopGen
 {
 #pragma region initialization
@@ -1660,6 +1660,7 @@ namespace LoopGen
 		cset.bound_edge_flag.resize(mesh->n_edges(), false);
 		cset.vertex_bound_index.resize(mesh->n_vertices(), std::pair<int, int>(-1, -1));
 		cset.has_vertex.resize(mesh->n_vertices(), false);
+		cset.has_face.resize(mesh->n_faces(), false);
 		//恢复柱体数据
 		for (int i = 0; i < size; ++i)
 		{
@@ -1738,6 +1739,10 @@ namespace LoopGen
 			for (auto vl : vls)
 			{
 				cset.has_vertex[vl->v.idx()] = true;
+			}
+			for (auto fl : fls)
+			{
+				cset.has_face[fl->f.idx()] = true;
 			}
 			for (int j = 0; j < 2; ++j)
 			{
@@ -1892,13 +1897,13 @@ namespace LoopGen
 	void LoopGen::OptimizeDisk(vl_pair_pq &path_pq)
 	{
 		int ccs = cset.cylinders.size();
-		std::vector<BoolVector> flag(ccs);
-		for (int i = 0; i < ccs; ++i)
-			flag[i].resize(ccs, false);
+		std::vector<BoolVector> flag(ccs * 2);
+		for (int i = 0; i < ccs * 2; ++i)
+			flag[i].resize(ccs * 2, false);
 
 		std::pair<int, int> from_bound;
 		std::pair<int, int> to_bound;
-
+		old_face_flag.resize(mesh->n_faces(), false);
 		BoolVector constraint_flag(mesh->n_faces(), false);
 		Eigen::Matrix3Xd constraint_dir(3, mesh->n_faces());
 		all_vertice_path.resize(mesh->n_vertices());
@@ -1908,7 +1913,7 @@ namespace LoopGen
 			ip = path_pq.top(); path_pq.pop();
 			from_bound = cset.vertex_bound_index[ip.vl->v.idx()];
 			to_bound = cset.vertex_bound_index[cset.all_path[ip.vl->id].back().hl->to / 4];
-			while (flag[from_bound.first][to_bound.first])
+			while (flag[from_bound.first * 2 + from_bound.second][to_bound.first * 2 + to_bound.second])
 			{
 				if (path_pq.empty())
 					goto goto0;
@@ -1916,9 +1921,9 @@ namespace LoopGen
 				from_bound = cset.vertex_bound_index[ip.vl->v.idx()];
 				to_bound = cset.vertex_bound_index[cset.all_path[ip.vl->id].back().hl->to / 4];
 			}
-			flag[from_bound.first][to_bound.first] = true;
-			flag[to_bound.first][from_bound.first] = true;
-			dprint(ip.vl->id, path_pq.size(), from_bound.first, to_bound.first);
+			flag[from_bound.first * 2 + from_bound.second][to_bound.first * 2 + to_bound.second] = true;
+			flag[to_bound.first * 2 + to_bound.second][from_bound.first * 2 + from_bound.second] = true;
+			dprint(ip.vl->id, path_pq.size(), from_bound.first, from_bound.second, to_bound.first, to_bound.second);
 #if 0
 			static double min_l = ip.data;
 			if (ip.data > min_l * 5.0)
@@ -1932,13 +1937,13 @@ namespace LoopGen
 
 			ConstructInitialRegion(ip.vl, tn);
 			set_one_field(tn);
-			if (ip.vl->id == 149107)
+			if (ip.vl->id == 85231)
 			{
 				//continue;
 				int fe = 0;
 				//break;
 			}
-			else
+			//else
 			{
 				while (true)
 				{
@@ -1946,7 +1951,7 @@ namespace LoopGen
 					if (!SpreadSubRegion(tn, grow_flag))
 						break;
 
-					if (ip.vl->id == 143946)
+					if (ip.vl->id == 85231)
 					{
 						//break;
 					}
@@ -1956,28 +1961,39 @@ namespace LoopGen
 
 			for (auto f : tn.region_face)
 			{
+				if (constraint_flag[f.idx()])
+					continue;
 				constraint_flag[f.idx()] = true;
 				constraint_dir.col(f.idx()) = tn.x_axis.col(f.idx());
 			}
+
 			new_vert_flag = tn.new_v_flag;
 			old_vert_flag = tn.region_v_flag;
 			uv_para[0] = tn.uv[0];
 			uv_para[1] = tn.uv[1];
 			vertexidmap = tn.vidmap;
 			new_face_flag = tn.new_f_flag;
-			old_face_flag = tn.region_f_flag;
+			//old_face_flag = tn.region_f_flag;
+			for (int kk = 0; kk < tn.region_f_flag.size(); ++kk)
+				if (tn.region_f_flag[kk])
+					old_face_flag[kk] = true;
 			xaxis = tn.x_axis;
-			if (ip.vl->id == 149107)
+			/*if (ip.vl->id == 85231)
 			{
+				for (auto f : tn.new_face)
+				{
+					constraint_flag[f.idx()] = true;
+					constraint_dir.col(f.idx()) = tn.x_axis.col(f.idx());
+				}
 				break;
-			}
+			}*/
 			/*static int se = 0;
 			++se;
 			if (se > 4)*/
-			//	break;
+				//break;
 		}
 	goto0:;
-		return;
+		//return;
 		for (auto &cy : cset.cylinders)
 		{
 			for (auto fh : cy.faces)
@@ -2000,13 +2016,6 @@ namespace LoopGen
 		auto &grow_dir = tn.grow_dir;
 		grow_dir.resize(mesh->n_vertices(), -1);
 		grow_dir[vl->v.idx()] = 0;
-		/*dprint("vl:", vl->id / 4);
-		for (auto hh : pl)
-			dprint(hh.hl->id / 8);*/
-		if (vl->id == 155440)
-		{
-			int p = 0;
-		}
 		int nv = mesh->n_vertices();
 		int nf = mesh->n_faces();
 		std::vector<std::vector<int>> advancing_front[2];
@@ -2039,7 +2048,7 @@ namespace LoopGen
 			std::vector<int> hierarchy;
 			for (auto caf : current_af)
 			{
-				for (auto vv : mesh->vv_range(mesh->vertex_handle(caf)))
+				/*for (auto vv : mesh->vv_range(mesh->vertex_handle(caf)))
 				{
 					if (visited_vl[vv.idx()])
 						continue;
@@ -2048,6 +2057,17 @@ namespace LoopGen
 						continue;
 					hierarchy.push_back(vv.idx());
 					grow_dir[vv.idx()] = 0;
+					visited_vl[vv.idx()] = true;
+				}*/
+				for (auto voh : mesh->voh_range(mesh->vertex_handle(caf)))
+				{
+					VertexHandle vv = voh.to();
+					if (visited_vl[vv.idx()])
+						continue;
+					if (cset.has_face[voh.face().idx()] && cset.has_face[voh.opp().face().idx()])
+						continue;
+					hierarchy.push_back(vv.idx());
+					grow_dir[vv.idx()] = 1;
 					visited_vl[vv.idx()] = true;
 				}
 			}
@@ -2087,12 +2107,24 @@ namespace LoopGen
 			std::vector<int> hierarchy;
 			for (auto caf : current_af)
 			{
-				for (auto vv : mesh->vv_range(mesh->vertex_handle(caf)))
+				//for (auto vv : mesh->vv_range(mesh->vertex_handle(caf)))
+				//{
+				//	if (visited_vl[vv.idx()])
+				//		continue;
+				//	//if (cset.has_vertex[vv.idx()] && cset.vertex_bound_index[vv.idx()].first != tn.from_bound.first
+				//	//	&& cset.vertex_bound_index[vv.idx()].first != tn.to_bound.first)
+				//	//	continue;
+				//	if()
+				//	hierarchy.push_back(vv.idx());
+				//	grow_dir[vv.idx()] = 1;
+				//	visited_vl[vv.idx()] = true;
+				//}
+				for (auto voh : mesh->voh_range(mesh->vertex_handle(caf)))
 				{
+					VertexHandle vv = voh.to();
 					if (visited_vl[vv.idx()])
 						continue;
-					if (cset.has_vertex[vv.idx()] && cset.vertex_bound_index[vv.idx()].first != tn.from_bound.first
-						&& cset.vertex_bound_index[vv.idx()].first != tn.to_bound.first)
+					if (cset.has_face[voh.face().idx()] && cset.has_face[voh.opp().face().idx()])
 						continue;
 					hierarchy.push_back(vv.idx());
 					grow_dir[vv.idx()] = 1;
@@ -2129,8 +2161,6 @@ namespace LoopGen
 			advancing_front[1].push_back(std::move(hierarchy));
 		}
 
-
-		
 		auto &new_vertex = tn.new_vertex;
 		auto &newv_flag = tn.new_v_flag;
 		auto &region_vertex = tn.region_vertex;
@@ -2162,11 +2192,14 @@ namespace LoopGen
 				if ((newv_flag[vh.to().idx()] || regionv_flag[vh.to().idx()]) &&
 					(newv_flag[vh.next().to().idx()] || regionv_flag[vh.next().to().idx()]))
 				{
-					if (!newf_flag[vh.face().idx()])
-					{
-						new_face.push_back(vh.face());
-						newf_flag[vh.face().idx()] = true;
-					}
+					if (newf_flag[vh.face().idx()]
+#if HASFACE
+						|| cset.has_face[vh.face().idx()]
+#endif
+						)
+						continue;
+					new_face.push_back(vh.face());
+					newf_flag[vh.face().idx()] = true;
 				}
 			}
 		}
@@ -2377,7 +2410,10 @@ namespace LoopGen
 		A.setFromTriplets(triple.begin(), triple.end());
 		Eigen::SparseLU<Eigen::SparseMatrix<double>> solver;
 		solver.compute(A);
-		//
+		if (solver.info() != Eigen::Success)
+		{
+			int p = 0;
+		}
 		uv[1].tail(new_vertex_size) = solver.solve(uv[1].tail(new_vertex_size));
 #if 1
 		uv[0].tail(new_vertex_size) = solver.solve(uv[0].tail(new_vertex_size));
@@ -2624,8 +2660,10 @@ namespace LoopGen
 		}
 		//dprint("new vertex:", lp.new_vertex.size());
 		//提取含有完整loop的区域
+		
 		if (region_vertex.size() == 1)
-			RefinePathByParametrization(region_vertex.front(), tn, visited_v, visited_f);
+			if (!RefinePathByParametrization(region_vertex.front(), tn, visited_v, visited_f))
+				return false;
 		std::vector<VertexHandle> vertex_cache;
 		BoolVector vertex_cache_flag = tn.region_v_flag;
 		//return true;
@@ -2706,10 +2744,13 @@ namespace LoopGen
 				}
 				tn.length[0] = std::min(tn.length[0], len);
 				tn.length[grow_id + 1] = std::max(tn.length[grow_id + 1], len);
-				if (sum < disk_e * similarity_angle.size()/* && tn.length[0] * 1.5 > tn.length[grow_id + 1]*/)
+				//dprint(i, sum / similarity_angle.size());
+				if (sum < disk_e * similarity_angle.size()/* && tn.length[0] * 1.2 > tn.length[grow_id + 1]*/)
 				{
 					if_similarity_energy_low[new_id] = true;
 				}
+				//if (region_vertex.front().idx() == 85231 / 4)
+				//	dprint(i, sum / similarity_angle.size());
 				//dprint(i, sum / similarity_angle.size(), seaa, disk_e);
 				//for (int j = 0; j < similarity_angle.size(); ++j)
 				//	dprint(i, j, normal_similarity_angle(j), similarity_angle(j));
@@ -2796,7 +2837,7 @@ namespace LoopGen
 			int growid = grow_dir[rvi.idx()];
 			if (!grow_flag[growid])
 				continue;
-			for (auto vv : mesh->vv_range(rvi))
+			/*for (auto vv : mesh->vv_range(rvi))
 			{
 				int vvid = vv.idx();
 				if (regionv_flag[vvid] || newv_flag[vvid])
@@ -2807,6 +2848,17 @@ namespace LoopGen
 				new_vertex.push_back(vv);
 				newv_flag[vvid] = true;
 				grow_dir[vvid] = growid;
+			}*/
+			for (auto voh : mesh->voh_range(rvi))
+			{
+				VertexHandle vv = voh.to();
+				if (regionv_flag[vv.idx()] || newv_flag[vv.idx()])
+					continue;
+				if (cset.has_face[voh.face().idx()] && cset.has_face[voh.opp().face().idx()])
+					continue;
+				new_vertex.push_back(vv);
+				newv_flag[vv.idx()] = true;
+				grow_dir[vv.idx()] = growid;
 			}
 		}
 		begin_ = 0;
@@ -2817,7 +2869,7 @@ namespace LoopGen
 			{
 				auto rvj = new_vertex[j];
 				int growid = grow_dir[rvj.idx()];
-				for (auto vv : mesh->vv_range(rvj))
+				/*for (auto vv : mesh->vv_range(rvj))
 				{
 					int vvid = vv.idx();
 					if (regionv_flag[vvid] || newv_flag[vvid])
@@ -2828,6 +2880,17 @@ namespace LoopGen
 					new_vertex.push_back(vv);
 					newv_flag[vvid] = true;
 					grow_dir[vvid] = growid;
+				}*/
+				for (auto voh : mesh->voh_range(rvj))
+				{
+					VertexHandle vv = voh.to();
+					if (regionv_flag[vv.idx()] || newv_flag[vv.idx()])
+						continue;
+					if (cset.has_face[voh.face().idx()] && cset.has_face[voh.opp().face().idx()])
+						continue;
+					new_vertex.push_back(vv);
+					newv_flag[vv.idx()] = true;
+					grow_dir[vv.idx()] = growid;
 				}
 			}
 			begin_ = end_;
@@ -2842,7 +2905,11 @@ namespace LoopGen
 			for (auto voh : mesh->voh_range(new_v))
 			{
 				int vfid = voh.face().idx();
-				if (regionf_flag[vfid] || newf_flag[vfid])
+				if (regionf_flag[vfid] || newf_flag[vfid]
+#if HASFACE
+					|| cset.has_face[vfid]
+#endif
+					)
 					continue;
 				if (!regionv_flag[voh.to().idx()] && !newv_flag[voh.to().idx()])
 					continue;

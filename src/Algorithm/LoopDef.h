@@ -91,6 +91,7 @@ namespace LoopGen
 		BoolVector bound_edge_flag;
 		std::vector<std::pair<int, int>> vertex_bound_index;
 		BoolVector has_vertex;
+		BoolVector has_face;
 		std::vector<BoolVector> tangential_intersection;
 	};
 

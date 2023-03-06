@@ -46,7 +46,7 @@ namespace LoopGen
 		std::vector<int> matching;    std::vector<int>& getMatching() { return matching; }       void setMatching();
 		std::vector<int> singularity; std::vector<int>& getSingularity() { return singularity; } void setSingularity();
 		//Eigen::Matrix4Xd weight;      Eigen::Matrix4Xd& getWeight() { return weight; }           void setWeight(double alpha = 900);
-		void initFieldInfo();
+		void initFieldInfo(); bool updateField = false;
 
 		void read_field();
 		void write_field();
