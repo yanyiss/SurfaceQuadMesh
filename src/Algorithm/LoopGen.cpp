@@ -1,9 +1,8 @@
 #include "LoopGen.h"
 #include <omp.h>
 
-#define COMPUTE_NEW_PLANELOOP 1
-#define COMPUTE_NEW_ENERGY 1
-#define HASFACE 1
+#define COMPUTE_NEW_PLANELOOP 0
+#define COMPUTE_NEW_ENERGY 0
 namespace LoopGen
 {
 #pragma region initialization
@@ -20,7 +19,7 @@ namespace LoopGen
 		}
 	}
 
-	double LoopGen::EvaluateSimilarity(Eigen::Matrix3Xd& loop0, Eigen::Matrix3Xd& loop1, double u, int begin_seg)
+	double LoopGen::EvaluateLoopSimilarity(Eigen::Matrix3Xd& loop0, Eigen::Matrix3Xd& loop1, double u, int begin_seg)
 	{
 		//对两个loop重新采样，对比采样点的切向，从而定义相似性
 		int n = loop0.cols() + loop1.cols();
@@ -526,7 +525,7 @@ namespace LoopGen
 					}
 					if (id == -1)
 						id = 0;
-					similarity_energy[hlid] = EvaluateSimilarity(loop0, loop1, u0, id);
+					similarity_energy[hlid] = EvaluateLoopSimilarity(loop0, loop1, u0, id);
 					similarity_energy[hlid + 2] = similarity_energy[hlid];
 					similarity_energy[hl.oppo->id] = similarity_energy[hlid];
 					similarity_energy[(hl.oppo->id / 4) * 4 + ((hl.oppo->id + 2) % 4)] = similarity_energy[hlid];
@@ -599,6 +598,8 @@ namespace LoopGen
 					hl_transfer = hl_transfer->prev->oppo;
 				} while (hl_transfer != hl_begin);
 			}
+			if (hierarchy.empty())
+				break;
 			advancing_front[0].push_back(std::move(hierarchy));
 		}
 	target0:;
@@ -624,6 +625,8 @@ namespace LoopGen
 					hl_transfer = hl_transfer->prev->oppo;
 				} while (hl_transfer != hl_begin);
 			}
+			if (hierarchy.empty())
+				break;
 			advancing_front[1].push_back(std::move(hierarchy));
 		}
 	target1:;
@@ -788,7 +791,7 @@ namespace LoopGen
 					return false;
 				hl_transfer = hl_transfer->prev->oppo;
 			} while (hl_transfer != hl_begin);
-			if (!CheckTopology(vertex_cache, vertex_cache_flag, lp.grow_dir))
+			if (!CheckCylinderTopology(vertex_cache, vertex_cache_flag, lp.grow_dir))
 				return false;
 		}
 		if (vertex_cache.empty())
@@ -1262,7 +1265,6 @@ namespace LoopGen
 #endif
 			//break;
 		}
-		//return;
 		ProcessOverlap(region_index);
 		WriteRegion(cset.cylinders, cf->crossfield, model_name);
 
@@ -1458,7 +1460,7 @@ namespace LoopGen
 #endif
 	}
 
-	bool LoopGen::CheckTopology(std::vector<VertexLayer*>& vertex_set, BoolVector& vs_flag, std::vector<int>& grow_dir)
+	bool LoopGen::CheckCylinderTopology(std::vector<VertexLayer*>& vertex_set, BoolVector& vs_flag, std::vector<int>& grow_dir)
 	{
 		//check if empty
 		if (vertex_set.empty())
@@ -1642,7 +1644,6 @@ namespace LoopGen
 		cset.cylinders = std::move(new_cylinders);
 	}
 
-
 	void LoopGen::ReLoop()
 	{
 		m4.set_base(mesh, cf);
@@ -1664,6 +1665,11 @@ namespace LoopGen
 		//恢复柱体数据
 		for (int i = 0; i < size; ++i)
 		{
+			/*dprint(i);
+			if (i == 3)
+			{
+				int p = 0;
+			}*/
 			BoolVector vh_flag(mesh->n_vertices(), false);
 			for (auto vh : vh_set[i])
 				vh_flag[vh] = true;
@@ -1731,9 +1737,14 @@ namespace LoopGen
 
 			//初始化bound
 			cset.cylinders[i].set_bound();
-
+			if (i == 3)
+			{
+				//cset.cylinders[i].cut.clear();
+				//continue;
+			}
 			//计算参数化
-			cset.cylinders[i].parametrize(m4, cf->getNormal());
+			//这个参数化代码好像是有bug
+			//cset.cylinders[i].parametrize(m4, cf->getNormal());
 
 			//初始化index记录
 			for (auto vl : vls)
@@ -1754,8 +1765,9 @@ namespace LoopGen
 				}
 			}
 		}
-
+		//return;
 		//初始化各区域的交集情况
+		//return;
 		std::vector<std::vector<int>> intersection(mesh->n_vertices());
 		for (auto &cy : cset.cylinders)
 		{
@@ -1797,7 +1809,7 @@ namespace LoopGen
 			return plane(0)*p[0] + plane(1)*p[1] + plane(2)*p[2] + plane(3);
 		};
 
-		vl_pair_pq path_pq;
+		//vl_pair_pq path_pq;
 		for (int i = 0; i < size; ++i)
 		{
 			for (int j = 0; j < 2; ++j)
@@ -1867,15 +1879,17 @@ namespace LoopGen
 						continue;
 					auto &fromb = cset.vertex_bound_index[vl->v.idx()];
 					auto &tob = cset.vertex_bound_index[path.back().hl->to / 4];
-					if (fromb != tob && !cset.tangential_intersection[fromb.first][tob.first])
-						path_pq.emplace(vl, l);
+					if (fromb == tob || cset.tangential_intersection[fromb.first][tob.first])
+						path.clear();
+					//if (fromb != tob && !cset.tangential_intersection[fromb.first][tob.first])
+					//    path_pq.emplace(vl, l);
 				}
 			}
 		}
 #endif
 		for (auto &cy : cset.cylinders)
 		{
-			cy.handle_to_layer.resize(mesh->n_vertices(), -1);
+			cy.handle_to_layer.resize(mesh->n_vertices(), std::pair<int, int>(-1, -1));
 			/*for (auto vl : cy.vertices)
 			{
 				cy.handle_to_layer[vl->v.idx()] = vl->id;
@@ -1885,15 +1899,1261 @@ namespace LoopGen
 				int shift = i == 0 ? 3 : 1;
 				for (auto hl : cy.bounds[i])
 				{
-					cy.handle_to_layer[hl->to / 4] = m4.conj_vl(&m4.verticelayers[hl->to], shift)->id;
+					cy.handle_to_layer[hl->to / 4].first = hl->to;
+					cy.handle_to_layer[hl->to / 4].second = m4.conj_vl(&m4.verticelayers[hl->to], shift)->id;
 				}
 			}
 		}
 
-		OptimizeDisk(path_pq);
+		//OptimizeDisk(path_pq);
+		OptimizeDisk();
 	}
 
+	void LoopGen::OptimizeDisk()
+	{
+		auto assemblePath = [&](PlaneLoop &pl, OpenMesh::Vec3d &start, Eigen::Matrix3Xd &path)
+		{
+			path.resize(3, 1 + pl.size());
+			path.col(0) << start[0], start[1], start[2];
+			int c = 0;
+			for (auto itr = pl.begin(); itr != pl.end(); ++itr)
+			{
+				auto pos = itr->point(m4);
+				path.col(++c) << pos[0], pos[1], pos[2];
+			}
+		};
+		int cy_size = cset.cylinders.size();
+		vl_pair_pq pq;
+		//std::vector<double> path_similarity_energy(mesh->n_edges(), YYSS_INFINITE);
 #if 1
+		const auto &crossfield = cf->getCrossField();
+		for (int i = 0; i < cy_size; ++i)
+		{
+			for (int j = 0; j < 2; ++j)
+			{
+				int shift = j == 0 ? 3 : 1;
+				auto &bound = cset.cylinders[i].bounds[j];
+				for (int k = 0; k < bound.size(); ++k)
+				{
+					VertexLayer* vl = m4.conj_vl(&m4.verticelayers[bound[k]->from], shift);
+					auto &path = cset.all_path[vl->id];
+					if (path.empty())
+						continue;
+					Eigen::Vector3d from_dir; from_dir.setZero();
+					Eigen::Vector3d to_dir; to_dir.setZero();
+					for (auto hl = bound[k]->oppo; hl != (k == 0 ? bound.back() : bound[k - 1]); hl = hl->next->oppo)
+					{
+						from_dir += crossfield.col(hl->left);
+					}
+					from_dir.normalize();
+					to_dir = crossfield.col(m4.conj_fl(&m4.facelayers[path.back().hl->oppo->left], shift)->id);
+
+					double e = 0;
+					double length = 0;
+					Eigen::Matrix3Xd pos;
+					assemblePath(path, mesh->point(mesh->vertex_handle(bound[k]->from / 4)), pos);
+					for (int m = 0; m < pos.cols() - 1; ++m)
+					{
+						auto dif = pos.col(m + 1) - pos.col(m);
+						e += fabs(dif.dot(from_dir)) + fabs(dif.dot(to_dir));
+						length += dif.norm();
+					}
+					pq.emplace(m4.conj_vl(&m4.verticelayers[bound[k]->from], shift), e * 0.5 / length);
+				}
+			}
+		}
+//#else
+		edge_path_similarity_energy.resize(mesh->n_edges(), YYSS_INFINITE);
+		vert_path_similarity_energy.resize(mesh->n_vertices(), YYSS_INFINITE);
+		all_vertice_path.resize(mesh->n_vertices());
+		for (int i = 0; i < cy_size; ++i)
+		{
+			for (int j = 0; j < 2; ++j)
+			{
+				/*if (i == 2 && j == 1)
+				{
+					int p = 11745;
+				}*/
+				int shift = j == 0 ? 3 : 1;
+				auto &bound = cset.cylinders[i].bounds[j];
+				Eigen::Matrix3Xd path0, path1;
+				Eigen::Matrix3Xd* pointer0 = &path0;
+				Eigen::Matrix3Xd* pointer1 = &path1;
+				VertexLayer* vl = m4.conj_vl(&m4.verticelayers[bound[0]->from], shift);
+				assemblePath(cset.all_path[vl->id], mesh->point(mesh->vertex_handle(bound[0]->from / 4)), path0);
+				//std::vector<double> path_similarity_energy(bound.size(), YYSS_INFINITE);
+				for (int k = 0; k < bound.size(); ++k)
+				{
+					/*if (k == 16)
+					{
+						int p = 0;
+					}*/
+					vl = m4.conj_vl(&m4.verticelayers[bound[k]->to], shift);
+					assemblePath(cset.all_path[vl->id], mesh->point(mesh->vertex_handle(bound[k]->to / 4)), *pointer1);
+					Eigen::Matrix3Xd* ptr = pointer0; pointer0 = pointer1; pointer1 = ptr;
+					VertexLayer* vl_another = m4.conj_vl(&m4.verticelayers[bound[k]->from], shift);
+					if (cset.all_path[vl->id].empty() || cset.all_path[vl_another->id].empty()
+						|| cset.vertex_bound_index[cset.all_path[vl->id].back().hl->to / 4] !=
+						cset.vertex_bound_index[cset.all_path[vl_another->id].back().hl->to / 4])
+						edge_path_similarity_energy[bound[k]->id / 8] = YYSS_INFINITE;
+					else
+						edge_path_similarity_energy[bound[k]->id / 8] = EvaluatePathSimilarity(*pointer0, *pointer1);
+				}
+				for (int k = 0; k < bound.size(); ++k)
+				{
+					/*if (bound[k]->to/4 == 11745)
+					{
+						int p = 11745;
+					}*/
+					double e = 0.5*(edge_path_similarity_energy[bound[k]->id / 8] + 
+						edge_path_similarity_energy[bound[(k + 1) % bound.size()]->id / 8]);
+					vert_path_similarity_energy[bound[k]->to / 4] = e;
+					//if (e < YYSS_INFINITE)
+					//	pq.emplace(m4.conj_vl(&m4.verticelayers[bound[k]->to], shift), e);
+				}
+			}
+		}
+		similarity_energy = edge_path_similarity_energy;
+#endif
+
+
+		//return;
+
+
+		BoolVector set_flag(mesh->n_vertices(), false);
+		old_face_flag.resize(mesh->n_faces(), false);
+		while (true)
+		{
+			vl_pair vp;
+			vp = pq.top(); pq.pop();
+			while (set_flag[vp.vl->id / 4])
+			{
+				if (pq.empty())
+				{
+					vp.data = YYSS_INFINITE;
+					break;
+				}
+				vp = pq.top(); pq.pop();
+			}
+			//dprint(vp.data);
+			if (vp.data > 0.1)
+				break;
+
+
+			bool grow_flag[2] = { true,true };
+			dset.disks.push_back(disk());
+			auto &dk = dset.disks.back();
+			dk.from_bound = cset.vertex_bound_index[vp.vl->v.idx()];
+			dk.to_bound = cset.vertex_bound_index[cset.all_path[vp.vl->id].back().hl->to / 4];
+			dprint(vp.vl->id, vp.vl->v.idx(), dk.from_bound.first, dk.from_bound.second, dk.to_bound.first, dk.to_bound.second);
+			//seed_vertex.push_back(vp.vl);
+			if (vp.vl->id == 23937)
+			{
+				int p = 0;
+			}
+
+			ConstructInitialRegion(vp.vl, dk);
+
+			if (vp.vl->id == 89113)
+			{
+				int p = 0;
+				//OptimizeDiskField(dk);
+			}
+			//else
+			{
+				do
+				{
+					OptimizeDiskField(dk);
+				} while (SpreadSubRegion(dk, grow_flag));
+			}
+			if (!dk.region_face.empty())
+			{
+				dprint(vp.vl->id, vp.vl->v.idx(), vp.data);
+				seed_vertex.push_back(vp.vl);
+			}
+
+			for (auto rv : dk.region_vertex)
+			{
+				set_flag[rv.idx()] = true;
+			}
+			new_vert_flag = dk.new_v_flag;
+			old_vert_flag = dk.region_v_flag;
+			new_face_flag = dk.new_f_flag;
+#if 0
+			old_face_flag = dk.region_f_flag;
+
+#else
+			for (auto rf : dk.region_face)
+				old_face_flag[rf.idx()] = true;
+#endif
+
+			xaxis = dk.x_axis;
+
+
+			if (!dk.region_face.empty())
+			{
+				for (auto v : dk.region_vertex)
+				{
+					for (auto voh : mesh->voh_range(v))
+					{
+						if (dk.region_f_flag[voh.face().idx()] ^ dk.region_f_flag[voh.opp().face().idx()])
+							dk.bounds.push_back(voh);
+					}
+				}
+			}
+			dk.initial_path = all_vertice_path[dk.region_vertex.front().idx()];
+			if (dk.region_face.empty())
+				dset.disks.pop_back();
+			if (vp.vl->id == 89113)
+			{
+				//break;
+			}
+		}
+		BoolVector constraint_flag(mesh->n_faces(), false);
+		Eigen::Matrix3Xd constraint_dir(3, mesh->n_faces());
+		for (auto &dk : dset.disks)
+		{
+			for (auto fh : dk.region_face)
+			{
+				constraint_flag[fh.idx()] = true;
+				constraint_dir.col(fh.idx()) = dk.x_axis.col(fh.idx());
+			}
+		}
+		for (auto &cy : cset.cylinders)
+		{
+			for (auto fh : cy.faces)
+			{
+				constraint_flag[fh->f.idx()] = true;
+				constraint_dir.col(fh->f.idx()) = cf->crossfield.col(fh->id);
+			}
+		}
+		/*cf->setOuterConstraint(constraint_flag, constraint_dir);
+		cf->setField();
+		cf->initFieldInfo();*/
+	}
+
+	void LoopGen::ConstructInitialRegion(VertexLayer* vl, disk &dk)
+	{
+		auto &pl = cset.all_path[vl->id];
+		auto &grow_dir = dk.grow_dir;
+		grow_dir.resize(mesh->n_vertices(), -1);
+		grow_dir[vl->v.idx()] = 0;
+		int nv = mesh->n_vertices();
+		int nf = mesh->n_faces();
+		std::vector<std::vector<int>> advancing_front[2];
+		std::vector<int> hierarchy_vertex[2];
+		hierarchy_vertex[0].reserve(pl.size());
+		hierarchy_vertex[1].reserve(pl.size());
+		BoolVector visited_vl(nv, false);
+		visited_vl[vl->v.idx()] = true;
+		for (auto& pohl : pl)
+		{
+			if (!visited_vl[pohl.hl->from / 4])
+			{
+				hierarchy_vertex[0].push_back(pohl.hl->from / 4);
+				grow_dir[pohl.hl->from / 4] = 0;
+				visited_vl[pohl.hl->from / 4] = true;
+			}
+			if (!visited_vl[pohl.hl->to / 4])
+			{
+				hierarchy_vertex[1].push_back(pohl.hl->to / 4);
+				grow_dir[pohl.hl->to / 4] = 1;
+				visited_vl[pohl.hl->to / 4] = true;
+			}
+		}
+
+		for (int i = 0; i < 2; ++i)
+		{
+			advancing_front[i].push_back(std::move(hierarchy_vertex[i]));
+			for (int itertimes = 0; itertimes < 2; ++itertimes)
+			{
+				const auto& current_af = advancing_front[i].back();
+				std::vector<int> hierarchy;
+				for (auto caf : current_af)
+				{
+					for (auto voh : mesh->voh_range(mesh->vertex_handle(caf)))
+					{
+						VertexHandle vv = voh.to();
+						if (visited_vl[vv.idx()])
+							continue;
+						if (cset.has_face[voh.face().idx()] && cset.has_face[voh.opp().face().idx()])
+							continue;
+						hierarchy.push_back(vv.idx());
+						grow_dir[vv.idx()] = i;
+						visited_vl[vv.idx()] = true;
+					}
+				}
+				//if (itertimes == 2)
+				{
+					for (int id : hierarchy)
+					{
+						//if (cset.vertex_bound_index[id] != (i == 0 ? dk.from_bound : dk.to_bound))
+						//	continue;
+						if (cset.vertex_bound_index[id] != dk.from_bound && cset.vertex_bound_index[id] != dk.to_bound)
+							continue;
+						if (vert_path_similarity_energy[id] > disk_e)
+							continue;
+						--itertimes;
+						break;
+					}
+				}
+				advancing_front[i].push_back(std::move(hierarchy));
+			}
+		}
+
+		auto &new_vertex = dk.new_vertex;
+		auto &newv_flag = dk.new_v_flag;
+		auto &region_vertex = dk.region_vertex;
+		auto &regionv_flag = dk.region_v_flag;
+
+		newv_flag.resize(nv, false);
+		region_vertex.push_back(vl->v);
+		regionv_flag.resize(nv, false); regionv_flag[vl->v.idx()] = true;
+		for (int i = 0; i < 2; ++i)
+		{
+			for (auto& ss : advancing_front[i])
+			{
+				for (auto& tt : ss)
+				{
+					new_vertex.push_back(mesh->vertex_handle(tt));
+					newv_flag[tt] = true;
+				}
+			}
+		}
+
+		auto &new_face = dk.new_face;
+		auto &newf_flag = dk.new_f_flag;
+		newf_flag.resize(nf, false);
+		dk.region_f_flag.resize(nf, false);
+		for (auto new_v : new_vertex)
+		{
+			for (auto vh : mesh->voh_range(new_v))
+			{
+				if ((newv_flag[vh.to().idx()] || regionv_flag[vh.to().idx()]) &&
+					(newv_flag[vh.next().to().idx()] || regionv_flag[vh.next().to().idx()]))
+				{
+					if (newf_flag[vh.face().idx()] || cset.has_face[vh.face().idx()])
+						continue;
+					new_face.push_back(vh.face());
+					newf_flag[vh.face().idx()] = true;
+				}
+			}
+		}
+
+		//加入边界上x_axis, y_axis的约束
+		auto &x_axis = dk.x_axis;
+		auto &y_axis = dk.y_axis;
+		x_axis.resize(3, mesh->n_faces()); x_axis.setZero();
+		y_axis.resize(3, mesh->n_faces()); y_axis.setZero();
+		auto &constraint_f_flag = dk.constraint_f_flag;
+		constraint_f_flag.resize(mesh->n_faces(), false);
+		auto &crossfield = cf->crossfield;
+		//可参考《实验记录》2.25示例图
+		auto &bound0 = cset.cylinders[dk.from_bound.first].bounds[dk.from_bound.second];
+		for (auto hl : bound0)
+		{
+			int flid = hl->oppo->left;
+			if (dk.from_bound.second == 1)
+				flid = (flid / 4) * 4 + ((flid + 2) % 4);
+			y_axis.col(flid / 4) = crossfield.col(flid);
+			x_axis.col(flid / 4) = crossfield.col((flid / 4) * 4 + ((flid + 3) % 4));
+			constraint_f_flag[flid / 4] = true;
+		}
+		auto &bound1 = cset.cylinders[dk.to_bound.first].bounds[dk.to_bound.second];
+		for (auto hl : bound1)
+		{
+			int flid = hl->oppo->left;
+			if (dk.to_bound.second == 0)
+				flid = (flid / 4) * 4 + ((flid + 2) % 4);
+			y_axis.col(flid / 4) = crossfield.col(flid);
+			x_axis.col(flid / 4) = crossfield.col((flid / 4) * 4 + ((flid + 3) % 4));
+			constraint_f_flag[flid / 4] = true;
+		}
+	}
+
+	void LoopGen::OptimizeDiskField(disk &dk)
+	{
+		auto &new_vertex = dk.new_vertex;
+		auto &newv_flag = dk.new_v_flag;
+		auto &new_face = dk.new_face;
+		auto &newf_flag = dk.new_f_flag;
+		auto &x_axis = dk.x_axis;
+		auto &y_axis = dk.y_axis;
+
+		typedef std::complex<double> COMPLEX;
+		std::vector<Eigen::Triplet<COMPLEX>> triple;
+		int count = 0;
+		std::vector<int> fidmap(mesh->n_faces());
+		for (auto f : new_face)
+		{
+			fidmap[f.idx()] = count++;
+		}
+		Eigen::VectorXcd b(3 * new_face.size()); b.setZero();
+		count = 0;
+		auto& position = cf->getPosition();
+		auto& faceBase = cf->getFaceBase();
+		for (auto f : new_face)
+		{
+			int fid = f.idx();
+			for (auto fh : mesh->fh_range(f))
+			{
+				if (mesh->is_boundary(fh.edge()))
+					continue;
+				int gid = fh.opp().face().idx();
+				//if()
+				if (newf_flag[gid] && fid < gid || dk.constraint_f_flag[gid])
+				{
+					auto ev = (position.col(fh.to().idx()) - position.col(fh.from().idx())).normalized();
+					COMPLEX e_f = COMPLEX(ev.dot(faceBase.col(fid * 2)), -ev.dot(faceBase.col(fid * 2 + 1)));
+					COMPLEX e_g = COMPLEX(ev.dot(faceBase.col(gid * 2)), -ev.dot(faceBase.col(gid * 2 + 1)));
+					triple.emplace_back(count, fidmap[fid], e_f);
+					if (newf_flag[gid])
+					{
+						triple.emplace_back(count, fidmap[gid], -e_g);
+					}
+					else
+					{
+						COMPLEX dir = COMPLEX(x_axis.col(gid).dot(faceBase.col(2 * gid)), x_axis.col(gid).dot(faceBase.col(2 * gid + 1)));
+						b(count) += e_g * dir;
+					}
+					++count;
+				}
+			}
+		}
+
+		Eigen::SimplicialLDLT<Eigen::SparseMatrix<COMPLEX>> solver;
+		Eigen::SparseMatrix<COMPLEX> A(count, new_face.size());
+		A.setFromTriplets(triple.begin(), triple.end());
+		Eigen::SparseMatrix<COMPLEX> AH = A.adjoint();
+		solver.compute(AH*A);
+		b = AH * b.head(count);
+		b = solver.solve(b);
+		for (auto f : new_face)
+		{
+			int fid = f.idx();
+			double theta = std::arg(b(fidmap[fid]));
+			x_axis.col(fid) = faceBase.col(fid * 2) * cos(theta) + faceBase.col(fid * 2 + 1) * sin(theta);
+			y_axis.col(fid) = faceBase.col(fid * 2) * cos(theta + 0.5 * PI) + faceBase.col(fid * 2 + 1) * sin(theta + 0.5 * PI);
+		}
+	}
+
+	bool LoopGen::RefinePathByField(VertexHandle v, disk &dk, BoolVector &visited_v, BoolVector &visited_f)
+	{
+		Eigen::Vector4d plane; plane.setZero();
+		double fromdis = 0; double todis = 0;
+		auto sign_dist = [&](OpenMesh::Vec3d &p)
+		{
+			return plane(0)*p[0] + plane(1)*p[1] + plane(2)*p[2] + plane(3);
+		};
+		PlaneLoop field_path;
+
+		auto &y_axis = dk.y_axis;
+		if (cset.vertex_bound_index[v.idx()] != dk.from_bound)
+		{
+			HalfedgeHandle hh; hh.invalidate();
+			plane.setZero();
+			for (auto vf : mesh->vf_range(v))
+				plane.head(3) += y_axis.col(vf.idx());
+			plane.head(3).normalize();
+			for (auto voh : mesh->voh_range(v))
+			{
+				if (!visited_f[voh.face().idx()])
+					continue;
+				//plane.head(3) = y_axis.col(voh.face().idx());
+				auto &pos = mesh->point(v);
+				plane(3) = -(pos[0] * plane(0) + pos[1] * plane(1) + pos[2] * plane(2));
+				fromdis = sign_dist(mesh->point(voh.next().to()));
+				todis = sign_dist(mesh->point(voh.to()));
+				if (fromdis <= 0 && todis >= 0)
+				{
+					hh = voh.next().opp();
+					break;
+				}
+			}
+			if (!hh.is_valid())
+				return false;
+			double c = todis / (todis - fromdis);
+			field_path.emplace_back(&m4.halfedgelayers[hh.idx() * 4], std::min(0.99, std::max(0.01, c)));
+			//while (!cset.bound_edge_flag[hh.idx() / 2])
+			while (cset.vertex_bound_index[mesh->to_vertex_handle(hh).idx()] != dk.from_bound || !cset.bound_edge_flag[hh.idx() / 2])
+			{
+				if (!visited_f[mesh->face_handle(hh).idx()])
+					return false;
+				plane.head(3) = y_axis.col(mesh->face_handle(hh).idx());
+				auto pos = field_path.back().point(m4);
+				plane(3) = -(pos[0] * plane(0) + pos[1] * plane(1) + pos[2] * plane(2));
+				double dis = sign_dist(mesh->point(mesh->to_vertex_handle(mesh->next_halfedge_handle(hh))));
+				if (dis > 0)
+				{
+					hh = mesh->opposite_halfedge_handle(mesh->prev_halfedge_handle(hh));
+					todis = dis;
+					fromdis = sign_dist(mesh->point(mesh->from_vertex_handle(hh)));
+					c = todis / (todis - fromdis);
+					field_path.emplace_back(&m4.halfedgelayers[hh.idx() * 4], std::min(0.99, std::max(0.01, c)));
+				}
+				else
+				{
+					hh = mesh->opposite_halfedge_handle(mesh->next_halfedge_handle(hh));
+					fromdis = dis;
+					todis = sign_dist(mesh->point(mesh->to_vertex_handle(hh)));
+					c = todis / (todis - fromdis);
+					field_path.emplace_back(&m4.halfedgelayers[hh.idx() * 4], std::min(0.99, std::max(0.01, c)));
+				}
+			}
+		}
+		std::reverse(field_path.begin(), field_path.end());
+		field_path.emplace_back(nullptr, v.idx()*1.0);
+		if (cset.vertex_bound_index[v.idx()] != dk.to_bound)
+		{
+			HalfedgeHandle hh; hh.invalidate();
+			plane.setZero();
+			for (auto vf : mesh->vf_range(v))
+				plane.head(3) += y_axis.col(vf.idx());
+			plane.head(3).normalize();
+			for (auto voh : mesh->voh_range(v))
+			{
+				if (!visited_f[voh.face().idx()])
+					continue;
+				//plane.head(3) = y_axis.col(voh.face().idx());
+				auto &pos = mesh->point(v);
+				plane(3) = -(pos[0] * plane(0) + pos[1] * plane(1) + pos[2] * plane(2));
+				fromdis = sign_dist(mesh->point(voh.to()));
+				todis = sign_dist(mesh->point(voh.next().to()));
+				if (fromdis <= 0 && todis >= 0)
+				{
+					hh = voh.next();
+					break;
+				}
+			}
+			if (!hh.is_valid())
+				return false;
+			double c = todis / (todis - fromdis);
+			field_path.emplace_back(&m4.halfedgelayers[hh.idx() * 4], std::min(0.99, std::max(0.01, c)));
+			while (cset.vertex_bound_index[mesh->to_vertex_handle(hh).idx()] != dk.to_bound || !cset.bound_edge_flag[hh.idx() / 2])
+			{
+				hh = mesh->opposite_halfedge_handle(hh);
+				if (!visited_f[mesh->face_handle(hh).idx()])
+					return false;
+				plane.head(3) = y_axis.col(mesh->face_handle(hh).idx());
+				auto pos = field_path.back().point(m4);
+				plane(3) = -(pos[0] * plane(0) + pos[1] * plane(1) + pos[2] * plane(2));
+				double dis = sign_dist(mesh->point(mesh->to_vertex_handle(mesh->next_halfedge_handle(hh))));
+				if (dis > 0)
+				{
+					hh = mesh->next_halfedge_handle(hh);
+					todis = dis;
+					fromdis = sign_dist(mesh->point(mesh->from_vertex_handle(hh)));
+					c = todis / (todis - fromdis);
+					field_path.emplace_back(&m4.halfedgelayers[hh.idx() * 4], std::min(0.99, std::max(0.01, c)));
+				}
+				else
+				{
+					hh = mesh->prev_halfedge_handle(hh);
+					fromdis = dis;
+					todis = sign_dist(mesh->point(mesh->to_vertex_handle(hh)));
+					c = todis / (todis - fromdis);
+					field_path.emplace_back(&m4.halfedgelayers[hh.idx() * 4], std::min(0.99, std::max(0.01, c)));
+				}
+			}
+		}
+		all_vertice_path[v.idx()] = std::move(field_path);
+		return true;
+	}
+
+	double LoopGen::EvaluatePathSimilarity(Eigen::Matrix3Xd &path0, Eigen::Matrix3Xd &path1)
+	{
+		//对两个path重新采样，对比采样点的切向，从而定义相似性
+		int n = path0.cols() + path1.cols();
+		/*static int sefz = 0;
+		++sefz;*/
+		auto pathLength = [&](Eigen::Matrix3Xd& path, Eigen::VectorXd& seg)
+		{
+			int cols = path.cols() - 1;
+			seg.resize(cols); seg.setZero();
+			double sum = 0;
+			for (int i = 0; i < cols; ++i)
+			{
+				seg(i) = (path.col(i + 1) - path.col(i)).norm();
+				sum += seg(i);
+			}
+			return sum;
+		};
+		auto assembleFragment = [&](Eigen::Matrix3Xd& fragment, Eigen::Matrix3Xd& path)
+		{
+			int cols = path.cols();
+			Eigen::VectorXd seg;
+			double step = pathLength(path, seg) / n;
+			Eigen::Vector3d vec = (path.col(1) - path.col(0)).normalized();
+			fragment.col(0) = vec;
+			int r = 0;
+			double l = seg(0);
+			int mark = 0;
+			double u0 = 0;
+			for (int i = 1; i < n; ++i)
+			{
+				u0 += step;
+				if (u0 > l)
+				{
+					while (u0 > l)
+					{
+						++r; ++mark;
+						l += seg(r % cols);
+					}
+					vec = (path.col((mark + 1) % cols) - path.col(mark % cols)).normalized();
+					//if(sefz==438)
+					//dprint("mark", mark, cols);
+					/*if (sefz == 438)
+					{
+						dprint(i, u0, l, mark, r);
+						dprint(path(0, (mark + 1) % cols), path(1, (mark + 1) % cols), path(2, (mark + 1) % cols));
+						dprint(path(0, mark%cols), path(1, mark%cols), path(2, mark%cols));
+					}*/
+				}
+				fragment.col(i) = vec;
+				/*if (sefz == 438)
+				{
+					dprint("faeifhaefjs", i, vec(0),vec(1),vec(2));
+				}*/
+			}
+		};
+		/*if (sefz == 438)
+		{
+			for (int i = 0; i < path0.cols(); ++i)
+				dprint(i, path0(0, i), path0(1, i), path0(2, i));
+			for (int i = 0; i < path1.cols(); ++i)
+				dprint(i, path1(0, i), path1(1, i), path1(2, i));
+		}*/
+		if (path0.cols() < 2 || path1.cols() < 2)
+			return YYSS_INFINITE;
+		Eigen::Matrix3Xd fragment0, fragment1;
+		fragment0.resize(3, n); fragment1.resize(3, n);
+		assembleFragment(fragment0, path0);
+		assembleFragment(fragment1, path1);
+		double sum = 0;
+		double dot = 0;
+		//dprint(sefz);
+		for (int i = 0; i < n; ++i)
+		{
+			/*if (sefz == 438)
+			{
+				dprint(i);
+				dprint(fragment0(0, i), fragment0(1, i), fragment0(2, i));
+				dprint(fragment1(0, i), fragment1(1, i), fragment1(2, i));
+			}*/
+			for (int j = i + 1; j < n; ++j)
+			{
+				double theta = conservativeArcCos(fragment0.col(i).dot(fragment0.col(j))) - conservativeArcCos(fragment1.col(i).dot(fragment1.col(j)));
+				sum += fabs(theta);
+				//if (sefz == 438)
+				//{
+				//	//dprint(i,j,theta);
+				//	//dprint(fragment0(0,i),fragment0(1,i),fragment0(2,i),)
+				//}
+			}
+		}
+		/*if (sefz == 438)
+		{
+			int p = 0;
+		}*/
+		return 2.0 * sum / (n * (n - 1));
+	}
+
+	double LoopGen::AssembleSimilarityAngle(PlaneLoop &path, Eigen::VectorXd &sa, int path_fragment_num)
+	{
+		/*static int ie = 0;
+		++ie;
+		dprint(ie);
+		if (ie == 124)
+		{
+			int p = 0;
+		}*/
+		Eigen::Matrix3Xd path_pos;
+		path_pos.resize(3, path.size()); path_pos.setZero();
+		for (int i = 0; i < path.size(); ++i)
+		{
+			auto pos = path[i].point(m4);
+			path_pos.col(i) << pos[0], pos[1], pos[2];
+		}
+		auto pathLength = [&](Eigen::VectorXd& seg)
+		{
+			int cols = path_pos.cols() - 1;
+			seg.resize(cols); seg.setZero();
+			double sum = 0;
+			for (int i = 0; i < cols; ++i)
+			{
+				seg(i) = (path_pos.col(i + 1) - path_pos.col(i)).norm();
+				sum += seg(i);
+			}
+			return sum;
+		};
+
+		Eigen::Matrix3Xd fragment;
+		fragment.resize(3, path_fragment_num); fragment.setZero();
+		int cols = path.size();
+		Eigen::VectorXd seg;
+		double step = pathLength(seg) / path_fragment_num;
+		Eigen::Vector3d vec = (path_pos.col(1) - path_pos.col(0)).normalized();
+		fragment.col(0) = vec;
+		int r = 0;
+		double l = seg(0);
+		int mark = 0;
+		double u0 = 0;
+		for (int i = 1; i < path_fragment_num; ++i)
+		{
+			u0 += step;
+			if (u0 > l)
+			{
+				while (u0 > l)
+				{
+					++r; ++mark;
+					l += seg(r % cols);
+				}
+				vec = (path_pos.col((mark + 1) % cols) - path_pos.col(mark % cols)).normalized();
+			}
+			fragment.col(i) = vec;
+		}
+		sa.resize(path_fragment_num*(path_fragment_num + 1) / 2); sa.setZero();
+		int count = 0;
+		for (int i = 0; i < path_fragment_num; ++i)
+			for (int j = i + 1; j < path_fragment_num; ++j)
+			{
+				sa(count++) = conservativeArcCos(fragment.col(i).dot(fragment.col(j)));
+				/*if (ie == 124)
+					dprint(i, j, sa(count - 1));*/
+			}
+		/*if (ie == 124)
+		{
+			int lp = 0;
+		}*/
+		return step * path_fragment_num;
+	}
+
+	bool LoopGen::SpreadSubRegion(disk &dk, bool grow_flag[2])
+	{
+		int nv = mesh->n_vertices();
+		int nf = mesh->n_faces();
+
+		auto& new_vertex = dk.new_vertex;
+		auto& new_face = dk.new_face;
+		auto &region_vertex = dk.region_vertex;
+		auto &region_face = dk.region_face;
+		auto& newv_flag = dk.new_v_flag;
+		auto& newf_flag = dk.new_f_flag;
+		auto &regionv_flag = dk.region_v_flag;
+		auto &regionf_flag = dk.region_f_flag;
+		BoolVector visited_v = dk.region_v_flag;
+		BoolVector visited_f = dk.region_f_flag;
+		for (auto new_v : new_vertex)
+		{
+			visited_v[new_v.idx()] = true;
+			newv_flag[new_v.idx()] = false;
+		}
+		for (auto new_f : new_face)
+		{
+			visited_f[new_f.idx()] = true;
+			newf_flag[new_f.idx()] = false;
+		}
+		//dprint("new vertex:", lp.new_vertex.size());
+		//提取含有完整loop的区域
+
+		if (region_vertex.size() == 1)
+			if (!RefinePathByField(region_vertex.front(), dk, visited_v, visited_f))
+				return false;
+		std::vector<VertexHandle> vertex_cache;
+		BoolVector vertex_cache_flag = dk.region_v_flag;
+		//return true;
+		for (auto new_v : new_vertex)
+		{
+			//dprint(new_v.idx());
+			if (new_v.idx() == 13397 && region_vertex.front().idx() == 23937/4)
+			{
+				int p = 0;
+			}
+			if (RefinePathByField(new_v, dk, visited_v, visited_f))
+			{
+				vertex_cache_flag[new_v.idx()] = true;
+				vertex_cache.push_back(new_v);
+			}
+		}
+		//dprint("vertex cache:", vertex_cache.size());
+		v_cache_flag = vertex_cache_flag;
+#if PRINT_DEBUG_INFO
+		dprint("提取含有完整loop的区域");
+#endif
+		/*if (region_face.empty())
+		{
+			auto hl_begin = region_vertex.front()->hl;
+			auto hl_transfer = hl_begin;
+			do
+			{
+				if (!vertex_cache_flag[hl_transfer->to])
+					return false;
+				hl_transfer = hl_transfer->prev->oppo;
+			} while (hl_transfer != hl_begin);
+			if (!CheckTopology(vertex_cache, vertex_cache_flag, lp.grow_dir))
+				return false;
+		}*/
+		//若区域不连接两个边界，则退出
+		bool fromflag = false; bool toflag = false;
+		for (auto v : vertex_cache)
+		{
+			if (cset.vertex_bound_index[v.idx()] == dk.from_bound)
+				fromflag = true;
+			if (cset.vertex_bound_index[v.idx()] == dk.to_bound)
+				toflag = true;
+		}
+		if (!fromflag || !toflag)
+			return false;
+		//若区域不满足disk拓扑，则退出
+		if (region_face.empty())
+			if (!CheckDiskTopology(vertex_cache, vertex_cache_flag))
+				return false;
+		if (vertex_cache.empty())
+			return false;
+
+#if PRINT_DEBUG_INFO
+		dprint("拓扑检查");
+#endif
+
+		if (region_face.empty())
+		{
+			Eigen::Vector3d from_dir; from_dir.setZero();
+			Eigen::Vector3d to_dir; to_dir.setZero();
+			//for (auto v : vertex_cache)
+			int min_id = -1;
+			double min_e = YYSS_INFINITE;
+			for (int k = 0; k < vertex_cache.size(); ++k)
+			{
+				auto &path = all_vertice_path[vertex_cache[k].idx()];
+				from_dir.setZero();
+				to_dir.setZero();
+				if (path.front().hl)
+				{
+					from_dir = dk.y_axis.col(path.front().hl->left / 4) + dk.y_axis.col(path.front().hl->oppo->left / 4);
+					from_dir.normalize();
+				}
+				else
+				{
+					for (auto vf : mesh->vf_range(mesh->vertex_handle(path.front().c)))
+						from_dir += dk.y_axis.col(vf.idx());
+					from_dir.normalize();
+				}
+				if (path.back().hl)
+				{
+					to_dir = dk.y_axis.col(path.back().hl->left / 4) + dk.y_axis.col(path.back().hl->oppo->left / 4);
+					to_dir.normalize();
+				}
+				else
+				{
+					for (auto vf : mesh->vf_range(mesh->vertex_handle(path.back().c)))
+						to_dir += dk.y_axis.col(vf.idx());
+					to_dir.normalize();
+				}
+				double e = 0;
+				double length = 0;
+				Eigen::Vector3d pos;
+				OpenMesh::Vec3d knot[2];
+				knot[0] = path.front().point(m4);
+				for (int i = 1; i < path.size(); ++i)
+				{
+					knot[i % 2] = path[i].point(m4);
+					for (int j = 0; j < 3; ++j)
+						pos(j) = knot[i % 2][j] - knot[(i + 1) % 2][j];
+					e += fabs(pos.dot(from_dir)) + fabs(pos.dot(to_dir));
+					length += pos.norm();
+				}
+				e /= length * 2.0;
+				if (e < min_e)
+				{
+					min_id = k;
+					min_e = e;
+				}
+			}
+
+			if (min_id != -1)
+			{
+#if 1
+				auto v = region_vertex.front();
+				region_vertex.front() = vertex_cache[min_id];
+				dk.grow_dir[v.idx()] = 0;
+				regionv_flag[vertex_cache[min_id].idx()] = true;
+				vertex_cache[min_id] = v;
+				regionv_flag[v.idx()] = false;
+#endif
+			}
+		}
+
+		auto& grow_dir = dk.grow_dir;
+
+		//检测相似性能量
+		auto& normal_similarity_angle = dk.normal_similarity_angle;
+		int path_fragment_num = all_vertice_path[region_vertex.front().idx()].size();
+		if (path_fragment_num == 0)
+			return false;
+		//auto& all_pl = lp.all_pl;
+		//int loop_fragment_num = all_pl[lp.region_vertex.front()->id].size();
+		if (vertex_cache_flag[region_vertex.front().idx()] && !dk.has_nsa)
+		{
+			dk.has_nsa = true;
+			//auto pohl = all_vertice_path[region_vertex.front().idx()].back();
+			//double len = AssembleSimilarityAngle(region_vertex.front(), normal_similarity_angle, tn, path_fragment_num);
+			double len = AssembleSimilarityAngle(all_vertice_path[region_vertex.front().idx()], normal_similarity_angle, path_fragment_num);
+			dk.length[0] = std::min(dk.length[0], len);
+			dk.length[1] = std::max(dk.length[1], len);
+			dk.length[2] = std::max(dk.length[2], len);
+		}
+
+		BoolVector if_similarity_energy_low;
+		//if (region_vertex.size() > 1)
+		{
+			if_similarity_energy_low.resize(nv, false);
+			int exceed[2] = { 0,0 };
+			//#pragma omp parallel for
+			for (int i = 0; i < vertex_cache.size(); ++i)
+			{
+				int new_id = vertex_cache[i].idx();
+				int grow_id = grow_dir[new_id];
+				if (!grow_flag[grow_id])
+					continue;
+				Eigen::VectorXd similarity_angle;
+				//double len = AssembleSimilarityAngle(vertex_cache[i], similarity_angle, tn, path_fragment_num);
+				double len = AssembleSimilarityAngle(all_vertice_path[vertex_cache[i].idx()], similarity_angle, path_fragment_num);
+				double sum = 0;
+				//double seaa = 0;
+				for (int j = 0; j < similarity_angle.size(); ++j) {
+					sum += fabs(normal_similarity_angle(j) - similarity_angle(j));
+					//seaa = std::max(seaa, fabs(normal_similarity_angle(j) - similarity_angle(j)));
+					if (region_vertex.front().idx() == 147012 / 4 && i == 463)
+					{
+						//dprint(i, j, normal_similarity_angle(j), similarity_angle(j), fabs(normal_similarity_angle(j) - similarity_angle(j)));
+					}
+				}
+				dk.length[0] = std::min(dk.length[0], len);
+				dk.length[grow_id + 1] = std::max(dk.length[grow_id + 1], len);
+				//dprint(i, sum / similarity_angle.size());
+				if (sum < disk_e * similarity_angle.size()/* && tn.length[0] * 1.3 > tn.length[grow_id + 1]*/)
+				{
+					if_similarity_energy_low[new_id] = true;
+				}
+
+				//if (/*vertex_cache[i].idx() == 20536 && */region_vertex.front().idx() == 24183)
+				//{
+				//	dprint(i, vertex_cache[i].idx(), sum, similarity_angle.size(), sum / similarity_angle.size());
+				//	eee.emplace_back(vertex_cache[i].idx(), sum / similarity_angle.size());
+				//	int p = 0;
+				//}
+			}
+			/*if (region_vertex.front().idx() == 147012 / 4)
+			{
+				grow_flag[0] = false; grow_flag[1] = false;
+				newf_flag = visited_f;
+				return false;
+			}*/
+			//if_similarity_energy_low.resize(nv, true);
+#if PRINT_DEBUG_INFO
+			dprint("检测相似性能量");
+#endif
+			for (auto vc : vertex_cache)
+			{
+				if (!grow_flag[grow_dir[vc.idx()]])
+				{
+					if_similarity_energy_low[vc.idx()] = false;
+					continue;
+				}
+				if (!if_similarity_energy_low[vc.idx()])
+					++exceed[grow_dir[vc.idx()]];
+				if (exceed[grow_dir[vc.idx()]] > 1)
+					grow_flag[grow_dir[vc.idx()]] = false;
+			}
+		}
+		//else
+		//	if_similarity_energy_low.resize(nv, true);
+		//else
+			//if_similarity_energy_low.resize(nv, true);
+
+
+		//更新新区域
+		int count = region_vertex.size();
+		int begin_ = count;
+		for (auto new_v : vertex_cache)
+		{
+			if (if_similarity_energy_low[new_v.idx()])
+			{
+				region_vertex.push_back(new_v);
+				int newid = new_v.idx();
+				regionv_flag[newid] = true;
+			}
+		}
+
+		for (auto new_f : new_face)
+		{
+			for (auto fv : mesh->fv_range(new_f))
+			{
+				if (!regionv_flag[fv.idx()])
+					goto target1;
+			}
+			regionf_flag[new_f.idx()] = true;
+			region_face.push_back(new_f);
+		target1:;
+		}
+
+		//若区域不连接两个边界，则退出
+		fromflag = false; toflag = false;
+		for (auto v : region_vertex)
+		{
+			if (cset.vertex_bound_index[v.idx()] == dk.from_bound)
+				fromflag = true;
+			if (cset.vertex_bound_index[v.idx()] == dk.to_bound)
+				toflag = true;
+		}
+		if (!fromflag || !toflag)
+		{
+			region_vertex.clear();
+			region_face.clear();
+			regionv_flag.resize(nv, false);
+			regionf_flag.resize(nf, false);
+			return false;
+		}
+		//若区域不满足disk拓扑，则退出
+		if (region_face.empty())
+			return false;
+		if (!CheckDiskTopology(region_vertex, regionv_flag))
+		{
+			region_vertex.clear();
+			region_face.clear();
+			regionv_flag.resize(nv, false);
+			regionf_flag.resize(nf, false);
+			return false;
+		}
+
+#if 1
+#if PRINT_DEBUG_INFO
+		dprint("更新新区域");
+		dprint("当前区域含有的顶点数：", region_vertex.size());
+#endif
+		//若已超过能量阈值或者遇到接近平面的区域，则退出
+		if (!grow_flag[0] && !grow_flag[1])
+			return false;
+
+		//扩展advancing_front
+		newv_flag.resize(nv, false);
+		new_vertex.clear();
+		for (int i = begin_; i < count; ++i)
+		{
+			auto rvi = region_vertex[i];
+			int growid = grow_dir[rvi.idx()];
+			if (!grow_flag[growid])
+				continue;
+			/*for (auto vv : mesh->vv_range(rvi))
+			{
+				int vvid = vv.idx();
+				if (regionv_flag[vvid] || newv_flag[vvid])
+					continue;
+				if (cset.has_vertex[vvid] && cset.vertex_bound_index[vvid].first != tn.from_bound.first
+					&& cset.vertex_bound_index[vvid].first != tn.to_bound.first)
+					continue;
+				new_vertex.push_back(vv);
+				newv_flag[vvid] = true;
+				grow_dir[vvid] = growid;
+			}*/
+			for (auto voh : mesh->voh_range(rvi))
+			{
+				VertexHandle vv = voh.to();
+				if (regionv_flag[vv.idx()] || newv_flag[vv.idx()])
+					continue;
+				if (cset.has_face[voh.face().idx()] && cset.has_face[voh.opp().face().idx()])
+					continue;
+				new_vertex.push_back(vv);
+				newv_flag[vv.idx()] = true;
+				grow_dir[vv.idx()] = growid;
+			}
+		}
+		begin_ = 0;
+		for (int i = 0; i < extend_layer - 1; ++i)
+		{
+			int end_ = new_vertex.size();
+			for (int j = begin_; j < end_; ++j)
+			{
+				auto rvj = new_vertex[j];
+				int growid = grow_dir[rvj.idx()];
+				/*for (auto vv : mesh->vv_range(rvj))
+				{
+					int vvid = vv.idx();
+					if (regionv_flag[vvid] || newv_flag[vvid])
+						continue;
+					if (cset.has_vertex[vvid] && cset.vertex_bound_index[vvid].first != tn.from_bound.first
+						&& cset.vertex_bound_index[vvid].first != tn.to_bound.first)
+						continue;
+					new_vertex.push_back(vv);
+					newv_flag[vvid] = true;
+					grow_dir[vvid] = growid;
+				}*/
+				for (auto voh : mesh->voh_range(rvj))
+				{
+					VertexHandle vv = voh.to();
+					if (regionv_flag[vv.idx()] || newv_flag[vv.idx()])
+						continue;
+					if (cset.has_face[voh.face().idx()] && cset.has_face[voh.opp().face().idx()])
+						continue;
+					new_vertex.push_back(vv);
+					newv_flag[vv.idx()] = true;
+					grow_dir[vv.idx()] = growid;
+				}
+			}
+			begin_ = end_;
+		}
+		if (new_vertex.empty())
+			return false;
+		newf_flag.resize(nf, false);
+		new_face.clear();
+		for (auto new_v : new_vertex)
+		{
+			int newid = new_v.idx();
+			for (auto voh : mesh->voh_range(new_v))
+			{
+				int vfid = voh.face().idx();
+				if (regionf_flag[vfid] || newf_flag[vfid] || cset.has_face[vfid])
+					continue;
+				if (!regionv_flag[voh.to().idx()] && !newv_flag[voh.to().idx()])
+					continue;
+				if (!regionv_flag[voh.next().to().idx()] && !newv_flag[voh.next().to().idx()])
+					continue;
+				new_face.push_back(voh.face());
+				newf_flag[voh.face().idx()] = true;
+			}
+		}
+		if (new_face.empty())
+			return false;
+#if PRINT_DEBUG_INFO
+		dprint("扩展advancing_front");
+#endif
+		//if (region_vertex.front().idx() == 147012 / 4)
+		//	return false;
+		//优化新区域的场
+		for (auto rf : region_face)
+			dk.constraint_f_flag[rf.idx()] = true;
+		//set_one_field(tn);
+		//OptimizeDiskField(dk);
+#if PRINT_DEBUG_INFO
+		dprint("优化新区域的场");
+#endif
+#endif
+		return true;
+	}
+
+	bool LoopGen::CheckDiskTopology(std::vector<VertexHandle> &vertex_set, BoolVector &vs_flag)
+	{
+		if (vertex_set.empty())
+			return false;
+
+#pragma region initialize fs_flag
+		int nv = mesh->n_vertices();
+		int nf = mesh->n_faces();
+		BoolVector fs_flag(nf, false);
+		for (auto v : vertex_set)
+		{
+			for (auto voh : mesh->voh_range(v))
+			{
+				if (cset.has_face[voh.face().idx()])
+					continue;
+				if (!vs_flag[voh.to().idx()] || !vs_flag[voh.next().to().idx()])
+					continue;
+				fs_flag[voh.face().idx()] = true;
+			}
+		}
+#pragma endregion
+
+#pragma region check connectivity
+		BoolVector visited(nv, false);
+		std::queue<VertexHandle> tree;
+		tree.push(vertex_set.front());
+		visited[vertex_set.front().idx()] = true;
+		int count = 0;
+		while (!tree.empty())
+		{
+			auto v = tree.front();
+			tree.pop();
+			++count;
+			for (auto vv : mesh->vv_range(v))
+			{
+				if (visited[vv.idx()] || !vs_flag[vv.idx()])
+					continue;
+				auto hh = mesh->find_halfedge(v, vv);
+				if (!fs_flag[hh.face().idx()] && !fs_flag[hh.opp().face().idx()])
+					continue;
+				tree.push(vv);
+				visited[vv.idx()] = true;
+			}
+		}
+		if (count < vertex_set.size())
+			return false;
+#pragma endregion
+
+#pragma region check manifold
+		BoolVector bv_flag(nv, false);
+		for (auto v : vertex_set)
+		{
+			for (auto vf : mesh->vf_range(v))
+			{
+				if (!fs_flag[vf.idx()])
+				{
+					bv_flag[v.idx()] = true;
+					break;
+				}
+			}
+		}
+#pragma endregion
+
+#pragma region check boundary number
+		{
+			BoolVector be_flag(mesh->n_edges(), false);
+			/*static int es = 0;
+			++es;
+			dprint(es);*/
+			count = 0;
+			for (auto v : vertex_set)
+			{
+				/*if (es == 40 && v.idx() == 1942)
+				{
+					dprint(v.idx());
+				}*/
+				if (!bv_flag[v.idx()])
+					continue;
+				/*auto he = mesh->voh_begin(v).handle();
+				while (fs_flag[mesh->face_handle(he).idx()] || !fs_flag[mesh->opposite_face_handle(he).idx()])
+					he = mesh->opposite_halfedge_handle(mesh->prev_halfedge_handle(he));*/
+				HalfedgeHandle he; he.invalidate();
+				for (auto voh : mesh->voh_range(v))
+				{
+					if (!fs_flag[mesh->face_handle(voh).idx()] && fs_flag[mesh->opposite_face_handle(voh).idx()])
+					{
+						he = voh; break;
+					}
+				}
+				if (!he.is_valid())
+					return false;
+				if (be_flag[he.idx() / 2])
+					continue;
+				HalfedgeHandle he_transfer = he;
+				do
+				{
+					be_flag[he_transfer.idx() / 2] = true;
+					he_transfer = mesh->opposite_halfedge_handle(he_transfer);
+					while (fs_flag[mesh->face_handle(he_transfer).idx()] || !fs_flag[mesh->opposite_face_handle(he_transfer).idx()])
+						he_transfer = mesh->next_halfedge_handle(mesh->opposite_halfedge_handle(he_transfer));
+				} while (he_transfer != he);
+				++count;
+				if (count > 1)
+					return false;
+			}
+			if (count < 1)
+				return false;
+		}
+#pragma endregion
+		return true;
+	}
+
+#if 0
 	void LoopGen::OptimizeDisk(vl_pair_pq &path_pq)
 	{
 		int ccs = cset.cylinders.size();
@@ -1937,13 +3197,13 @@ namespace LoopGen
 
 			ConstructInitialRegion(ip.vl, tn);
 			set_one_field(tn);
-			if (ip.vl->id == 85231)
+			if (ip.vl->id == 163938)
 			{
 				//continue;
 				int fe = 0;
 				//break;
 			}
-			//else
+			else
 			{
 				while (true)
 				{
@@ -1978,7 +3238,8 @@ namespace LoopGen
 				if (tn.region_f_flag[kk])
 					old_face_flag[kk] = true;
 			xaxis = tn.x_axis;
-			/*if (ip.vl->id == 85231)
+#if 1
+			if (ip.vl->id == 163938)
 			{
 				for (auto f : tn.new_face)
 				{
@@ -1986,7 +3247,8 @@ namespace LoopGen
 					constraint_dir.col(f.idx()) = tn.x_axis.col(f.idx());
 				}
 				break;
-			}*/
+			}
+#endif
 			/*static int se = 0;
 			++se;
 			if (se > 4)*/
@@ -2078,7 +3340,7 @@ namespace LoopGen
 				{
 					if (cset.vertex_bound_index[id] == tn.from_bound)
 					{
-						auto &path_temp = cset.all_path[cset.cylinders[tn.from_bound.first].handle_to_layer[id]];
+						auto &path_temp = cset.all_path[cset.cylinders[tn.from_bound.first].handle_to_layer[id].second];
 						if (path_temp.empty())
 							continue;
 						if (cset.vertex_bound_index[path_temp.back().hl->to / 4] == tn.to_bound)
@@ -2088,7 +3350,7 @@ namespace LoopGen
 					}
 					else if (cset.vertex_bound_index[id] == tn.to_bound)
 					{
-						auto &path_temp = cset.all_path[cset.cylinders[tn.to_bound.first].handle_to_layer[id]];
+						auto &path_temp = cset.all_path[cset.cylinders[tn.to_bound.first].handle_to_layer[id].second];
 						if (path_temp.empty())
 							continue;
 						if (cset.vertex_bound_index[path_temp.back().hl->to / 4] == tn.from_bound)
@@ -2138,7 +3400,7 @@ namespace LoopGen
 				{
 					if (cset.vertex_bound_index[id] == tn.from_bound)
 					{
-						auto &path_temp = cset.all_path[cset.cylinders[tn.from_bound.first].handle_to_layer[id]];
+						auto &path_temp = cset.all_path[cset.cylinders[tn.from_bound.first].handle_to_layer[id].second];
 						if (path_temp.empty())
 							continue;
 						if (cset.vertex_bound_index[path_temp.back().hl->to / 4] == tn.to_bound)
@@ -2148,7 +3410,7 @@ namespace LoopGen
 					}
 					else if (cset.vertex_bound_index[id] == tn.to_bound)
 					{
-						auto &path_temp = cset.all_path[cset.cylinders[tn.to_bound.first].handle_to_layer[id]];
+						auto &path_temp = cset.all_path[cset.cylinders[tn.to_bound.first].handle_to_layer[id].second];
 						if (path_temp.empty())
 							continue;
 						if (cset.vertex_bound_index[path_temp.back().hl->to / 4] == tn.from_bound)
@@ -2418,14 +3680,33 @@ namespace LoopGen
 #if 1
 		uv[0].tail(new_vertex_size) = solver.solve(uv[0].tail(new_vertex_size));
 #else
+#if 1
 		for (auto v : new_vertex)
 		{
+			int vid = v.idx();
+			int vm = vidmap[vid];
+			auto &vertex_bound_index = cset.vertex_bound_index[vid];
+			auto &cy = cset.cylinders[vertex_bound_index.first];
+			if (vertex_bound_index == tn.from_bound)
+			{
+
+			}
+		}
+#else
+		double weight = 1.0;
+		for (auto v : new_vertex)
+		{
+			//if (tn.region_vertex.front().idx() == 60535 /4)
+			//dprint("id", v.idx());
 			int vid = v.idx();
 			int vm = vidmap[vid];
 			auto &vertex_bound_vertex = cset.vertex_bound_index[vid];
 			auto &cy = cset.cylinders[vertex_bound_vertex.first];
 			if (vertex_bound_vertex == tn.from_bound)
 			{
+				//if(v.idx()== 29472)
+				//for (int i = 0; i < cy.uv[1].size(); ++i)
+				//	dprint(i, cy.uv[1](i));
 				double rate = vertex_bound_vertex.second == 1 ? 1.0 : -1.0;
 				for (auto vv : mesh->vv_range(v))
 				{
@@ -2435,19 +3716,22 @@ namespace LoopGen
 						for (auto &tr : triple)
 						{
 							if (tr.row() == vm - region_vertex_size && tr.col() == vm - region_vertex_size)
-								tr = Eigen::Triplet<double>(tr.row(), tr.col(), tr.value() + 1.0);
+								tr = Eigen::Triplet<double>(tr.row(), tr.col(), tr.value() + weight);
 							else if (tr.row() == vm - region_vertex_size &&
 								tr.col() == vidmap[vvid] - region_vertex_size)
-								tr = Eigen::Triplet<double>(tr.row(), tr.col(), tr.value() - 1.0);
+								tr = Eigen::Triplet<double>(tr.row(), tr.col(), tr.value() - weight);
 						}
-						//triple.emplace_back(vm - region_vertex_size, vm - region_vertex_size, 1.0);
-						//triple.emplace_back(vm - region_vertex_size, vidmap[vvid] - region_vertex_size, -1.0);
-						uv[0](vm) += rate * (cy.uv[1](cy.vidmap[cy.handle_to_layer[vid]]) - cy.uv[1](cy.vidmap[cy.handle_to_layer[vvid]]));
+						//if(tn.region_vertex.front().idx()== 60535 / 4)
+						//dprint("u", cy.uv[1](cy.vidmap[cy.handle_to_layer[vid].first]) - cy.uv[1](cy.vidmap[cy.handle_to_layer[vvid].first]));
+						uv[0](vm) += weight * rate * (cy.uv[1](cy.vidmap[cy.handle_to_layer[vid].first]) - cy.uv[1](cy.vidmap[cy.handle_to_layer[vvid].first]));
 					}
 				}
 			}
 			else if (vertex_bound_vertex == tn.to_bound)
 			{
+				//if (v.idx() == 29472)
+				//for (int i = 0; i < cy.uv[1].size(); ++i)
+				//	dprint(i, cy.uv[1](i));
 				double rate = vertex_bound_vertex.second == 0 ? 1.0 : -1.0;
 				for (auto vv : mesh->vv_range(v))
 				{
@@ -2457,14 +3741,14 @@ namespace LoopGen
 						for (auto &tr : triple)
 						{
 							if (tr.row() == vm - region_vertex_size && tr.col() == vm - region_vertex_size)
-								tr = Eigen::Triplet<double>(tr.row(), tr.col(), tr.value() + 1.0);
+								tr = Eigen::Triplet<double>(tr.row(), tr.col(), tr.value() + weight);
 							else if (tr.row() == vm - region_vertex_size &&
 								tr.col() == vidmap[vvid] - region_vertex_size)
-								tr = Eigen::Triplet<double>(tr.row(), tr.col(), tr.value() - 1.0);
+								tr = Eigen::Triplet<double>(tr.row(), tr.col(), tr.value() - weight);
 						}
-						//triple.emplace_back(vm - region_vertex_size, vm - region_vertex_size, 1.0);
-						//triple.emplace_back(vm - region_vertex_size, vidmap[vvid] - region_vertex_size, -1.0);
-						uv[0](vm) += rate * (cy.uv[1](cy.vidmap[cy.handle_to_layer[vid]]) - cy.uv[1](cy.vidmap[cy.handle_to_layer[vvid]]));
+						//if (tn.region_vertex.front().idx() == 60535 / 4)
+						//dprint("u", cy.uv[1](cy.vidmap[cy.handle_to_layer[vid].first]) - cy.uv[1](cy.vidmap[cy.handle_to_layer[vvid].first]));
+						uv[0](vm) += weight * rate * (cy.uv[1](cy.vidmap[cy.handle_to_layer[vid].first]) - cy.uv[1](cy.vidmap[cy.handle_to_layer[vvid].first]));
 					}
 				}
 			}
@@ -2473,6 +3757,7 @@ namespace LoopGen
 		A.setFromTriplets(triple.begin(), triple.end());
 		solver.compute(A);
 		uv[0].tail(new_vertex_size) = solver.solve(uv[0].tail(new_vertex_size));
+#endif
 #endif
 	}
 
@@ -2745,7 +4030,7 @@ namespace LoopGen
 				tn.length[0] = std::min(tn.length[0], len);
 				tn.length[grow_id + 1] = std::max(tn.length[grow_id + 1], len);
 				//dprint(i, sum / similarity_angle.size());
-				if (sum < disk_e * similarity_angle.size()/* && tn.length[0] * 1.2 > tn.length[grow_id + 1]*/)
+				if (sum < disk_e * similarity_angle.size()/* && tn.length[0] * 1.3 > tn.length[grow_id + 1]*/)
 				{
 					if_similarity_energy_low[new_id] = true;
 				}

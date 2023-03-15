@@ -44,7 +44,8 @@ namespace LoopGen
 		Eigen::Matrix3Xd crossfield;  Eigen::Matrix3Xd& getCrossField() { return crossfield; }   void setField();
 
 		std::vector<int> matching;    std::vector<int>& getMatching() { return matching; }       void setMatching();
-		std::vector<int> singularity; std::vector<int>& getSingularity() { return singularity; } void setSingularity();
+		//std::vector<int> singularity; std::vector<int>& getSingularity() { return singularity; } void setSingularity();
+		std::vector<std::vector<int>> singularity; std::vector<std::vector<int>>& getSingularity() { return singularity; } void setSingularity();
 		//Eigen::Matrix4Xd weight;      Eigen::Matrix4Xd& getWeight() { return weight; }           void setWeight(double alpha = 900);
 		void initFieldInfo(); bool updateField = false;
 

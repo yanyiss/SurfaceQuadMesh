@@ -76,7 +76,7 @@ namespace LoopGen
 
 		std::vector<int> vidmap;
 		Eigen::VectorXd uv[2];
-		std::vector<int> handle_to_layer;
+		std::vector<std::pair<int, int>> handle_to_layer;
 
 		cylinder::cylinder() {}
 		cylinder::~cylinder() {}
@@ -95,7 +95,40 @@ namespace LoopGen
 		std::vector<BoolVector> tangential_intersection;
 	};
 
-	struct temp_name
+	struct disk
+	{
+		std::vector<VertexHandle> new_vertex;
+		std::vector<FaceHandle> new_face;
+		std::vector<VertexHandle> region_vertex;
+		std::vector<FaceHandle> region_face;
+
+		BoolVector new_f_flag;
+		BoolVector new_v_flag;
+		BoolVector region_f_flag;
+		BoolVector region_v_flag;
+		BoolVector constraint_f_flag;
+		std::vector<int> grow_dir;
+
+		std::vector<HalfedgeHandle> bounds;
+		PlaneLoop initial_path;
+		//std::vector<PlaneLoop> all_pl;
+		Eigen::Matrix3Xd x_axis;
+		Eigen::Matrix3Xd y_axis;
+
+		std::pair<int, int> from_bound;
+		std::pair<int, int> to_bound;
+
+		Eigen::VectorXd normal_similarity_angle;
+		double length[3] = { YYSS_INFINITE, -YYSS_INFINITE, -YYSS_INFINITE };
+		bool has_nsa = false;
+	};
+
+	struct disk_set
+	{
+		std::vector<disk> disks;
+	};
+
+	/*struct disk
 	{
 		std::vector<VertexHandle> new_vertex;
 		std::vector<FaceHandle> new_face;
@@ -127,5 +160,5 @@ namespace LoopGen
 		inline double GetV(int vid) { return uv[1](vidmap[vid]); }
 		inline Eigen::VectorXd& GetU() { return uv[0]; }
 		inline Eigen::VectorXd& GetV() { return uv[1]; }
-	};
+	};*/
 }

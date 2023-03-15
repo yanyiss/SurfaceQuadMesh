@@ -174,7 +174,12 @@ namespace LoopGen
 				hl_transfer = hl_transfer->prev->oppo;
 			} while (hl_transfer != hl_begin);
 		}
-
+		static int es = 0;
+		++es;
+		if (es == 4)
+		{
+			int p = 0;
+		}
 		Eigen::SparseMatrix<double> A(vl_size - 1, vl_size - 1);
 		A.setFromTriplets(triple.begin(), triple.end());
 		Eigen::SparseLU<Eigen::SparseMatrix<double>> solver;

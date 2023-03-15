@@ -356,7 +356,8 @@ namespace LoopGen
 	void crossField::setSingularity()
 	{
 		singularity.clear();
-		int count = 0;
+		singularity.resize(3);
+		//int count = 0;
 		for (auto& tv : mesh->vertices())
 		{
 			int sum = 0;
@@ -364,12 +365,25 @@ namespace LoopGen
 			{
 				sum += matching[tvoh.idx()];
 			}
-			if (sum % 4)
+			//if (sum % 4)
+			//{
+			//	//dprint(tv.idx());
+			//	//singularity[count] = tv.idx();
+			//	singularity.push_back(tv.idx());
+			//	++count;
+			//}
+			switch (sum % 4)
 			{
-				//dprint(tv.idx());
-				//singularity[count] = tv.idx();
-				singularity.push_back(tv.idx());
-				++count;
+			case 1:
+				singularity[0].push_back(tv.idx());
+				break;
+			case 3:
+				singularity[1].push_back(tv.idx());
+				break;
+			case 2:
+				singularity[2].push_back(tv.idx());
+			default:
+				break;
 			}
 		}
 	}
@@ -449,14 +463,18 @@ namespace LoopGen
 		char line[1024] = { 0 };
 		file_reader.getline(line, sizeof(line));
 		std::stringstream n(line);
-		int mark[6];
-		n >> mark[0] >> mark[1] >> mark[2] >> mark[3] >> mark[4] >> mark[5];// >> mark[6];
-		crossfield.resize(3, mark[0]); mark[0] += 1;
-		normal.resize(3, mark[1]);     mark[1] += mark[0];
-		matching.resize(mark[2]);      mark[2] += mark[1];
-		position.resize(3, mark[3]);   mark[3] += mark[2];
-		singularity.resize(mark[4]);   mark[4] += mark[3];
-		faceBase.resize(3, mark[5]);   mark[5] += mark[4];
+		int mark[8];
+		n >> mark[0] >> mark[1] >> mark[2] >> mark[3] >> mark[4] >> mark[5] >> mark[6] >> mark[7];
+		crossfield.resize(3, mark[0]);  mark[0] += 1;
+		normal.resize(3, mark[1]);      mark[1] += mark[0];
+		matching.resize(mark[2]);       mark[2] += mark[1];
+		position.resize(3, mark[3]);    mark[3] += mark[2];
+		//singularity.resize(mark[4]);   mark[4] += mark[3];
+		singularity.resize(3);
+		singularity[0].resize(mark[4]); mark[4] += mark[3];
+		singularity[1].resize(mark[5]); mark[5] += mark[4];
+		singularity[2].resize(mark[6]); mark[6] += mark[5];
+		faceBase.resize(3, mark[7]);    mark[7] += mark[6];
 		//weight.resize(4, mark[6]);     mark[6] += mark[5];
 		int row = 1;
 		while (file_reader.getline(line, sizeof(line)))
@@ -480,11 +498,19 @@ namespace LoopGen
 			}
 			else if (row < mark[4])
 			{
-				num >> singularity[row - mark[3]];
+				num >> singularity[0][row - mark[3]];
 			}
 			else if (row < mark[5])
 			{
-				num >> faceBase(0, row - mark[4]) >> faceBase(1, row - mark[4]) >> faceBase(2, row - mark[4]);
+				num >> singularity[1][row - mark[4]];
+			}
+			else if (row < mark[6])
+			{
+				num >> singularity[2][row - mark[5]];
+			}
+			else if (row < mark[7])
+			{
+				num >> faceBase(0, row - mark[6]) >> faceBase(1, row - mark[6]) >> faceBase(2, row - mark[6]);
 			}
 			/*else
 			{
@@ -504,7 +530,8 @@ namespace LoopGen
 		}
 		//crossfield, normal, matching, position, singularity, faceBase, weight
 		file_writer << mesh->n_faces() * 4 << " " << mesh->n_faces() << " " << mesh->n_halfedges() << " " << mesh->n_vertices()
-			<< " " << singularity.size() << " " << mesh->n_faces() * 2 /*<< " " << mesh->n_halfedges() */<<"\n";
+			<< " " << singularity[0].size() << " " << singularity[1].size() << " " << singularity[2].size()
+			<< " " << mesh->n_faces() * 2 /*<< " " << mesh->n_halfedges() */<<"\n";
 		for (auto i = 0; i < crossfield.cols(); ++i)
 			file_writer << crossfield(0, i) << " " << crossfield(1, i) << " " << crossfield(2, i) << "\n";
 		for (auto i = 0; i < normal.cols(); ++i)
@@ -513,7 +540,11 @@ namespace LoopGen
 			file_writer << match << "\n";
 		for (auto i = 0; i < position.cols(); ++i)
 			file_writer << position(0, i) << " " << position(1, i) << " " << position(2, i) << "\n";
-		for (auto sing : singularity)
+		for (auto sing : singularity[0])
+			file_writer << sing << "\n";
+		for (auto sing : singularity[1])
+			file_writer << sing << "\n";
+		for (auto sing : singularity[2])
 			file_writer << sing << "\n";
 		for (auto i = 0; i < faceBase.cols(); ++i)
 			file_writer << faceBase(0, i) << " " << faceBase(1, i) << " " << faceBase(2, i) << "\n";

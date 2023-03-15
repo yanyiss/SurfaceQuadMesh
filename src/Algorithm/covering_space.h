@@ -114,8 +114,11 @@ namespace LoopGen
 		void update()
 		{
 			sing_flag.resize(mesh->n_vertices(), false);
-			for (auto sing : cf->getSingularity())
-				sing_flag[sing] = true;
+			/*for (auto sing : cf->getSingularity())
+				sing_flag[sing] = true;*/
+			for (auto &sing : cf->getSingularity())
+				for (auto &s : sing)
+					sing_flag[s] = true;
 
 			for (auto tf : mesh->faces())
 			{
@@ -211,6 +214,11 @@ namespace LoopGen
 			//int id = verticemap[vl->v.idx()];
 			int id = vl->v.idx() * 4;
 			return &verticelayers[id + (vl->id - id + layer_plus) % 4];
+		}
+		FaceLayer* conj_fl(FaceLayer* fl, int layer_plus)
+		{
+			int id = fl->f.idx() * 4;
+			return &facelayers[id + (fl->id - id + layer_plus) % 4];
 		}
 		void set_weight(double alpha = 900)
 		{
