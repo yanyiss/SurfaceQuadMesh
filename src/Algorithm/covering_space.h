@@ -220,6 +220,11 @@ namespace LoopGen
 			int id = fl->f.idx() * 4;
 			return &facelayers[id + (fl->id - id + layer_plus) % 4];
 		}
+		HalfedgeLayer* conj_hl(HalfedgeLayer* hl, int layer_plus)
+		{
+			int id = hl->h.idx() * 4;
+			return &halfedgelayers[id + (hl->id - id + layer_plus) % 4];
+		}
 		void set_weight(double alpha = 900)
 		{
 			auto &crossfield = cf->getCrossField();
@@ -242,6 +247,10 @@ namespace LoopGen
 					double arc = fabs(atan2(sin(arc0) + sin(arc1), cos(arc0) + cos(arc1)));
 					if (arc < quarterPI)
 						weight(hl.id) = ev.norm() * sqrt(alpha*sin(arc)*sin(arc) + 1);
+					/*{
+						weight(hl.id) = sin(arc);
+						weight(hl.id) *= weight(hl.id);
+					}*/
 					else
 						weight(hl.id) = YYSS_INFINITE;
 				}

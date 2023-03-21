@@ -354,6 +354,8 @@ void InteractiveViewerWidget::pick_edge(int x,int y)
 	if(desiredEdge < 0) return;
 	lastestEdge = desiredEdge;
 	dprint("Select Edge:", lastestEdge);
+	if (lg)
+		dprint("Energy:", lg->similarity_energy[lastestEdge * 8], lg->similarity_energy[lastestEdge * 8 + 1]);
 
 	std::vector<int>::iterator it;
 	if( (it = std::find(selectedEdge.begin(),selectedEdge.end(),desiredEdge)) == selectedEdge.end() )
@@ -752,10 +754,10 @@ void InteractiveViewerWidget::showLoop()
 	{
 		loop_gen_init = true;
 
-#if 1
+#if 0
 		lg->m4.set_base(&mesh, lg->cf); lg->m4.init(); lg->m4.update(); lg->m4.set_weight();
 #else
-#if 1
+#if 0
 		lg->InitializePQ();
 		lg->OptimizeLoop();
 #else
@@ -846,7 +848,7 @@ void InteractiveViewerWidget::showDebugTest()
 
 void InteractiveViewerWidget::draw_energy()
 {
-	double max_e = 0.25;
+	double max_e = lg->energy_threshold;
 	double step_e =1.0/max_e;
 	if (loop_gen_init)
 	{
@@ -873,22 +875,13 @@ void InteractiveViewerWidget::draw_energy()
 
 void InteractiveViewerWidget::draw_submesh()
 {
+	
 	//画某个点
 #if 0
 	glColor3d(1, 0, 0);
 	glPointSize(15);
 	glBegin(GL_POINTS);
-	glVertex3dv(mesh.point(mesh.vertex_handle(16715/4)).data());
-	glVertex3dv(mesh.point(mesh.vertex_handle(19748 / 4)).data());
-	glColor3d(0, 1, 0);
-	glVertex3dv(mesh.point(mesh.vertex_handle(10637 / 4)).data());
-	glVertex3dv(mesh.point(mesh.vertex_handle(31827 / 4)).data());
-	glVertex3dv(mesh.point(mesh.vertex_handle(27507 / 4)).data());
-	glVertex3dv(mesh.point(mesh.vertex_handle(36388 / 4)).data());
-	glVertex3dv(mesh.point(mesh.vertex_handle(27467 / 4)).data());
-	glVertex3dv(mesh.point(mesh.vertex_handle(23474 / 4)).data());
-	glColor3d(0, 0, 1);
-	glVertex3dv(mesh.point(mesh.vertex_handle(10465/4)).data());
+	glVertex3dv(mesh.point(mesh.vertex_handle(4019)).data());
 	glEnd();
 #endif
 
@@ -1006,7 +999,7 @@ void InteractiveViewerWidget::draw_submesh()
 #endif
 
 	//画方向
-#if 1
+#if 0
 	double avgl = 0.2*calc_mesh_ave_edge_length(&mesh);
 	glColor3d(1, 0, 0);
 	glLineWidth(3);
@@ -1041,7 +1034,7 @@ void InteractiveViewerWidget::draw_submesh()
 #endif
 
 	//画path起始点
-#if 10
+#if 1
 	glColor3d(0, 0, 1);
 	glPointSize(15);
 	glBegin(GL_POINTS);
@@ -1161,6 +1154,34 @@ void InteractiveViewerWidget::draw_submesh()
 	glEnd();
 #endif
 
+	//画pls
+#if 0
+	glLineWidth(3);
+	glBegin(GL_LINES);
+	glColor3d(0.8, 0.2, 0.1);
+	int nv = mesh.n_vertices();
+	for (int j = 0; j < lg->pls.size(); ++j)
+	{
+		if (j % 5 != 0)
+			continue;
+		auto& pl = lg->pls[j];
+		int nn = pl.size();
+		if (nn < 1)
+			continue;
+		auto poin = pl.front().point(lg->m4);
+		glVertex3dv(poin.data());
+		for (int i = 1; i < nn - 1; ++i)
+		{
+			poin = pl[i].point(lg->m4);
+			glVertex3dv(poin.data());
+			glVertex3dv(poin.data());
+		}
+		poin = pl.back().point(lg->m4);
+		glVertex3dv(poin.data());
+	}
+	glEnd();
+#endif
+
 	if (loop_gen_init)
 	{
 		//画区域顶点
@@ -1266,7 +1287,7 @@ void InteractiveViewerWidget::draw_submesh()
 #endif
 		
 		//画所有柱体的面
-#if 0
+#if 1
 		glColor3d(0, 0.8, 0);
 		glBegin(GL_TRIANGLES);
 		for (auto &cy : lg->cset.cylinders)

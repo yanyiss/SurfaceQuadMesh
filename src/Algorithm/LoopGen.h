@@ -11,7 +11,7 @@ namespace LoopGen
 	class LoopGen
 	{
 	public:
-		LoopGen(Mesh& mesh_) :mesh(&mesh_) { /*InitializeAABBTREE();*/initMeshStatusAndNormal(*mesh); };
+		LoopGen(Mesh& mesh_) :mesh(&mesh_) { initMeshStatusAndNormal(*mesh); avg_len = calc_mesh_ave_edge_length(mesh); };
 		~LoopGen() {
 			if (cf) { delete cf; cf = nullptr; }
 		};
@@ -27,6 +27,7 @@ namespace LoopGen
 		//M2 m2;
 		M4 m4;
 		timeRecorder tr;
+		double avg_len;
 
 		
 		//初始化阶段变量
@@ -81,6 +82,7 @@ namespace LoopGen
 		cylinder_set cset;
 		disk_set dset;
 		//优化阶段函数
+		void AssembleSampling(VertexLayer* vl, Eigen::Matrix3Xd &sampling, LocalParametrization &lp, int loop_sampling_num);
 		void AssembleSimilarityAngle(VertexLayer* vl, Eigen::VectorXd& sa, LocalParametrization& lp, int loop_fragment_num);
 		bool RefineLoopByParametrization(VertexLayer* vl, LocalParametrization& lp, BoolVector& visited_v, BoolVector& visited_f);
 		void ResetLocalField(LocalParametrization &lp, std::vector<FaceLayer*>& opt_face, BoolVector& opt_flag, BoolVector& constraint_flag);

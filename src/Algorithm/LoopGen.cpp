@@ -1,8 +1,8 @@
 #include "LoopGen.h"
 #include <omp.h>
 
-#define COMPUTE_NEW_PLANELOOP 0
-#define COMPUTE_NEW_ENERGY 0
+#define COMPUTE_NEW_PLANELOOP 1
+#define COMPUTE_NEW_ENERGY 1
 namespace LoopGen
 {
 #pragma region initialization
@@ -23,26 +23,33 @@ namespace LoopGen
 	{
 		//对两个loop重新采样，对比采样点的切向，从而定义相似性
 		int n = loop0.cols() + loop1.cols();
-		auto loopLength = [&](Eigen::Matrix3Xd& loop, Eigen::VectorXd& seg, int mark)
+		auto loopLength = [&](Eigen::Matrix3Xd& loop, Eigen::VectorXd& seg, int mark, Eigen::Vector3d &barycenter)
 		{
 			int cols = loop.cols();
 			double sum = 0;
+			seg.resize(cols);
+			barycenter.setZero();
 			for (int i = 0; i < cols; ++i)
 			{
 				seg(i) = (loop.col((mark + i + 1) % cols) - loop.col((mark + i) % cols)).norm();
 				sum += seg(i);
+				barycenter += loop.col(i);
 			}
+			barycenter /= cols;
 			return sum;
 		};
-		auto assembleFragment = [&](Eigen::Matrix3Xd& fragment, double u0, int mark, Eigen::Matrix3Xd& loop)
+		auto assembleSampling = [&](Eigen::Matrix3Xd &sampling, double u0, int mark, Eigen::Matrix3Xd &loop)
 		{
 			int cols = loop.cols();
-			Eigen::VectorXd seg(cols);
-			double step = loopLength(loop, seg, mark) / n;
+			Eigen::VectorXd seg;
+			Eigen::Vector3d barycenter; 
+			double len = loopLength(loop, seg, mark, barycenter);
+			double step = len / n;
 			Eigen::Vector3d vec = (loop.col((mark + 1) % cols) - loop.col(mark % cols)).normalized();
-			fragment.col(0) = vec;
 			int r = 0;
 			double l = seg(0);
+			sampling.resize(3, n);
+			sampling.col(0) = (loop.col(mark % cols) + u0 * vec - barycenter) / len;
 			for (int i = 1; i < n; ++i)
 			{
 				u0 += step;
@@ -55,25 +62,14 @@ namespace LoopGen
 					}
 					vec = (loop.col((mark + 1) % cols) - loop.col(mark % cols)).normalized();
 				}
-				fragment.col(i) = vec;
+				//sampling.col(i) = (loop.col(mark % cols) + u0 * vec - source).normalized();
+				sampling.col(i) = (loop.col(mark % cols) + u0 * vec - barycenter) / len;
 			}
 		};
-
-		Eigen::Matrix3Xd fragment0, fragment1;
-		fragment0.resize(3, n); fragment1.resize(3, n);
-		assembleFragment(fragment0, 0, 0, loop0);
-		assembleFragment(fragment1, u, begin_seg, loop1);
-		double sum = 0;
-		double dot = 0;
-		for (int i = 0; i < n; ++i)
-		{
-			for (int j = i + 1; j < n; ++j)
-			{
-				double theta = conservativeArcCos(fragment0.col(i).dot(fragment0.col(j))) - conservativeArcCos(fragment1.col(i).dot(fragment1.col(j)));
-				sum += fabs(theta);
-			}
-		}
-		return 2.0 * sum / (n * (n - 1));
+		Eigen::Matrix3Xd sampling0, sampling1;
+		assembleSampling(sampling0, 0, 0, loop0);
+		assembleSampling(sampling1, u, begin_seg, loop1);
+		return ICP_Energy(sampling0, sampling1);
 	}
 
 	void LoopGen::LeastSquarePlane(Eigen::VectorXd xyz[3], double plane[4])
@@ -96,6 +92,7 @@ namespace LoopGen
 		m.col(2) << m(2, 0), m(2, 1), n;
 		Eigen::Vector3d right(p0.dot(p1), p0.dot(p2), p0.sum());
 		//加强权重
+		if (1)
 		{
 			n *= n;
 			m(0, 0) += n * p1(0) * p1(0); m(0, 1) += n * p1(0) * p2(0); m(0, 2) += n * p1(0);
@@ -228,9 +225,9 @@ namespace LoopGen
 	{
 		struct LayerNode
 		{
-			int id;
-			int count;
-			double dist;
+			int id;//序号
+			int count;//加速队列的次数
+			double dist;//与源点的距离
 			LayerNode() {}
 			LayerNode(int id_, double dist_, int count_) :id(id_), dist(dist_), count(count_) {}
 			bool operator>(const LayerNode& x) const { return dist > x.dist; }
@@ -246,6 +243,8 @@ namespace LoopGen
 
 		HalfedgeLayer* hl_begin = vl->hl;
 		HalfedgeLayer* hl_transfer = hl_begin;
+		//Eigen::Vector4d plane_func; plane_func.setZero();
+		auto &crossfield = cf->getCrossField();
 		do
 		{
 			double w = m4.weight(hl_transfer->id);
@@ -268,9 +267,16 @@ namespace LoopGen
 					}
 				}
 			}
+			//plane_func.head(3) += crossfield.col(m4.conj_hl(hl_transfer, 1)->left);
 			hl_transfer = hl_transfer->prev->oppo;
 		} while (hl_transfer != hl_begin);
-
+		//plane_func.head(3).normalize();
+		OpenMesh::Vec3d pos = mesh->point(vl->v);
+		//plane_func(3) = -(plane_func(0)*pos[0] + plane_func(1)*pos[1] + plane_func(2)*pos[2]);
+		/*auto plane_dist = [&](OpenMesh::Vec3d &p)
+		{
+			return fabs(plane_func(0)*p[0] + plane_func(1)*p[1] + plane_func(2)*p[2] + plane_func(3));
+		};*/
 		while (true)
 		{
 			LayerNode ln;
@@ -298,6 +304,11 @@ namespace LoopGen
 					if (!m4.sing_flag[vid] && !visited[hl_transfer->to])
 					{
 						int toid = hl_transfer->to;
+						/*double ratio = plane_dist(mesh->point(mesh->vertex_handle(vid))) / avg_len;
+						if (ratio > 2.0)
+						{
+							w *= ratio / 2;
+						}*/
 						if (distance[fromid] + w < distance[toid])
 						{
 							distance[toid] = distance[fromid] + w;
@@ -575,7 +586,6 @@ namespace LoopGen
 		}
 		advancing_front[0].push_back(std::move(hierarchy_vertex[0]));
 		advancing_front[1].push_back(std::move(hierarchy_vertex[1]));
-
 		while (true)
 		{
 			const auto& current_af = advancing_front[0].back();
@@ -590,7 +600,7 @@ namespace LoopGen
 					int toid = hl_transfer->to;
 					if (!visited_vl[toid])
 					{
-						if (InfoOnMesh[toid].energy > energy_threshold)
+						if (InfoOnMesh[toid].energy > energy_threshold || m4.sing_flag[toid / 4])
 							goto target0;
 						visited_vl[toid] = true;
 						hierarchy.push_back(toid);
@@ -617,7 +627,7 @@ namespace LoopGen
 					int toid = hl_transfer->to;
 					if (!visited_vl[toid])
 					{
-						if (InfoOnMesh[toid].energy > energy_threshold)
+						if (InfoOnMesh[toid].energy > energy_threshold || m4.sing_flag[toid / 4])
 							goto target1;
 						visited_vl[toid] = true;
 						hierarchy.push_back(toid);
@@ -685,6 +695,75 @@ namespace LoopGen
 			x_axis.col(fid) = crossfield.col(flid);
 			y_axis.col(fid) = crossfield.col(fid * 4 + (flid + 1) % 4);
 		}
+	}
+
+	void LoopGen::AssembleSampling(VertexLayer* vl, Eigen::Matrix3Xd &sampling, LocalParametrization &lp, int loop_sampling_num)
+	{
+		double step = 1.0 / loop_sampling_num;
+		auto setData = [&](double t0, double t1, double c, Eigen::Matrix3Xd& sampling, double fromu, double& tou, OpenMesh::Vec3d& frompos, OpenMesh::Vec3d& topos)
+		{
+			if (fabs(t0 - t1) > 0.5) { if (t0 < t1) { t0 += 1.0; } else { t1 += 1.0; } }
+			tou = c * t0 + (1 - c) * t1;
+			tou -= std::floor(tou);
+			if (fromu > tou && fabs(fromu - tou) < 0.5) return;
+
+			int u0 = std::floor(fromu * loop_sampling_num);
+			int u1 = std::floor(tou * loop_sampling_num);
+			if (u0 == u1) return;
+			//OpenMesh::Vec3d ev = (topos - frompos).normalized();
+			if (u0 < u1) for (int i = u0 + 1; i <= u1; ++i) {
+				if (fabs(fromu - tou) < YYSS_FAIRLY_SMALL)
+					c = 0.5;
+				else
+					c = (i*step - fromu) / (tou - fromu);
+				for (int j = 0; j < 3; ++j)
+					sampling(j, i) = (1 - c)*frompos[j] + c * topos[j];
+			}
+			else {
+				for (int i = u0 + 1; i < loop_sampling_num; ++i) {
+					if (fabs(1.0 - fromu) < YYSS_FAIRLY_SMALL)
+						c = 0.5;
+					else
+						c = (i*step - fromu) / (1.0 - fromu);
+					for (int j = 0; j < 3; ++j)
+						sampling(j, i) = (1 - c)*frompos[j] + c * topos[j];
+				}
+				for (int i = 0; i <= u1; ++i) {
+					if (u1 == 0)
+						c = 0.5;
+					else
+						c = i * step / tou;
+					for (int j = 0; j < 3; ++j)
+						sampling(j, i) = (1 - c)*frompos[j] + c * topos[j];
+				}
+			}
+		};
+		sampling.resize(3, loop_sampling_num); sampling.setZero();
+		double len = 0;
+		OpenMesh::Vec3d barycenter(0.0, 0.0, 0.0);
+		OpenMesh::Vec3d frompos, topos;
+		double fromu, tou;
+		frompos = mesh->point(vl->v);
+		fromu = lp.GetRegularU(vl->id);
+		for (auto& pl : lp.all_pl[vl->id])
+		{
+			topos = pl.c * mesh->point(m4.verticelayers[pl.hl->from].v) + (1 - pl.c) * mesh->point(m4.verticelayers[pl.hl->to].v);
+			barycenter += topos;
+			len += (frompos - topos).norm();
+			setData(lp.GetU(pl.hl->from), lp.GetU(pl.hl->to), pl.c, sampling, fromu, tou, frompos, topos);
+			frompos = topos;
+			fromu = tou;
+		}
+		topos = mesh->point(vl->v);
+		barycenter += topos;
+		len += (frompos - topos).norm();
+		tou = lp.GetRegularU(vl->id);
+		setData(tou, tou, 0, sampling, fromu, tou, frompos, topos);
+
+		Eigen::Vector3d bc(barycenter[0], barycenter[1], barycenter[2]);
+		bc /= loop_sampling_num;
+		for (int i = 0; i < loop_sampling_num; ++i)
+			sampling.col(i) = (sampling.col(i) - bc) / len;
 	}
 
 	void LoopGen::AssembleSimilarityAngle(VertexLayer* vl, Eigen::VectorXd& sa, LocalParametrization& lp, int loop_fragment_num)
@@ -806,14 +885,25 @@ namespace LoopGen
 		auto& grow_dir = lp.grow_dir;
 
 		//检测相似性能量
-		auto& normal_similarity_angle = lp.normal_similarity_angle;
 		auto& all_pl = lp.all_pl;
+#if USE_NEW_SIMILARITY_ENERGY
+		auto& normal_sampling = lp.normal_sampling;
+		int loop_sampling_num = all_pl[lp.region_vertex.front()->id].size();
+		if (vertex_cache_flag[lp.region_vertex.front()->id] && !lp.has_ns)
+		{
+			lp.has_ns = true;
+			AssembleSampling(lp.region_vertex.front(), normal_sampling, lp, loop_sampling_num);
+		}
+#else
+		auto &normal_similarity_angle = lp.normal_similarity_angle;
 		int loop_fragment_num = all_pl[lp.region_vertex.front()->id].size();
 		if (vertex_cache_flag[lp.region_vertex.front()->id] && !lp.has_nsa)
 		{
 			lp.has_nsa = true;
 			AssembleSimilarityAngle(lp.region_vertex.front(), normal_similarity_angle, lp, loop_fragment_num);
 		}
+#endif
+		
 
 		BoolVector if_similarity_energy_low;
 		if (lp.region_vertex.size() > 1)
@@ -827,6 +917,14 @@ namespace LoopGen
 				int grow_id = grow_dir[new_id];
 				if (!grow_flag[grow_id])
 					continue;
+#if USE_NEW_SIMILARITY_ENERGY
+				Eigen::Matrix3Xd sampling;
+				AssembleSampling(vertex_cache[i], sampling, lp, loop_sampling_num);
+				double ey = ICP_Energy(normal_sampling, sampling);
+				//dprint(i, ey);
+				if (ey < energy_threshold)
+					if_similarity_energy_low[new_id] = true;
+#else
 				Eigen::VectorXd similarity_angle;
 				AssembleSimilarityAngle(vertex_cache[i], similarity_angle, lp, loop_fragment_num);
 				double sum = 0;
@@ -836,7 +934,8 @@ namespace LoopGen
 				if (sum < energy_threshold * similarity_angle.size())
 				{
 					if_similarity_energy_low[new_id] = true;
-				}
+			    }
+#endif
 			}
 
 #if PRINT_DEBUG_INFO
@@ -1101,7 +1200,7 @@ namespace LoopGen
 		cut.push_back(vl);
 		vl = m4.conj_vl(vl, 1);
 		HalfedgeLayer* hl_begin = vl->hl;
-		HalfedgeLayer* hl_transfer = hl_begin;
+		HalfedgeLayer* hl_transfer = hl_begin;	
 		while (true)
 		{
 			double w = YYSS_INFINITE;
@@ -1189,6 +1288,10 @@ namespace LoopGen
 			bool grow_flag[2] = { true, true };
 			do
 			{
+				/*static int fe = 0;
+				++fe;
+				dprint("fe", fe);
+				dprint("vertices:", lp.region_vertex.size());*/
 				BoolVector visited_v = lp.region_v_flag;
 				for (auto& ver : lp.new_vertex)
 					visited_v[ver->id] = true;
@@ -1196,7 +1299,7 @@ namespace LoopGen
 					break;
 				lp.run(cf->getNormal());
 			} while (SpreadSubRegion(lp, grow_flag));
-
+			//dprint("vertices:", lp.region_vertex.size());
 			if (lp.region_vertex.size() > 1)
 				lp.modify_cut();
 
@@ -1267,7 +1370,6 @@ namespace LoopGen
 		}
 		ProcessOverlap(region_index);
 		WriteRegion(cset.cylinders, cf->crossfield, model_name);
-
 		cf->setOuterConstraint(constraint_flag, constraint_dir);
 		cf->setField();
 		cf->initFieldInfo();
@@ -1666,8 +1768,9 @@ namespace LoopGen
 		for (int i = 0; i < size; ++i)
 		{
 			/*dprint(i);
-			if (i == 3)
+			if (i != 6)
 			{
+				continue;
 				int p = 0;
 			}*/
 			BoolVector vh_flag(mesh->n_vertices(), false);
@@ -1697,7 +1800,7 @@ namespace LoopGen
 					do
 					{
 						VertexLayer* vl = &m4.verticelayers[hl_transfer->to];
-						if (vh_flag[vl->v.idx()] && !vl_flag[vl->id])
+						if (vh_flag[vl->v.idx()] && !vl_flag[vl->id] && !m4.sing_flag[vl->v.idx()])
 						{
 							vls.push_back(vl);
 							vl_flag[vl->id] = true;
@@ -1734,7 +1837,7 @@ namespace LoopGen
 
 			//构造cut
 			ConstructRegionCut(seed_vl, vl_flag, cset.cylinders[i].cut);
-
+			//return;
 			//初始化bound
 			cset.cylinders[i].set_bound();
 			if (i == 3)
@@ -2046,6 +2149,8 @@ namespace LoopGen
 			dk.from_bound = cset.vertex_bound_index[vp.vl->v.idx()];
 			dk.to_bound = cset.vertex_bound_index[cset.all_path[vp.vl->id].back().hl->to / 4];
 			dprint(vp.vl->id, vp.vl->v.idx(), dk.from_bound.first, dk.from_bound.second, dk.to_bound.first, dk.to_bound.second);
+			/*if (vp.vl->id == 142502)
+				break;*/
 			//seed_vertex.push_back(vp.vl);
 			if (vp.vl->id == 23937)
 			{
@@ -2127,9 +2232,9 @@ namespace LoopGen
 				constraint_dir.col(fh->f.idx()) = cf->crossfield.col(fh->id);
 			}
 		}
-		/*cf->setOuterConstraint(constraint_flag, constraint_dir);
+		cf->setOuterConstraint(constraint_flag, constraint_dir);
 		cf->setField();
-		cf->initFieldInfo();*/
+		cf->initFieldInfo();
 	}
 
 	void LoopGen::ConstructInitialRegion(VertexLayer* vl, disk &dk)

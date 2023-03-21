@@ -1,6 +1,7 @@
 #include "crossField.h"
 #include "LoopDef.h"
 #define PRINT_DEBUG_INFO 0
+#define USE_NEW_SIMILARITY_ENERGY 1
 namespace LoopGen
 {
 	class LocalParametrization
@@ -45,8 +46,14 @@ namespace LoopGen
 		Eigen::Matrix3Xd y_axis;
 		std::vector<int> vidmap;
 		Eigen::VectorXd uv[2];
+#if USE_NEW_SIMILARITY_ENERGY
+		Eigen::Matrix3Xd normal_sampling;
+		bool has_ns = false;
+#else
 		Eigen::VectorXd normal_similarity_angle;
 		bool has_nsa = false;
+#endif
+
 
 		void run(const Eigen::Matrix3Xd &normal);
 		void modify_cut();

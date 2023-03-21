@@ -386,6 +386,7 @@ namespace LoopGen
 				break;
 			}
 		}
+		dprint("#Singularity:", singularity[0].size() + singularity[1].size() + singularity[2].size());
 	}
 
 	//void crossField::setWeight(double alpha)
