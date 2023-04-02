@@ -757,10 +757,13 @@ void InteractiveViewerWidget::showLoop()
 #if 0
 		lg->m4.set_base(&mesh, lg->cf); lg->m4.init(); lg->m4.update(); lg->m4.set_weight();
 #else
-#if 0
-		lg->InitializePQ();
-		lg->OptimizeLoop();
-#else
+#if 1
+		//lg->InitializePlaneLoop();
+		//lg->InitializeSimilarityEnergy();
+		//lg->ConstructCylinder();
+		//lg->OptimizeCylinder();
+		//lg->IterateCylinder();
+////#else
 		lg->ReLoop();
 #endif
 #endif
@@ -803,7 +806,9 @@ void InteractiveViewerWidget::showLoop()
 		{
 			//if (i == 0)
 				//continue;
-			if (lg->FieldAligned_PlanarLoop(vl, loop))
+			BoolVector break_info(lg->m4.verticelayers.size(), false);
+			break_info[vl->id] = true;
+			if (lg->FieldAligned_PlanarLoop(vl, loop, break_info))
 			{
 				for (int j = 0; j < loop.size() - 1; ++j)
 				{
@@ -881,307 +886,377 @@ void InteractiveViewerWidget::draw_submesh()
 	glColor3d(1, 0, 0);
 	glPointSize(15);
 	glBegin(GL_POINTS);
-	glVertex3dv(mesh.point(mesh.vertex_handle(4019)).data());
+	glVertex3dv(mesh.point(mesh.vertex_handle(5680/4)).data());
 	glEnd();
 #endif
 
-	//画某条线
+	//画线
 #if 0
 	glLineWidth(3);
 	glBegin(GL_LINES);
 	glColor3d(0.8, 0.2, 0.1);
+	std::ifstream file_reader;
+	file_reader.open("C://Users//123//Desktop//vscode compare//old.txt", std::ios::in);
+	char line[1024] = { 0 };
 
-	//for (auto &path : lg->all_vertice_path)
-	//for (int i = 0; i < lg->all_vertice_path.size(); ++i)
-	//for (int i = 0; i < lg->region_path.size(); ++i)
-	for (int k = 0; k < lg->seed_vertex.size(); ++k)
+	glVertex3dv(mesh.point(mesh.vertex_handle(26480 / 4)).data());
+	glVertex3dv(mesh.point(mesh.vertex_handle(26430 / 4)).data());
+	glVertex3dv(mesh.point(mesh.vertex_handle(26430 / 4)).data());
+	glVertex3dv(mesh.point(mesh.vertex_handle(5636 / 4)).data());
+	glVertex3dv(mesh.point(mesh.vertex_handle(5636 / 4)).data());
+	glVertex3dv(mesh.point(mesh.vertex_handle(26682 / 4)).data());
+	glVertex3dv(mesh.point(mesh.vertex_handle(26682 / 4)).data());
+	glVertex3dv(mesh.point(mesh.vertex_handle(32650 / 4)).data());
+	glVertex3dv(mesh.point(mesh.vertex_handle(32650 / 4)).data());
+	while (file_reader.getline(line, sizeof(line)))
 	{
-		//if (lg->seed_vertex[k]->id != 147012)
-		//	continue;
-		auto &path = lg->all_vertice_path[lg->seed_vertex[k]->v.idx()];
-		//if (i == 147012 / 4)
-		//	glColor3d(0, 0, 1);
-		//else if (i == 10399)
-		//	glColor3d(0, 1, 0);
-		//else if (i == 38687)
-		//	glColor3d(1, 1, 0);
-		//else if (i == 10449)
-		//	glColor3d(0, 1, 1);
-		//else if (i == 38288)
-		//	glColor3d(1, 1, 1);
-		//else
-		//	//glColor3d(0.8, 0.2, 0.1);
-		//	continue;
-		//auto &path = lg->all_vertice_path[i];
-		//if (i % 10 != 0)
-		//	continue;
-		if (path.size() < 2)
-			continue;
+		std::stringstream num(line);
+		int id;
+		num >> id;
+		glVertex3dv(mesh.point(mesh.vertex_handle(id / 4)).data());
+		glVertex3dv(mesh.point(mesh.vertex_handle(id / 4)).data());
+	}
+	glVertex3dv(mesh.point(mesh.vertex_handle(32650 / 4)).data());
+	file_reader.close();
+	glEnd();
+#endif
 
-		if (path.front().hl)
-			glVertex3dv(path.front().point(lg->m4).data());
-		else
-			glVertex3dv(mesh.point(mesh.vertex_handle(path.front().c)).data());
-		OpenMesh::Vec3d p;
-		for (int i = 1; i < path.size() - 1; ++i)
+	//画link_on_cylinder
+#if 0
+	glLineWidth(3);
+	glBegin(GL_LINES);
+	glColor3d(0.8, 0.2, 0.1);
+	//for (auto &lpoc : lg->cylinder_link_path)
+	for (int j=0;j<lg->cylinder_link_path.size();++j)
+	{
+		if (j != 176 && j != 81654)
+			continue;
+		auto &lpoc = lg->cylinder_link_path[j];
+		if (lpoc.size() < 2)
+			continue;
+		for (int i = 0; i < lpoc.size() - 1; ++i)
 		{
-			if (path[i].hl)
-				p = path[i].point(lg->m4);
+			glVertex3dv(mesh.point(lpoc[i]->v).data());
+			glVertex3dv(mesh.point(lpoc[i + 1]->v).data());
+		}
+	}
+	glEnd();
+#endif
+
+	//画search_loop
+#if 0
+	glLineWidth(3);
+	glBegin(GL_LINES);
+	glColor3d(0.8, 0.2, 0.1);
+	if (lg->search_loop.size() > 2)
+	{
+		for (int i = 0; i < lg->search_loop.size() - 1; ++i)
+		{
+			glVertex3dv(mesh.point(lg->search_loop[i]->v).data());
+			glVertex3dv(mesh.point(lg->search_loop[i + 1]->v).data());
+		}
+	}
+	glEnd();
+#endif
+	if (loop_gen_init)
+	{
+		//画某条线
+#if 0
+		glLineWidth(3);
+		glBegin(GL_LINES);
+		glColor3d(0.8, 0.2, 0.1);
+
+		//for (auto &path : lg->all_vertice_path)
+		//for (int i = 0; i < lg->all_vertice_path.size(); ++i)
+		//for (int i = 0; i < lg->region_path.size(); ++i)
+		for (int k = 0; k < lg->seed_vertex.size(); ++k)
+		{
+			//if (lg->seed_vertex[k]->id != 147012)
+			//	continue;
+			auto &path = lg->all_vertice_path[lg->seed_vertex[k]->v.idx()];
+			//if (i == 147012 / 4)
+			//	glColor3d(0, 0, 1);
+			//else if (i == 10399)
+			//	glColor3d(0, 1, 0);
+			//else if (i == 38687)
+			//	glColor3d(1, 1, 0);
+			//else if (i == 10449)
+			//	glColor3d(0, 1, 1);
+			//else if (i == 38288)
+			//	glColor3d(1, 1, 1);
+			//else
+			//	//glColor3d(0.8, 0.2, 0.1);
+			//	continue;
+			//auto &path = lg->all_vertice_path[i];
+			//if (i % 10 != 0)
+			//	continue;
+			if (path.size() < 2)
+				continue;
+
+			if (path.front().hl)
+				glVertex3dv(path.front().point(lg->m4).data());
 			else
-				p = mesh.point(mesh.vertex_handle(path[i].c));
-			glVertex3dv(p.data());
-			glVertex3dv(p.data());
+				glVertex3dv(mesh.point(mesh.vertex_handle(path.front().c)).data());
+			OpenMesh::Vec3d p;
+			for (int i = 1; i < path.size() - 1; ++i)
+			{
+				if (path[i].hl)
+					p = path[i].point(lg->m4);
+				else
+					p = mesh.point(mesh.vertex_handle(path[i].c));
+				glVertex3dv(p.data());
+				glVertex3dv(p.data());
+			}
+			if (path.back().hl)
+				glVertex3dv(path.back().point(lg->m4).data());
+			else
+				glVertex3dv(mesh.point(mesh.vertex_handle(path.back().c)).data());
 		}
-		if (path.back().hl)
-			glVertex3dv(path.back().point(lg->m4).data());
-		else
-			glVertex3dv(mesh.point(mesh.vertex_handle(path.back().c)).data());
-	}
-	glEnd();
+		glEnd();
 #endif
 
-	//画u参数
+		//画u参数
 #if 0
-	double vmi = 1.0e12;
-	double vma = -1.0e12;
-	for (int i = 0; i < lg->old_vert_flag.size(); ++i)
-	{
-		if (lg->old_vert_flag[i])
+		double vmi = 1.0e12;
+		double vma = -1.0e12;
+		for (int i = 0; i < lg->old_vert_flag.size(); ++i)
 		{
-			double c = lg->uv_para[0](lg->vertexidmap[i]);
-			vmi = std::min(c, vmi);
-			vma = std::max(c, vma);
+			if (lg->old_vert_flag[i])
+			{
+				double c = lg->uv_para[0](lg->vertexidmap[i]);
+				vmi = std::min(c, vmi);
+				vma = std::max(c, vma);
+			}
 		}
-	}
-	vma = 1.0 / (vma - vmi);
-	glPointSize(5);
-	glBegin(GL_POINTS);
-	for (int i = 0; i < lg->old_vert_flag.size(); ++i)
-	{
-		if (lg->old_vert_flag[i])
+		vma = 1.0 / (vma - vmi);
+		glPointSize(5);
+		glBegin(GL_POINTS);
+		for (int i = 0; i < lg->old_vert_flag.size(); ++i)
 		{
-			double c = lg->uv_para[0](lg->vertexidmap[i]);
-			c = (c - vmi)*vma;
-			glColor3d(c, c, c);
-			glVertex3dv(mesh.point(mesh.vertex_handle(i)).data());
+			if (lg->old_vert_flag[i])
+			{
+				double c = lg->uv_para[0](lg->vertexidmap[i]);
+				c = (c - vmi)*vma;
+				glColor3d(c, c, c);
+				glVertex3dv(mesh.point(mesh.vertex_handle(i)).data());
+			}
 		}
-	}
-	glEnd();
+		glEnd();
 #endif
 
-	//画v参数
+		//画v参数
 #if 0
-	double vmi = 1.0e12;
-	double vma = -1.0e12;
-	for (int i = 0; i < lg->old_vert_flag.size(); ++i)
-	{
-		if (lg->old_vert_flag[i])
+		double vmi = 1.0e12;
+		double vma = -1.0e12;
+		for (int i = 0; i < lg->old_vert_flag.size(); ++i)
 		{
-			double c = lg->uv_para[1](lg->vertexidmap[i]);
-			vmi = std::min(c, vmi);
-			vma = std::max(c, vma);
+			if (lg->old_vert_flag[i])
+			{
+				double c = lg->uv_para[1](lg->vertexidmap[i]);
+				vmi = std::min(c, vmi);
+				vma = std::max(c, vma);
+			}
 		}
-	}
-	vma = 1.0 / (vma - vmi);
-	glPointSize(5);
-	glBegin(GL_POINTS);
-	for (int i = 0; i < lg->old_vert_flag.size(); ++i)
-	{
-		if (lg->old_vert_flag[i])
+		vma = 1.0 / (vma - vmi);
+		glPointSize(5);
+		glBegin(GL_POINTS);
+		for (int i = 0; i < lg->old_vert_flag.size(); ++i)
 		{
-			double c = lg->uv_para[1](lg->vertexidmap[i]);
-			c = (c - vmi)*vma;
-			glColor3d(c, c, c);
-			glVertex3dv(mesh.point(mesh.vertex_handle(i)).data());
+			if (lg->old_vert_flag[i])
+			{
+				double c = lg->uv_para[1](lg->vertexidmap[i]);
+				c = (c - vmi)*vma;
+				glColor3d(c, c, c);
+				glVertex3dv(mesh.point(mesh.vertex_handle(i)).data());
+			}
 		}
-	}
-	glEnd();
+		glEnd();
 #endif
 
-	//画方向
+		//画方向
 #if 0
-	double avgl = 0.2*calc_mesh_ave_edge_length(&mesh);
-	glColor3d(1, 0, 0);
-	glLineWidth(3);
-	glBegin(GL_LINES);
-	for (int i = 0; i < lg->old_face_flag.size(); ++i)
-	{
-		if (lg->old_face_flag[i])
+		double avgl = 0.2*calc_mesh_ave_edge_length(&mesh);
+		glColor3d(1, 0, 0);
+		glLineWidth(3);
+		glBegin(GL_LINES);
+		for (int i = 0; i < lg->old_face_flag.size(); ++i)
 		{
-			auto c = mesh.calc_face_centroid(mesh.face_handle(i));
-			Eigen::Vector3d vc(c[0], c[1], c[2]);
-			Eigen::Vector3d topoint = vc + lg->xaxis.col(i) * avgl;
-			glVertex3dv(vc.data());
-			glVertex3dv(topoint.data());
+			if (lg->old_face_flag[i])
+			{
+				auto c = mesh.calc_face_centroid(mesh.face_handle(i));
+				Eigen::Vector3d vc(c[0], c[1], c[2]);
+				Eigen::Vector3d topoint = vc + lg->xaxis.col(i) * avgl;
+				glVertex3dv(vc.data());
+				glVertex3dv(topoint.data());
+			}
 		}
-	}
-	glEnd();
+		glEnd();
 #endif
 
-	//画区域顶点
+		//画区域顶点
 #if 0
-	glColor3d(1, 1, 1);
-	glPointSize(5);
-	glBegin(GL_POINTS);
-	for (int i = 0; i < lg->old_vert_flag.size(); ++i)
-	{
-		if (lg->old_vert_flag[i])
+		glColor3d(1, 1, 1);
+		glPointSize(5);
+		glBegin(GL_POINTS);
+		for (int i = 0; i < lg->old_vert_flag.size(); ++i)
 		{
-			glVertex3dv(mesh.point(mesh.vertex_handle(i)).data());
+			if (lg->old_vert_flag[i])
+			{
+				glVertex3dv(mesh.point(mesh.vertex_handle(i)).data());
+			}
 		}
-	}
-	glEnd();
+		glEnd();
 #endif
 
-	//画path起始点
+		//画path起始点
 #if 1
-	glColor3d(0, 0, 1);
-	glPointSize(15);
-	glBegin(GL_POINTS);
-	for (auto vl : lg->seed_vertex)
-		glVertex3dv(mesh.point(vl->v).data());
-	glEnd();
+		glColor3d(0, 0, 1);
+		glPointSize(15);
+		glBegin(GL_POINTS);
+		for (auto vl : lg->seed_vertex)
+			glVertex3dv(mesh.point(vl->v).data());
+		glEnd();
 #endif
 
-	//画初始path路径
+		//画初始path路径
 #if 1
-	glLineWidth(3);
-	glBegin(GL_LINES);
-	glColor3d(0.8, 0.0, 0.8);
-	//for (auto &path : lg->all_vertice_path)
-	for (auto &dk:lg->dset.disks)
-	{
-		auto &path = dk.initial_path;
-		if (path.size() < 2)
-			continue;
-		for (int i = 0; i < path.size() - 1; ++i)
+		glLineWidth(3);
+		glBegin(GL_LINES);
+		glColor3d(0.8, 0.0, 0.8);
+		//for (auto &path : lg->all_vertice_path)
+		for (auto &dk : lg->dset.disks)
 		{
-			glVertex3dv(path[i].point(lg->m4).data());
-			glVertex3dv(path[i + 1].point(lg->m4).data());
+			auto &path = dk.initial_path;
+			if (path.size() < 2)
+				continue;
+			for (int i = 0; i < path.size() - 1; ++i)
+			{
+				glVertex3dv(path[i].point(lg->m4).data());
+				glVertex3dv(path[i + 1].point(lg->m4).data());
+			}
 		}
-	}
-	glEnd();
+		glEnd();
 #endif
 
-	//画区域的面
+		//画区域的面
 #if 1
-	glColor3d(0, 1, 0);
-	glBegin(GL_TRIANGLES);
-	for (int i = 0; i < 
+		glColor3d(0, 1, 0);
+		glBegin(GL_TRIANGLES);
+		for (int i = 0; i <
 #if 1
-		lg->old_face_flag.size();
+			lg->old_face_flag.size();
 #else
-		lg->new_face_flag.size();
+			lg->new_face_flag.size();
 #endif
-		++i)
-	{
-		if (
+			++i)
+		{
+			if (
 #if 1
-			lg->old_face_flag[i]
+				lg->old_face_flag[i]
 #else
-			lg->new_face_flag[i]
+				lg->new_face_flag[i]
 #endif
-			)
-		{
-			auto itr = mesh.fv_begin(mesh.face_handle(i));
-			glVertex3dv(mesh.point(itr.handle()).data()); ++itr;
-			glVertex3dv(mesh.point(itr.handle()).data()); ++itr;
-			glVertex3dv(mesh.point(itr.handle()).data());
+				)
+			{
+				auto itr = mesh.fv_begin(mesh.face_handle(i));
+				glVertex3dv(mesh.point(itr.handle()).data()); ++itr;
+				glVertex3dv(mesh.point(itr.handle()).data()); ++itr;
+				glVertex3dv(mesh.point(itr.handle()).data());
+			}
 		}
-		}
-	glEnd();
+		glEnd();
 #endif
 
-	//画边界搜索路径
+		//画边界搜索路径
 #if 0
-	glLineWidth(3);
-	glBegin(GL_LINES);
-	glColor3d(0.8, 0.2, 0.1);
-	int nv = mesh.n_vertices();
-	for (auto &path : lg->all_vertice_path)
-	{
-		if (path.size() < 2)
-			continue;
-		for (int i = 0; i < path.size() - 1; ++i)
+		glLineWidth(3);
+		glBegin(GL_LINES);
+		glColor3d(0.8, 0.2, 0.1);
+		int nv = mesh.n_vertices();
+		for (auto &path : lg->all_vertice_path)
 		{
-			glVertex3dv(path[i].point(lg->m4).data());
-			glVertex3dv(path[i + 1].point(lg->m4).data());
+			if (path.size() < 2)
+				continue;
+			for (int i = 0; i < path.size() - 1; ++i)
+			{
+				glVertex3dv(path[i].point(lg->m4).data());
+				glVertex3dv(path[i + 1].point(lg->m4).data());
+			}
 		}
-		}
-	glEnd();
+		glEnd();
 #endif
 
-	//画相似性能量分布
+		//画相似性能量分布
 #if 0
-	double mine = YYSS_INFINITE;
-	double maxe = -YYSS_INFINITE;
-	for (auto e : lg->eee)
-	{
-		mine = std::min(mine, e.second);
-		maxe = std::max(maxe, e.second);
-	}
-	maxe = 0.2;
-	maxe = 1.0 / (maxe - mine);
-	glPointSize(15);
-	glBegin(GL_POINTS);
-	for (auto e : lg->eee)
-	{
-		if (e.second > 0.2)
-			glColor3d(0, 1, 0);
-		else
+		double mine = YYSS_INFINITE;
+		double maxe = -YYSS_INFINITE;
+		for (auto e : lg->eee)
 		{
-			double c = (e.second - mine)*maxe;
-			glColor3d(c, 0, 1 - c);
+			mine = std::min(mine, e.second);
+			maxe = std::max(maxe, e.second);
 		}
-		glVertex3dv(mesh.point(mesh.vertex_handle(e.first)).data());
-	}
-	glEnd();
+		maxe = 0.2;
+		maxe = 1.0 / (maxe - mine);
+		glPointSize(15);
+		glBegin(GL_POINTS);
+		for (auto e : lg->eee)
+		{
+			if (e.second > 0.2)
+				glColor3d(0, 1, 0);
+			else
+			{
+				double c = (e.second - mine)*maxe;
+				glColor3d(c, 0, 1 - c);
+			}
+			glVertex3dv(mesh.point(mesh.vertex_handle(e.first)).data());
+		}
+		glEnd();
 #endif
 
-	//画disk边界
+		//画disk边界
 #if 1
-	glLineWidth(3);
-	glBegin(GL_LINES);
-	glColor3d(0.5, 0.0, 0.5);
-	for (auto &disk : lg->dset.disks)
-	{
-		for (auto be : disk.bounds)
+		glLineWidth(3);
+		glBegin(GL_LINES);
+		glColor3d(0.5, 0.0, 0.5);
+		for (auto &disk : lg->dset.disks)
 		{
-			glVertex3dv(mesh.point(mesh.from_vertex_handle(be)).data());
-			glVertex3dv(mesh.point(mesh.to_vertex_handle(be)).data());
+			for (auto be : disk.bounds)
+			{
+				glVertex3dv(mesh.point(mesh.from_vertex_handle(be)).data());
+				glVertex3dv(mesh.point(mesh.to_vertex_handle(be)).data());
+			}
 		}
-	}
-	glEnd();
+		glEnd();
 #endif
 
-	//画pls
+		//画pls
 #if 0
-	glLineWidth(3);
-	glBegin(GL_LINES);
-	glColor3d(0.8, 0.2, 0.1);
-	int nv = mesh.n_vertices();
-	for (int j = 0; j < lg->pls.size(); ++j)
-	{
-		if (j % 5 != 0)
-			continue;
-		auto& pl = lg->pls[j];
-		int nn = pl.size();
-		if (nn < 1)
-			continue;
-		auto poin = pl.front().point(lg->m4);
-		glVertex3dv(poin.data());
-		for (int i = 1; i < nn - 1; ++i)
+		glLineWidth(3);
+		glBegin(GL_LINES);
+		glColor3d(0.8, 0.2, 0.1);
+		int nv = mesh.n_vertices();
+		for (int j = 0; j < lg->pls.size(); ++j)
 		{
-			poin = pl[i].point(lg->m4);
+			if (j % 5 != 0)
+				continue;
+			auto& pl = lg->pls[j];
+			int nn = pl.size();
+			if (nn < 1)
+				continue;
+			auto poin = pl.front().point(lg->m4);
 			glVertex3dv(poin.data());
+			for (int i = 1; i < nn - 1; ++i)
+			{
+				poin = pl[i].point(lg->m4);
+				glVertex3dv(poin.data());
+				glVertex3dv(poin.data());
+			}
+			poin = pl.back().point(lg->m4);
 			glVertex3dv(poin.data());
 		}
-		poin = pl.back().point(lg->m4);
-		glVertex3dv(poin.data());
-	}
-	glEnd();
+		glEnd();
 #endif
-
+	}
 	if (loop_gen_init)
 	{
 		//画区域顶点
@@ -1278,6 +1353,8 @@ void InteractiveViewerWidget::draw_submesh()
 		glBegin(GL_POINTS);
 		for (auto &cy : lg->cset.cylinders)
 		{
+			if (cy.id < 12)
+				continue;
 			for (auto vl : cy.vertices)
 			{
 				glVertex3dv(mesh.point(vl->v).data());
@@ -1287,7 +1364,7 @@ void InteractiveViewerWidget::draw_submesh()
 #endif
 		
 		//画所有柱体的面
-#if 1
+#if 0
 		glColor3d(0, 0.8, 0);
 		glBegin(GL_TRIANGLES);
 		for (auto &cy : lg->cset.cylinders)
@@ -1304,7 +1381,7 @@ void InteractiveViewerWidget::draw_submesh()
 #endif
 
 		//画所有柱体的cut
-#if 1
+#if 0
 		glColor3d(1, 0, 0);
 		glBegin(GL_LINES);
 		for (auto &cy : lg->cset.cylinders)
@@ -1417,9 +1494,9 @@ void InteractiveViewerWidget::draw_submesh()
 #if 0
 		double vma = -1.0 * YYSS_FAIRLY_SMALL;
 		double vmi = YYSS_INFINITE;
-		for (int i = 0; i < lg->old_vert_flag.size(); ++i)
+		for (int i = 0; i < lg->new_vert_flag.size(); ++i)
 		{
-			if (lg->old_vert_flag[i])
+			if (lg->new_vert_flag[i])
 			{
 				double c = lg->uv_para[1](lg->vertexidmap[i]);
 				vma = std::max(vma, c);
@@ -1429,11 +1506,13 @@ void InteractiveViewerWidget::draw_submesh()
 		double step = 1.0 / (vma - vmi);
 		glPointSize(5);
 		glBegin(GL_POINTS);
-		for (int i = 0; i < lg->old_vert_flag.size(); ++i)
+		for (int i = 0; i < lg->new_vert_flag.size(); ++i)
 		{
-			if (lg->old_vert_flag[i])
+			if (lg->new_vert_flag[i])
 			{
-				double c = (lg->uv_para[1](lg->idmap[i]) - vmi) * step;
+				double c = (lg->uv_para[1](lg->vertexidmap[i]) - vmi) * step;
+				if (fabs(lg->uv_para[1](lg->vertexidmap[i])) > 0.01)
+					continue;
 				glColor3d(c, c, c);
 				glVertex3dv(mesh.point(lg->m4.verticelayers[i].v).data());
 			}

@@ -209,18 +209,18 @@ namespace LoopGen
 			} while (hl_transfer != hl_begin);
 			return nullptr;
 		}
-		VertexLayer* conj_vl(VertexLayer* vl, int layer_plus)
+		VertexLayer* another_layer(VertexLayer* vl, int layer_plus)
 		{
 			//int id = verticemap[vl->v.idx()];
 			int id = vl->v.idx() * 4;
 			return &verticelayers[id + (vl->id - id + layer_plus) % 4];
 		}
-		FaceLayer* conj_fl(FaceLayer* fl, int layer_plus)
+		FaceLayer* another_layer(FaceLayer* fl, int layer_plus)
 		{
 			int id = fl->f.idx() * 4;
 			return &facelayers[id + (fl->id - id + layer_plus) % 4];
 		}
-		HalfedgeLayer* conj_hl(HalfedgeLayer* hl, int layer_plus)
+		HalfedgeLayer* another_layer(HalfedgeLayer* hl, int layer_plus)
 		{
 			int id = hl->h.idx() * 4;
 			return &halfedgelayers[id + (hl->id - id + layer_plus) % 4];

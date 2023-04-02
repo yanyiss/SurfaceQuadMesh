@@ -1,7 +1,6 @@
 #include "crossField.h"
 #include "LoopDef.h"
 #define PRINT_DEBUG_INFO 0
-#define USE_NEW_SIMILARITY_ENERGY 1
 namespace LoopGen
 {
 	class LocalParametrization
@@ -27,12 +26,6 @@ namespace LoopGen
 		std::vector<FaceLayer*> region_face;
 		std::vector<VertexLayer*> cut;
 
-		/*std::deque<bool> new_f_flag;
-		std::deque<bool> new_v_flag;
-		std::deque<bool> region_f_flag;
-		std::deque<bool> region_v_flag;
-		std::deque<bool> cutv_flag;
-		std::deque<bool> cutf_flag;*/
 		BoolVector new_f_flag;
 		BoolVector new_v_flag;
 		BoolVector region_f_flag;

@@ -39,7 +39,7 @@ namespace LoopGen
 
 		//初始化阶段函数
 		//bool FieldAligned_PlanarLoop(VertexHandle v, std::vector<VertexHandle>& loop, int shift = 0);
-		bool FieldAligned_PlanarLoop(/*M4 &m4, */VertexLayer* vl, std::vector<VertexLayer*> &loop);
+		bool FieldAligned_PlanarLoop(/*M4 &m4, */VertexLayer* vl, std::vector<VertexLayer*> &path, BoolVector &break_info);
 		double RefineLoopByPlanarity(/*M4 &m4, */std::vector<VertexLayer*>& loop, PlaneLoop& planar_loop);
 		void GetPositionFromLoop(const std::vector<VertexLayer*>& loop, Eigen::VectorXd xyz[3]);
 		double EvaluateLoopSimilarity(Eigen::Matrix3Xd& loop0, Eigen::Matrix3Xd& loop1, double u, int begin_seg);
@@ -48,7 +48,9 @@ namespace LoopGen
 
 		void InitializeField();
 		//void InitializeGraphWeight(double alpha = 900);
-		void InitializePQ();
+		//void InitializePQ();
+		void InitializePlaneLoop();
+		void InitializeSimilarityEnergy(bool re_compute = false);
 
 		//用于数据交换与绘制的变量
 		//std::vector<VertexHandle> region_vertex;
@@ -72,10 +74,12 @@ namespace LoopGen
 		//std::vector<Vec3d> u0point5;
 		std::vector<VertexLayer*> seed_vertex;
 		std::vector<VertexLayer*> cut_vertex;
+		std::vector<std::vector<VertexLayer*>> cylinder_link_path;
+		std::vector<VertexLayer*> search_loop;
 
 		//算法重要参数
 		double energy_threshold = 0.2;
-		double disk_e = 0.2;
+		double disk_e = 0.075;
 		int extend_layer = 3;
 
 		//优化阶段变量
@@ -93,31 +97,30 @@ namespace LoopGen
 		void ConstructInitialRegion(InfoOnVertex* iov, LocalParametrization &lp);
 		bool SpreadSubRegion(LocalParametrization& lp, bool grow_flag[2]);
 		bool ConstructRegionCut(VertexLayer* vl, BoolVector& visited, std::vector<VertexLayer*>& cut);
-		void ProcessOverlap(std::vector<std::vector<int>> &region_index);
-		void OptimizeLoop();
+		void ProcessOverlap();
+		void IterativePQ();
+		void ConstructCylinder();
 
 		//Loop迭代阶段
+		bool CylinderBasedPLSearch(VertexLayer* vl, std::vector<VertexLayer*> &loop, std::vector<std::vector<VertexLayer*>> &link_on_cylinder);
+		void OptimizeCylinder();
+		void IterateCylinder();
+		void RecoverCylinder(std::vector<std::vector<int>> &vh_set, std::vector<OpenMesh::Vec3d> &dir,
+			bool set_cut = true, bool set_bound = true, bool set_parameter = true,
+			bool set_flag = true, bool set_intersection = true);
 		void ReLoop();
 		void OptimizeDisk();
 		double EvaluatePathSimilarity(Eigen::Matrix3Xd &path0, Eigen::Matrix3Xd &path1);
 		void ConstructInitialRegion(VertexLayer* vl, disk &dk);
 		void OptimizeDiskField(disk &dk);
 		bool RefinePathByField(VertexHandle v, disk &dk, BoolVector &visited_v, BoolVector &visited_f);
+		void AssembleSampling(PlaneLoop &path, Eigen::Matrix3Xd &sampling, int path_sampling_num);
 		double AssembleSimilarityAngle(PlaneLoop &path, Eigen::VectorXd &sa, int path_fragment_num);
 		bool SpreadSubRegion(disk &dk, bool grow_flag[2]);
 		bool CheckDiskTopology(std::vector<VertexHandle> &vertex_set, BoolVector &vs_flag);
 		std::vector<double> edge_path_similarity_energy;
 		std::vector<double> vert_path_similarity_energy;
 		std::vector<std::pair<int, double>> eee;
-#if 0
-		void ConstructInitialRegion(VertexLayer* vl, temp_name &tn);
-		void set_one_field(temp_name &tn);
-		void parame(temp_name &tn);
-		bool RefinePathByParametrization(VertexHandle v, temp_name &tn, BoolVector &visited_v, BoolVector &visited_f);
-		double AssembleSimilarityAngle(VertexHandle v, Eigen::VectorXd& sa, temp_name &tn, int path_fragment_num);
-		bool SpreadSubRegion(temp_name &tn, bool grow_flag[2]);
-		void OptimizeDisk(vl_pair_pq &path_pq);
-#endif
 		std::vector<PlaneLoop> all_vertice_path;
 
 		//void SetUParaLine(InfoOnVertex& iov, LocalParametrization& lp, std::deque<bool>& visited_v, std::deque<bool>& visited_f);
