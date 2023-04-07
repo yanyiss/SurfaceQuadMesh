@@ -114,8 +114,6 @@ namespace LoopGen
 		void update()
 		{
 			sing_flag.resize(mesh->n_vertices(), false);
-			/*for (auto sing : cf->getSingularity())
-				sing_flag[sing] = true;*/
 			for (auto &sing : cf->getSingularity())
 				for (auto &s : sing)
 					sing_flag[s] = true;
@@ -259,4 +257,41 @@ namespace LoopGen
 	};
 	//typedef CoveringSpaceDataStructure<2> M2;
 	typedef CoveringSpaceDataStructure<4> M4;
+
+#define vhMarkCirculator(hl_begin, hl_transfer, codeBody)\
+do\
+{\
+##codeBody##\
+##hl_transfer## = ##hl_transfer##->prev->oppo;\
+}while(##hl_transfer## != ##hl_begin##);
+
+#define fhMarkCirculator(hl_begin, hl_transfer, codeBody)\
+do\
+{\
+##codeBody##\
+##hl_transfer## = ##hl_transfer##->next;\
+}while(##hl_transfer## != ##hl_begin##);
+
+#define vhCirculator(vl, codeBody)\
+{\
+HalfedgeLayer* hl_begin = ##vl##->hl;\
+HalfedgeLayer* hl_transfer = hl_begin;\
+do\
+{\
+##codeBody##\
+hl_transfer = hl_transfer->prev->oppo;\
+}while(hl_transfer != hl_begin);\
+}
+
+#define fhCirculator(fl, codeBody)\
+{\
+HalfedgeLayer* hl_begin = ##fl##->hl;\
+HalfedgeLayer* hl_transfer = hl_begin;\
+do\
+{\
+##codeBody##\
+hl_transfer = hl_transfer->next;\
+}while(hl_transfer != hl_begin);\
+}
+
 }

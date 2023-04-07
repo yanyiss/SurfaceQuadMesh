@@ -12,7 +12,6 @@
 namespace LoopGen
 {
 	struct PointOnHalfedgeLayer {
-		//HalfedgeHandle h;
 		HalfedgeLayer* hl;
 		double c = 0.0;
 		PointOnHalfedgeLayer() {}
@@ -40,23 +39,15 @@ namespace LoopGen
 		bool operator>(const LayerNode& x) const { return dist > x.dist; }
 	};
 	typedef std::priority_queue<LayerNode, std::vector<LayerNode>, std::greater<LayerNode>> layernode_pq;
-	//struct InfoOnVertex {
-	//	int id;
-	//	std::map<int, int> mark;//这里的int记录了平行loop的朝向关系，0表示同向，1表示反向
-	//	//std::map<VertexHandle, InfoOnVertex*> adj;
-	//	//PlaneLoop pl;
 
-	//	double energy = YYSS_INFINITE;
-	//};
 	enum DIRECTION {
 		Forward,
 		Reverse
 	};
+
 	struct InfoOnVertex
 	{
 		int id;
-		//std::map<int, int> mark;
-		//PlaneLoop pl;
 		int plid;
 		DIRECTION dir;
 		double energy = YYSS_INFINITE;
@@ -75,22 +66,50 @@ namespace LoopGen
 	};
 	typedef std::priority_queue<vl_pair, std::vector<vl_pair>, std::greater<vl_pair>> vl_pair_pq;
 
-	struct cylinder
+	struct spread_info
 	{
+		M4* m4;
+
+		std::vector<VertexLayer*> new_vertex;
+		std::vector<FaceLayer*> new_face;
+
+		BoolVector new_f_flag;
+		BoolVector new_v_flag;
+		std::vector<int> grow_dir;
+
+		std::vector<PlaneLoop> all_pl;
+		Eigen::Matrix3Xd x_axis;
+		Eigen::Matrix3Xd y_axis;
+
+		Eigen::Matrix3Xd normal_sampling;
+		bool has_ns = false;
+	};
+
+	struct region
+	{
+		//最基础信息
 		int id = -1;
 		std::vector<VertexLayer*> vertices;
+		BoolVector vertice_flag;
+		//次基础信息
 		std::vector<FaceLayer*> faces;
+		BoolVector face_flag;
+
+		void set_face(M4 &m4);
+	};
+
+	struct cylinder : region
+	{
 		std::vector<VertexLayer*> cut;
 		std::vector<std::vector<HalfedgeLayer*>> bounds;
-		BoolVector vertice_flag;
-		BoolVector face_flag; 
-
 		std::vector<int> vidmap;
 		Eigen::VectorXd uv[2];
 		std::vector<std::pair<int, int>> handle_to_layer;
 
-		cylinder::cylinder() {}
-		cylinder::~cylinder() {}
+		cylinder() {}
+		cylinder(cylinder &&cy);
+		cylinder& operator=(cylinder&& cy);
+		
 		inline double GetRegularU(int vlid) { return uv[0](vidmap[vlid]) - std::floor(uv[0](vidmap[vlid])); }
 		inline double GetU(int vlid) { return uv[0](vidmap[vlid]); }
 		inline double GetV(int vlid) { return uv[1](vidmap[vlid]); }
@@ -109,38 +128,49 @@ namespace LoopGen
 		std::vector<BoolVector> tangential_intersection;
 	};
 
-	struct disk
+	struct disk : region
 	{
-		std::vector<VertexHandle> new_vertex;
-		std::vector<FaceHandle> new_face;
-		std::vector<VertexHandle> region_vertex;
-		std::vector<FaceHandle> region_face;
-
-		BoolVector new_f_flag;
-		BoolVector new_v_flag;
-		BoolVector region_f_flag;
-		BoolVector region_v_flag;
-		BoolVector constraint_f_flag;
-		std::vector<int> grow_dir;
-
-		std::vector<HalfedgeHandle> bounds;
-		PlaneLoop initial_path;
-		//std::vector<PlaneLoop> all_pl;
-		Eigen::Matrix3Xd x_axis;
-		Eigen::Matrix3Xd y_axis;
-
 		std::pair<int, int> from_bound;
 		std::pair<int, int> to_bound;
-#if USE_NEW_SIMILARITY_ENERGY
-		Eigen::Matrix3Xd normal_sampling;
-		bool has_ns = false;
-		double normal_length = 0.0;
-#else
-		Eigen::VectorXd normal_similarity_angle;
-		bool has_nsa = false;
-#endif
-		double length[3] = { YYSS_INFINITE, -YYSS_INFINITE, -YYSS_INFINITE };
+		BoolVector constraint_f_flag;
+
+		disk(){}
+		disk(disk &&dk);
+		disk& operator=(disk&& dk);
 	};
+
+//	struct disk
+//	{
+//		std::vector<VertexHandle> new_vertex;
+//		std::vector<FaceHandle> new_face;
+//		std::vector<VertexHandle> region_vertex;
+//		std::vector<FaceHandle> region_face;
+//
+//		BoolVector new_f_flag;
+//		BoolVector new_v_flag;
+//		BoolVector region_f_flag;
+//		BoolVector region_v_flag;
+//		BoolVector constraint_f_flag;
+//		std::vector<int> grow_dir;
+//
+//		std::vector<HalfedgeHandle> bounds;
+//		PlaneLoop initial_path;
+//		//std::vector<PlaneLoop> all_pl;
+//		Eigen::Matrix3Xd x_axis;
+//		Eigen::Matrix3Xd y_axis;
+//
+//		std::pair<int, int> from_bound;
+//		std::pair<int, int> to_bound;
+//#if USE_NEW_SIMILARITY_ENERGY
+//		Eigen::Matrix3Xd normal_sampling;
+//		bool has_ns = false;
+//		double normal_length = 0.0;
+//#else
+//		Eigen::VectorXd normal_similarity_angle;
+//		bool has_nsa = false;
+//#endif
+//		double length[3] = { YYSS_INFINITE, -YYSS_INFINITE, -YYSS_INFINITE };
+//	};
 
 	struct disk_set
 	{

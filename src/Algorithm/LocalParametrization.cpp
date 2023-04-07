@@ -1,28 +1,40 @@
 #include "LocalParametrization.h"
 namespace LoopGen
 {
-	LocalParametrization::LocalParametrization(M4& m4_, VertexLayer* vl_)
+	LocalParametrization::LocalParametrization(VertexLayer* vl_, cylinder &cy_, spread_info &sp_)
 	{
-		m4 = &m4_;
-		int nfl = m4->facelayers.size();
-		int nvl = m4->verticelayers.size();
-		region_f_flag.resize(nfl, false);
-		region_v_flag.resize(nvl, false);
-		region_vertex.push_back(vl_);
-		region_v_flag[vl_->id] = true;
-		uv[0].resize(1); uv[0].setZero();
-		uv[1].resize(1); uv[1].setZero();
-		all_pl.resize(nvl);
-		vidmap.resize(nvl, -1); vidmap[vl_->id] = 0;
-		x_axis.resize(3, m4->mesh->n_faces()); x_axis.setZero();
-		y_axis.resize(3, m4->mesh->n_faces()); y_axis.setZero();
-		grow_dir.resize(nvl, -1);
+		cy = &cy_;
+		sp = &sp_;
+		int nfl = sp->m4->facelayers.size();
+		int nvl = sp->m4->verticelayers.size();
+		cy->face_flag.resize(nfl, false);
+		cy->vertice_flag.resize(nvl, false);
+		cy->vertices.push_back(vl_);
+		cy->vertice_flag[vl_->id] = true;
+		cy->uv[0].resize(1); cy->uv[0].setZero();
+		cy->uv[1].resize(1); cy->uv[1].setZero();
+		cy->vidmap.resize(nvl, -1); cy->vidmap[vl_->id] = 0;
 
+		sp->all_pl.resize(nvl);
+		sp->x_axis.resize(3, sp->m4->mesh->n_faces()); sp->x_axis.setZero();
+		sp->y_axis.resize(3, sp->m4->mesh->n_faces()); sp->y_axis.setZero();
+		sp->grow_dir.resize(nvl, -1);
 	}
 
 	void LocalParametrization::run(const Eigen::Matrix3Xd& normal)
 	{
 		//int nf = mesh->n_faces();
+		M4* m4 = sp->m4;
+		auto &new_vertex = sp->new_vertex;
+		auto &new_v_flag = sp->new_v_flag;
+		auto &region_vertex = cy->vertices;
+		auto &cut = cy->cut;
+		auto &new_face = sp->new_face;
+		auto &new_f_flag = sp->new_f_flag;
+		auto &vidmap = cy->vidmap;
+		auto &x_axis = sp->x_axis;
+		auto &y_axis = sp->y_axis;
+		Eigen::VectorXd* uv = cy->uv;
 		int nfl = m4->facelayers.size();
 
 		//标记与cut相关的顶点和面，计算装配矩阵需要的数据
@@ -54,7 +66,6 @@ namespace LoopGen
 				info[flid].insert(std::make_pair(&m4->verticelayers[vi],
 					std::make_pair(flag && cutv_flag[vi], normal.col(fid).cross(Eigen::Vector3d(ev[0], ev[1], ev[2])) * inv_area)));
 			};
-
 			while (new_f_flag[flid])
 			{
 				cutf_flag[flid] = true;
@@ -114,7 +125,6 @@ namespace LoopGen
 				flid = fl->id;
 				fid = fl->f.idx();
 			}
-
 			for (auto fa : new_face)
 			{
 				if (cutf_flag[fa->id])
@@ -143,7 +153,6 @@ namespace LoopGen
 				vidmap[vv->id] = count++;
 			}
 		}
-
 		int new_vertex_size = new_vertex.size();
 		int new_face_size = new_face.size();
 		std::vector<Eigen::Triplet<double>> triple;
@@ -219,6 +228,8 @@ namespace LoopGen
 
 	void LocalParametrization::modify_cut()
 	{
+		auto &cut = cy->cut;
+		auto &region_f_flag = cy->face_flag;
 		if (cut.size() < 3)
 			return;
 

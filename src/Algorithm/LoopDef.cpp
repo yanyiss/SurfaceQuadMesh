@@ -1,6 +1,76 @@
 #include "LoopDef.h"
 namespace LoopGen
 {
+	void region::set_face(M4 &m4)
+	{
+		face_flag.resize(m4.facelayers.size(), false);
+		for (auto vl : vertices)
+		{
+			HalfedgeLayer* hl_begin = vl->hl;
+			HalfedgeLayer* hl_transfer = hl_begin;
+			do
+			{
+				if (!face_flag[hl_transfer->left])
+				{
+					if (vertice_flag[hl_transfer->to] && vertice_flag[hl_transfer->next->to])
+					{
+						faces.push_back(&m4.facelayers[hl_transfer->left]);
+						face_flag[hl_transfer->left] = true;
+					}
+				}
+				hl_transfer = hl_transfer->prev->oppo;
+			} while (hl_transfer != hl_begin);
+		}
+	}
+
+	cylinder::cylinder(cylinder &&cy)
+	{
+		id = cy.id; cy.id = -1;
+		vertices = std::move(cy.vertices);
+		faces = std::move(cy.faces);
+		cut = std::move(cy.cut);
+		bounds = std::move(cy.bounds);
+		vertice_flag = std::move(cy.vertice_flag);
+		face_flag = std::move(cy.face_flag);
+		vidmap = std::move(cy.vidmap);
+		uv[0] = std::move(cy.uv[0]); uv[1] = std::move(cy.uv[1]);
+		handle_to_layer = std::move(cy.handle_to_layer);
+	}
+
+	cylinder& cylinder::operator=(cylinder&& cy)
+	{
+		id = cy.id; cy.id = -1;
+		vertices = std::move(cy.vertices);
+		faces = std::move(cy.faces);
+		cut = std::move(cy.cut);
+		bounds = std::move(cy.bounds);
+		vertice_flag = std::move(cy.vertice_flag);
+		face_flag = std::move(cy.face_flag);
+		vidmap = std::move(cy.vidmap);
+		uv[0] = std::move(cy.uv[0]); uv[1] = std::move(cy.uv[1]);
+		handle_to_layer = std::move(cy.handle_to_layer);
+		return *this;
+	}
+	
+	disk::disk(disk &&dk)
+	{
+		id = dk.id; dk.id = -1;
+		vertices = std::move(dk.vertices);
+		faces = std::move(dk.faces);
+		vertice_flag = std::move(dk.vertice_flag);
+		face_flag = std::move(dk.face_flag);
+	}
+
+	disk& disk::operator=(disk&& dk)
+	{
+		id = dk.id; dk.id = -1;
+		vertices = std::move(dk.vertices);
+		faces = std::move(dk.faces);
+		vertice_flag = std::move(dk.vertice_flag);
+		face_flag = std::move(dk.face_flag);
+		return *this;
+	}
+
 	void cylinder::set_bound()
 	{
 		for (int i = 0; i < 2; ++i)

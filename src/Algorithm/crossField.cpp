@@ -454,7 +454,6 @@ namespace LoopGen
 		setMatching();
 		setSingularity();
 		updateField = true;
-		//setWeight();
 	}
 
 	void crossField::read_field()

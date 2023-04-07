@@ -79,7 +79,7 @@ namespace LoopGen
 
 		//算法重要参数
 		double energy_threshold = 0.2;
-		double disk_e = 0.075;
+		double disk_e = 0.08;
 		int extend_layer = 3;
 
 		//优化阶段变量
@@ -89,12 +89,12 @@ namespace LoopGen
 		void AssembleSampling(VertexLayer* vl, Eigen::Matrix3Xd &sampling, LocalParametrization &lp, int loop_sampling_num);
 		void AssembleSimilarityAngle(VertexLayer* vl, Eigen::VectorXd& sa, LocalParametrization& lp, int loop_fragment_num);
 		bool RefineLoopByParametrization(VertexLayer* vl, LocalParametrization& lp, BoolVector& visited_v, BoolVector& visited_f);
-		void ResetLocalField(LocalParametrization &lp, std::vector<FaceLayer*>& opt_face, BoolVector& opt_flag, BoolVector& constraint_flag);
+		void ResetLocalField(spread_info &sp, std::vector<FaceLayer*>& opt_face, BoolVector& opt_flag, BoolVector& constraint_flag);
 		double LoopLenGrad(std::vector<VertexLayer*> &vertex_set, LocalParametrization &lp, BoolVector &vertex_flag, int growDir);
 		void AssembleIOVLoopEnergy(vl_pair_pq &pq);
 		bool CheckCylinderTopology(std::vector<VertexLayer*>& vertex_set, BoolVector &set_flag, std::vector<int> &grow_dir);
 
-		void ConstructInitialRegion(InfoOnVertex* iov, LocalParametrization &lp);
+		void ConstructInitialRegion(VertexLayer* vl,  spread_info &sp);
 		bool SpreadSubRegion(LocalParametrization& lp, bool grow_flag[2]);
 		bool ConstructRegionCut(VertexLayer* vl, BoolVector& visited, std::vector<VertexLayer*>& cut);
 		void ProcessOverlap();
@@ -111,17 +111,15 @@ namespace LoopGen
 		void ReLoop();
 		void OptimizeDisk();
 		double EvaluatePathSimilarity(Eigen::Matrix3Xd &path0, Eigen::Matrix3Xd &path1);
-		void ConstructInitialRegion(VertexLayer* vl, disk &dk);
-		void OptimizeDiskField(disk &dk);
-		bool RefinePathByField(VertexHandle v, disk &dk, BoolVector &visited_v, BoolVector &visited_f);
+		void ConstructInitialRegion(VertexLayer* vl, disk &dk, spread_info &sp);
+		bool RefinePathByField(VertexLayer* vl, disk &dk, spread_info &sp, BoolVector &visited_v, BoolVector &visited_f);
 		void AssembleSampling(PlaneLoop &path, Eigen::Matrix3Xd &sampling, int path_sampling_num);
 		double AssembleSimilarityAngle(PlaneLoop &path, Eigen::VectorXd &sa, int path_fragment_num);
-		bool SpreadSubRegion(disk &dk, bool grow_flag[2]);
-		bool CheckDiskTopology(std::vector<VertexHandle> &vertex_set, BoolVector &vs_flag);
+		bool SpreadSubRegion(disk &dk, spread_info &sp, bool grow_flag[2]);
+		bool CheckDiskTopology(std::vector<VertexLayer*> &vertex_set, BoolVector &vs_flag);
 		std::vector<double> edge_path_similarity_energy;
 		std::vector<double> vert_path_similarity_energy;
 		std::vector<std::pair<int, double>> eee;
-		std::vector<PlaneLoop> all_vertice_path;
 
 		//void SetUParaLine(InfoOnVertex& iov, LocalParametrization& lp, std::deque<bool>& visited_v, std::deque<bool>& visited_f);
 	};

@@ -354,7 +354,7 @@ void InteractiveViewerWidget::pick_edge(int x,int y)
 	if(desiredEdge < 0) return;
 	lastestEdge = desiredEdge;
 	dprint("Select Edge:", lastestEdge);
-	if (lg)
+	if (lg && !lg->similarity_energy.empty())
 		dprint("Energy:", lg->similarity_energy[lastestEdge * 8], lg->similarity_energy[lastestEdge * 8 + 1]);
 
 	std::vector<int>::iterator it;
@@ -757,15 +757,20 @@ void InteractiveViewerWidget::showLoop()
 #if 0
 		lg->m4.set_base(&mesh, lg->cf); lg->m4.init(); lg->m4.update(); lg->m4.set_weight();
 #else
-#if 1
-		//lg->InitializePlaneLoop();
-		//lg->InitializeSimilarityEnergy();
-		//lg->ConstructCylinder();
-		//lg->OptimizeCylinder();
-		//lg->IterateCylinder();
-////#else
-		lg->ReLoop();
+		{
+#if 0
+			lg->InitializePlaneLoop();
+			lg->InitializeSimilarityEnergy();
+			lg->ConstructCylinder();
+			lg->OptimizeCylinder();
 #endif
+#if 0
+			lg->IterateCylinder();
+#endif
+#if 1
+			lg->ReLoop();
+#endif
+		}
 #endif
 		/*std::ifstream file_reader;
 		file_reader.open("..//resource//energy//vase.energy", std::ios::in);
@@ -886,7 +891,22 @@ void InteractiveViewerWidget::draw_submesh()
 	glColor3d(1, 0, 0);
 	glPointSize(15);
 	glBegin(GL_POINTS);
-	glVertex3dv(mesh.point(mesh.vertex_handle(5680/4)).data());
+	glVertex3dv(mesh.point(mesh.vertex_handle(103517/4)).data());
+	glEnd();
+#endif
+
+	//画线
+#if 0
+	glLineWidth(3);
+	glBegin(GL_LINES);
+	glColor3d(0.8, 0.2, 0.1);
+
+	glVertex3dv(mesh.point(mesh.vertex_handle(103517 / 4)).data());
+	glVertex3dv((mesh.point(mesh.vertex_handle(103517 / 4)) + OpenMesh::Vec3d(-0.398935, -0.0333667, 0.916372)).data());
+	glVertex3dv(mesh.point(mesh.vertex_handle(103517 / 4)).data());
+	glVertex3dv((mesh.point(mesh.vertex_handle(103517 / 4)) + OpenMesh::Vec3d(-0.460426, 0.00749925, 0.887666)).data());
+	glVertex3dv(mesh.point(mesh.vertex_handle(103517 / 4)).data());
+	glVertex3dv((mesh.point(mesh.vertex_handle(103517 / 4)) + OpenMesh::Vec3d(-0.100875, 0.864587, 0.492253)).data());
 	glEnd();
 #endif
 
@@ -1119,7 +1139,7 @@ void InteractiveViewerWidget::draw_submesh()
 #endif
 
 		//画初始path路径
-#if 1
+#if 0
 		glLineWidth(3);
 		glBegin(GL_LINES);
 		glColor3d(0.8, 0.0, 0.8);
@@ -1214,7 +1234,7 @@ void InteractiveViewerWidget::draw_submesh()
 #endif
 
 		//画disk边界
-#if 1
+#if 0
 		glLineWidth(3);
 		glBegin(GL_LINES);
 		glColor3d(0.5, 0.0, 0.5);
@@ -1573,7 +1593,7 @@ void InteractiveViewerWidget::draw_submesh()
 #endif
 
 		//画新设的场
-#if 0
+#if 1
 		double avgl = 0.2*calc_mesh_ave_edge_length(&mesh);
 		glColor3d(1, 0, 0);
 		glBegin(GL_LINES);
