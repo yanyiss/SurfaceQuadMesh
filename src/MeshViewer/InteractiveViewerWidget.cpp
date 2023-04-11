@@ -1133,8 +1133,10 @@ void InteractiveViewerWidget::draw_submesh()
 		glColor3d(0, 0, 1);
 		glPointSize(15);
 		glBegin(GL_POINTS);
-		for (auto vl : lg->seed_vertex)
-			glVertex3dv(mesh.point(vl->v).data());
+		for (auto &dk : lg->dset.disks)
+		{
+			glVertex3dv(mesh.point(dk.vertices.front()->v).data());
+		}
 		glEnd();
 #endif
 
@@ -1159,7 +1161,7 @@ void InteractiveViewerWidget::draw_submesh()
 #endif
 
 		//画区域的面
-#if 1
+#if 0
 		glColor3d(0, 1, 0);
 		glBegin(GL_TRIANGLES);
 		for (int i = 0; i <
@@ -1233,17 +1235,39 @@ void InteractiveViewerWidget::draw_submesh()
 		glEnd();
 #endif
 
+		//画disk区域的面
+#if 1
+		glColor3d(0, 1, 0);
+		glBegin(GL_TRIANGLES);
+		for (auto &disk : lg->dset.disks)
+		{
+			//if (disk.vertices.front()->v.idx() != 37284)//37254
+			//	continue;
+			for (auto fl : disk.faces)
+			{
+				auto fv = mesh.fv_begin(fl->f);
+				glVertex3dv(mesh.point(fv.handle()).data()); ++fv;
+				glVertex3dv(mesh.point(fv.handle()).data()); ++fv;
+				glVertex3dv(mesh.point(fv.handle()).data()); 
+			}
+		}
+		glEnd();
+#endif
+
 		//画disk边界
-#if 0
+#if 1
 		glLineWidth(3);
 		glBegin(GL_LINES);
 		glColor3d(0.5, 0.0, 0.5);
 		for (auto &disk : lg->dset.disks)
 		{
-			for (auto be : disk.bounds)
+			for (auto bo : disk.bounds)
 			{
-				glVertex3dv(mesh.point(mesh.from_vertex_handle(be)).data());
-				glVertex3dv(mesh.point(mesh.to_vertex_handle(be)).data());
+				for (auto be : bo)
+				{
+					glVertex3dv(mesh.point(mesh.vertex_handle(be->from / 4)).data());
+					glVertex3dv(mesh.point(mesh.vertex_handle(be->to / 4)).data());
+				}
 			}
 		}
 		glEnd();

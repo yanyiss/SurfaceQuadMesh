@@ -94,6 +94,7 @@ namespace LoopGen
 		//次基础信息
 		std::vector<FaceLayer*> faces;
 		BoolVector face_flag;
+		std::vector<std::vector<HalfedgeLayer*>> bounds;
 
 		void set_face(M4 &m4);
 	};
@@ -101,7 +102,6 @@ namespace LoopGen
 	struct cylinder : region
 	{
 		std::vector<VertexLayer*> cut;
-		std::vector<std::vector<HalfedgeLayer*>> bounds;
 		std::vector<int> vidmap;
 		Eigen::VectorXd uv[2];
 		std::vector<std::pair<int, int>> handle_to_layer;
@@ -126,6 +126,8 @@ namespace LoopGen
 		BoolVector has_vertex;
 		BoolVector has_face;
 		std::vector<BoolVector> tangential_intersection;
+
+		void ProcessOverlap(M4 &m4);
 	};
 
 	struct disk : region
@@ -137,77 +139,20 @@ namespace LoopGen
 		disk(){}
 		disk(disk &&dk);
 		disk& operator=(disk&& dk);
+		void set_bound();
 	};
 
-//	struct disk
-//	{
-//		std::vector<VertexHandle> new_vertex;
-//		std::vector<FaceHandle> new_face;
-//		std::vector<VertexHandle> region_vertex;
-//		std::vector<FaceHandle> region_face;
-//
-//		BoolVector new_f_flag;
-//		BoolVector new_v_flag;
-//		BoolVector region_f_flag;
-//		BoolVector region_v_flag;
-//		BoolVector constraint_f_flag;
-//		std::vector<int> grow_dir;
-//
-//		std::vector<HalfedgeHandle> bounds;
-//		PlaneLoop initial_path;
-//		//std::vector<PlaneLoop> all_pl;
-//		Eigen::Matrix3Xd x_axis;
-//		Eigen::Matrix3Xd y_axis;
-//
-//		std::pair<int, int> from_bound;
-//		std::pair<int, int> to_bound;
-//#if USE_NEW_SIMILARITY_ENERGY
-//		Eigen::Matrix3Xd normal_sampling;
-//		bool has_ns = false;
-//		double normal_length = 0.0;
-//#else
-//		Eigen::VectorXd normal_similarity_angle;
-//		bool has_nsa = false;
-//#endif
-//		double length[3] = { YYSS_INFINITE, -YYSS_INFINITE, -YYSS_INFINITE };
-//	};
+
 
 	struct disk_set
 	{
 		std::vector<disk> disks;
+
+		void ProcessOverlap(M4 &m4);
 	};
 
-	/*struct disk
+	struct region_set
 	{
-		std::vector<VertexHandle> new_vertex;
-		std::vector<FaceHandle> new_face;
-		std::vector<VertexHandle> region_vertex;
-		std::vector<FaceHandle> region_face;
 
-		BoolVector new_f_flag;
-		BoolVector new_v_flag;
-		BoolVector region_f_flag;
-		BoolVector region_v_flag;
-		BoolVector constraint_f_flag;
-		std::vector<int> grow_dir;
-
-		std::vector<PlaneLoop> all_pl;
-		Eigen::Matrix3Xd x_axis;
-		Eigen::Matrix3Xd y_axis;
-		std::vector<int> vidmap;
-		Eigen::VectorXd uv[2];
-
-		std::pair<int, int> from_bound;
-		std::pair<int, int> to_bound;
-
-		Eigen::VectorXd normal_similarity_angle;
-		double umx[2] = { 0, 0 };
-		double length[3] = { YYSS_INFINITE, -YYSS_INFINITE, -YYSS_INFINITE };
-		bool has_nsa = false;
-
-		inline double GetU(int vid) { return uv[0](vidmap[vid]); }
-		inline double GetV(int vid) { return uv[1](vidmap[vid]); }
-		inline Eigen::VectorXd& GetU() { return uv[0]; }
-		inline Eigen::VectorXd& GetV() { return uv[1]; }
-	};*/
+	};
 }

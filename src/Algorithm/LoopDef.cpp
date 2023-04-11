@@ -52,25 +52,6 @@ namespace LoopGen
 		return *this;
 	}
 	
-	disk::disk(disk &&dk)
-	{
-		id = dk.id; dk.id = -1;
-		vertices = std::move(dk.vertices);
-		faces = std::move(dk.faces);
-		vertice_flag = std::move(dk.vertice_flag);
-		face_flag = std::move(dk.face_flag);
-	}
-
-	disk& disk::operator=(disk&& dk)
-	{
-		id = dk.id; dk.id = -1;
-		vertices = std::move(dk.vertices);
-		faces = std::move(dk.faces);
-		vertice_flag = std::move(dk.vertice_flag);
-		face_flag = std::move(dk.face_flag);
-		return *this;
-	}
-
 	void cylinder::set_bound()
 	{
 		for (int i = 0; i < 2; ++i)
@@ -250,5 +231,151 @@ namespace LoopGen
 		solver.compute(A);
 		uv[0].tail(vl_size - 1) = solver.solve(uv[0].tail(vl_size - 1));
 		uv[1].tail(vl_size - 1) = solver.solve(uv[1].tail(vl_size - 1));
+	}
+
+	void cylinder_set::ProcessOverlap(M4 &m4)
+	{
+		if (cylinders.size() < 2)
+			return;
+		int nvl = m4.verticelayers.size();
+		std::vector<std::vector<int>> region_index(nvl);
+		for (auto &cy : cylinders)
+		{
+			for (auto vl : cy.vertices)
+			{
+				region_index[vl->id].push_back(cy.id);
+				region_index[m4.another_layer(vl, 2)->id].push_back(cy.id);
+			}
+		}
+		for (int i = 0; i < nvl; ++i)
+		{
+			int ris = region_index[i].size();
+			while (ris > 1)
+			{
+				int parent = region_index[i][ris - 2];
+				int child = region_index[i][ris - 1];
+				auto &pc = cylinders[parent];
+				auto &cc = cylinders[child];
+				if (pc.vertice_flag[i] && cc.vertice_flag[i])
+				{
+					for (auto vl : cc.vertices)
+					{
+						if (pc.vertice_flag[vl->id])
+							continue;
+						pc.vertices.push_back(vl);
+						pc.vertice_flag[vl->id] = true;
+					}
+				}
+				else
+				{
+					VertexLayer* oppo_vl = nullptr;
+					for (auto vl : cc.vertices)
+					{
+						oppo_vl = m4.another_layer(vl, 2);
+						if (pc.vertice_flag[oppo_vl->id])
+							continue;
+						pc.vertices.push_back(oppo_vl);
+						pc.vertice_flag[oppo_vl->id] = true;
+					}
+				}
+				cc.id = -1;
+				for (int j = 0; j < nvl; ++j)
+				{
+					if (region_index[j].empty())
+						continue;
+					if (region_index[j].back() == child)
+						region_index[j].pop_back();
+				}
+				ris = region_index[i].size();
+			}
+		}
+
+		std::vector<cylinder> new_cylinders;
+		for (auto &cy : cylinders)
+		{
+			if (cy.id == -1)
+				continue;
+			new_cylinders.push_back(std::move(cy));
+			new_cylinders.back().id = new_cylinders.size() - 1;
+		}
+		cylinders = std::move(new_cylinders);
+	}
+
+	disk::disk(disk &&dk)
+	{
+		id = dk.id; dk.id = -1;
+		vertices = std::move(dk.vertices);
+		faces = std::move(dk.faces);
+		vertice_flag = std::move(dk.vertice_flag);
+		face_flag = std::move(dk.face_flag);
+		bounds = std::move(dk.bounds);
+	}
+
+	disk& disk::operator=(disk&& dk)
+	{
+		id = dk.id; dk.id = -1;
+		vertices = std::move(dk.vertices);
+		faces = std::move(dk.faces);
+		vertice_flag = std::move(dk.vertice_flag);
+		face_flag = std::move(dk.face_flag);
+		bounds = std::move(dk.bounds);
+		return *this;
+	}
+
+	void disk::set_bound()
+	{
+		bounds.resize(2);
+		
+	}
+
+	void disk_set::ProcessOverlap(M4 &m4)
+	{
+		if (disks.size() < 2)
+			return;
+		int nvl = m4.verticelayers.size();
+		std::vector<std::vector<int>> region_index(nvl);
+		for (auto &dk : disks)
+		{
+			for (auto vl : dk.vertices)
+			{
+				region_index[vl->id].push_back(dk.id);
+				region_index[m4.another_layer(vl, 2)->id].push_back(dk.id);
+			}
+		}
+		for (int i = 0; i < nvl; ++i)
+		{
+			int ris = region_index[i].size();
+			while (ris > 1)
+			{
+				int parent = region_index[i][ris - 2];
+				int child = region_index[i][ris - 1];
+				auto &pd = disks[parent];
+				auto &cd = disks[child];
+				if (pd.faces.size() < cd.faces.size())
+				{
+					disk dk = std::move(pd);
+					pd = std::move(cd);
+					cd = std::move(dk);
+				}
+				cd.id = -1;
+				for (int j = 0; j < nvl; ++j)
+				{
+					if (region_index[j].empty())
+						continue;
+					if (region_index[j].back() == child)
+						region_index[j].pop_back();
+				}
+				ris = region_index[i].size();
+			}
+		}
+		std::vector<disk> new_disks;
+		for (auto &dk : disks)
+		{
+			if (dk.id == -1)
+				continue;
+			new_disks.push_back(std::move(dk));
+			new_disks.back().id = new_disks.size() - 1;
+		}
+		disks = std::move(new_disks);
 	}
 }

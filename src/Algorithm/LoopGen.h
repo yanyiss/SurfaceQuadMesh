@@ -79,7 +79,7 @@ namespace LoopGen
 
 		//算法重要参数
 		double energy_threshold = 0.2;
-		double disk_e = 0.08;
+		double disk_e = 0.1;
 		int extend_layer = 3;
 
 		//优化阶段变量
@@ -97,7 +97,6 @@ namespace LoopGen
 		void ConstructInitialRegion(VertexLayer* vl,  spread_info &sp);
 		bool SpreadSubRegion(LocalParametrization& lp, bool grow_flag[2]);
 		bool ConstructRegionCut(VertexLayer* vl, BoolVector& visited, std::vector<VertexLayer*>& cut);
-		void ProcessOverlap();
 		void IterativePQ();
 		void ConstructCylinder();
 

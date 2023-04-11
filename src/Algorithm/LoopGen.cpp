@@ -1574,7 +1574,7 @@ namespace LoopGen
 			}
 		}
 		//return;
-		ProcessOverlap();
+		cset.ProcessOverlap(m4);
 		WriteRegion(cset.cylinders, cf->crossfield, model_name);
 
 		for (auto &cy : cset.cylinders)
@@ -1687,7 +1687,7 @@ namespace LoopGen
 			}
 #endif
 		}
-		ProcessOverlap();
+		cset.ProcessOverlap(m4);
 		WriteRegion(cset.cylinders, cf->crossfield, model_name);
 
 		for (auto &cy : cset.cylinders)
@@ -2523,74 +2523,6 @@ namespace LoopGen
 		return true;
 	}
 
-	void LoopGen::ProcessOverlap()
-	{
-		std::vector<std::vector<int>> region_index(m4.verticelayers.size());
-		for (auto &cy : cset.cylinders)
-		{
-			for (auto vl : cy.vertices)
-			{
-				region_index[vl->id].push_back(cy.id);
-				region_index[m4.another_layer(vl, 2)->id].push_back(cy.id);
-			}
-		}
-		if (cset.cylinders.size() < 2)
-			return;
-		int nvl = region_index.size();
-		for (int i = 0; i < nvl; ++i)
-		{
-			int ris = region_index[i].size();
-			while (ris > 1)
-			{
-				int parent = region_index[i][ris - 2];
-				int child = region_index[i][ris - 1];
-				auto &pc = cset.cylinders[parent];
-				auto &cc = cset.cylinders[child];
-				if (pc.vertice_flag[i] && cc.vertice_flag[i])
-				{
-					for (auto vl : cc.vertices)
-					{
-						if (pc.vertice_flag[vl->id])
-							continue;
-						pc.vertices.push_back(vl);
-						pc.vertice_flag[vl->id] = true;
-					}
-				}
-				else
-				{
-					VertexLayer* oppo_vl = nullptr;
-					for (auto vl : cc.vertices)
-					{
-						oppo_vl = m4.another_layer(vl, 2);
-						if (pc.vertice_flag[oppo_vl->id])
-							continue;
-						pc.vertices.push_back(oppo_vl);
-						pc.vertice_flag[oppo_vl->id] = true;
-					}
-				}
-				cc.id = -1;
-				for (int j = 0; j < nvl; ++j)
-				{
-					if (region_index[j].empty())
-						continue;
-					if (region_index[j].back() == child)
-						region_index[j].pop_back();
-				}
-				ris = region_index[i].size();
-			}
-		}
-
-		std::vector<cylinder> new_cylinders;
-		for (auto &cy : cset.cylinders)
-		{
-			if (cy.id == -1)
-				continue;
-			new_cylinders.push_back(std::move(cy));
-			new_cylinders.back().id = new_cylinders.size() - 1;
-		}
-		cset.cylinders = std::move(new_cylinders);
-	}
-
 	void LoopGen::ReLoop()
 	{
 		m4.set_base(mesh, cf);
@@ -2808,8 +2740,6 @@ namespace LoopGen
 				}
 			}
 		}
-		//return;
-		//OptimizeDisk(path_pq);
 		OptimizeDisk();
 	}
 
@@ -2863,6 +2793,14 @@ namespace LoopGen
 						length += dif.norm();
 					}
 					pq.emplace(m4.another_layer(&m4.verticelayers[bound[k]->from], shift), e * 0.5 / length);
+					if (m4.another_layer(&m4.verticelayers[bound[k]->from], shift)->id == 126154)
+					{
+						int p = 0;
+					}
+					if (bound[k]->from == 126154 / 4)
+					{
+						int p = 0;
+					}
 				}
 			}
 		}
@@ -2946,36 +2884,52 @@ namespace LoopGen
 			{
 				ResetLocalField(sp, sp.new_face, sp.new_f_flag, dk.constraint_f_flag);
 			} while (SpreadSubRegion(dk, sp, grow_flag));
-			if (dk.vertices.size() > 1)
-			{
-				dprint(seed_vertex.size(), vp.vl->id, vp.data);
-				seed_vertex.push_back(vp.vl);
-			}
+
 			for (auto vl : dk.vertices)
 			{
 				set_flag[vl->id] = true;
 				set_flag[m4.another_layer(vl, 2)->id] = true;
+				vhCirculator(vl,
+					set_flag[hl_transfer->to] = true;
+				)
+				vhCirculator(m4.another_layer(vl, 2),
+					set_flag[hl_transfer->to] = true;
+				)
 			}
-
 
 			new_vert_flag = sp.new_v_flag;
 			old_vert_flag = dk.vertice_flag;
 			new_face_flag = sp.new_f_flag;
-#if 0
-			old_face_flag = dk.region_f_flag;
-
-#else
 			for (auto fl : dk.faces)
 				old_face_flag[fl->f.idx()] = true;
-#endif
-
 			xaxis = sp.x_axis;
 			
-
-			
+			std::vector<disk>::iterator ptr = std::find_if(dset.disks.begin(), dset.disks.end(),
+				[&](const disk &rhs)->bool { return dk.vertices.front()->v == rhs.vertices.front()->v; });
 			if (dk.vertices.size() > 1)
-				dset.disks.push_back(std::move(dk));
+			{
+				if (ptr == dset.disks.end())
+				{
+					dprint(seed_vertex.size(), dk.vertices.front()->id, vp.data);
+					seed_vertex.push_back(vp.vl);
+					dk.id = dset.disks.size();
+					dset.disks.push_back(std::move(dk));
+				}
+				else if (ptr->faces.size() < dk.faces.size())
+				{
+					dprint("replace!", ptr->id, dk.vertices.front()->id, vp.data);
+					seed_vertex[ptr->id] = vp.vl;
+					dk.id = ptr->id;
+					*ptr = std::move(dk);
+				}
+			}
 		}
+		dset.ProcessOverlap(m4);
+		for (auto &dk : dset.disks)
+		{
+			dk.set_bound();
+		}
+
 		BoolVector constraint_flag(mesh->n_faces(), false);
 		Eigen::Matrix3Xd constraint_dir(3, mesh->n_faces());
 		for (auto &dk : dset.disks)
