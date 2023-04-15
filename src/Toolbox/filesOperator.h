@@ -132,20 +132,20 @@ namespace LoopGen
 	bool WriteEnergy(std::vector<double>& energy, std::string& model_name);
 	bool ReadEnergy(std::vector<double>& energy, std::string& model_name);
 
-	template <typename cylinder, typename MatrixXd>
-	bool WriteRegion(std::vector<cylinder> &cylinders, MatrixXd &crossfield, std::string& model_name)
+	template <typename region, typename MatrixXd>
+	bool WriteRegion(std::vector<region*> &regions, MatrixXd &crossfield, std::string& model_name)
 	{
 		std::ofstream file_writer;
 		file_writer.open("..//resource//region//" + model_name + ".region");
 		if (file_writer.fail()) {
 			return false;
 		}
-		for (auto &cy : cylinders)
+		for (auto &rg : regions)
 		{
-			file_writer << cy.vertices.size() << "\n";
-			int fid = cy.vertices.front()->hl->left;
+			file_writer << rg->vertices.size() << "\n";
+			int fid = rg->vertices.front()->hl->left;
 			file_writer << crossfield(0, fid) << " " << crossfield(1, fid) << " " << crossfield(2, fid) << "\n";
-			for (auto vl : cy.vertices)
+			for (auto vl : rg->vertices)
 			{
 				file_writer << vl->v.idx() << "\n";
 			}

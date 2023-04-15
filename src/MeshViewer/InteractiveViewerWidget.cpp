@@ -309,10 +309,10 @@ void InteractiveViewerWidget::pick_vertex(int x,int y)
 			lg->m4.sing_flag[r] ? -1 : lg->pls[lg->InfoOnMesh[lg->m4.verticemap[r] + 1].plid].size());*/
 		//dprint("vertex layer:", lg->m4.verticemap[r]);
 		dprint("vertex layer:", r * 4);
-		if (lg->uv_para[0].size()!=0 && lg->vertexidmap.size() != 0)
-			dprint("uv para:", lg->uv_para[0](lg->vertexidmap[r]));
-		if (!lg->cset.vertex_bound_index.empty())
-			dprint("vertex bound index:", lg->cset.vertex_bound_index[r].first, lg->cset.vertex_bound_index[r].second);
+		/*if (lg->uv_para[0].size()!=0 && lg->vertexidmap.size() != 0)
+			dprint("uv para:", lg->uv_para[0](lg->vertexidmap[r]));*/
+		//if (!lg->cset.vertex_bound_index.empty())
+		//	dprint("vertex bound index:", lg->cset.vertex_bound_index[r].first, lg->cset.vertex_bound_index[r].second);
 	}
 	double angle_defect = 0;
 	for (auto vih : mesh.vih_range(mesh.vertex_handle(r)))
@@ -866,7 +866,7 @@ void InteractiveViewerWidget::draw_energy()
 		glBegin(GL_LINES);
 		for(int i=0;i<mesh.n_edges();++i)
 		{
-			double t = std::min(lg->similarity_energy[i * 8], lg->similarity_energy[i * 8 + 1]);
+			double t = lg->similarity_energy[i];// std::min(lg->similarity_energy[i * 8], lg->similarity_energy[i * 8 + 1]);
 			if (t > max_e)
 				glColor3d(0, 1, 0);
 			else
@@ -883,9 +883,190 @@ void InteractiveViewerWidget::draw_energy()
 
 }
 
+
 void InteractiveViewerWidget::draw_submesh()
 {
-	
+	if (loop_gen_init)
+	{
+		using namespace LoopGen;
+		//画顶点
+#if 0
+		glColor3d(1, 1, 1);
+		glPointSize(5);
+		glBegin(GL_POINTS);
+		for (int i = 0; i < lg->old_vert_flag.size(); ++i)
+		{
+			if (lg->old_vert_flag[i])
+			{
+				glVertex3dv(mesh.point(mesh.vertex_handle(i)).data());
+			}
+		}
+		glEnd();
+#endif
+
+		//画边
+#if 0
+		glLineWidth(6);
+		glBegin(GL_LINES);
+		{
+			HalfedgeHandle hh = mesh.halfedge_handle(938616 / 4);
+			glVertex3dv(mesh.point(mesh.from_vertex_handle(hh)).data());
+			glVertex3dv(mesh.point(mesh.to_vertex_handle(hh)).data());
+		}
+		glEnd();
+#endif
+
+		//画面
+#if 0
+		glColor3d(0, 1, 0);
+		glBegin(GL_TRIANGLES);
+		{
+			auto fvPtr = mesh.fv_begin(mesh.face_handle(71020));
+			glVertex3dv(mesh.point(fvPtr.handle()).data()); ++fvPtr;
+			glVertex3dv(mesh.point(fvPtr.handle()).data()); ++fvPtr;
+			glVertex3dv(mesh.point(fvPtr.handle()).data()); 
+		}
+		glEnd();
+#endif
+
+		//画新搜索的点
+#if 1
+		glColor3d(1, 1, 1);
+		glPointSize(5);
+		glBegin(GL_POINTS);
+		for (auto vl : lg->nvert)
+		{
+			glVertex3dv(mesh.point(vl->v).data());
+		}
+		glEnd();
+#endif
+
+		//画新搜索的面
+#if 0
+		glColor3d(0, 1, 0);
+		glBegin(GL_TRIANGLES);
+		for (auto fl : lg->nface)
+		{
+			auto fvPtr = mesh.fv_begin(fl->f);
+			glVertex3dv(mesh.point(fvPtr.handle()).data()); ++fvPtr;
+			glVertex3dv(mesh.point(fvPtr.handle()).data()); ++fvPtr;
+			glVertex3dv(mesh.point(fvPtr.handle()).data()); 
+		}
+		glEnd();
+#endif
+
+		//画所有disk区域的面
+#if 1
+		glColor3d(0, 1, 0);
+		glBegin(GL_TRIANGLES);
+		for (auto rg : rset.regions)
+		{
+			if (rg->id < rset.disk_mark)
+				continue;
+			for (auto fl : rg->faces)
+			{
+				auto fvPtr = mesh.fv_begin(fl->f);
+				glVertex3dv(mesh.point(fvPtr.handle()).data()); ++fvPtr;
+				glVertex3dv(mesh.point(fvPtr.handle()).data()); ++fvPtr;
+				glVertex3dv(mesh.point(fvPtr.handle()).data());
+			}
+		}
+		glEnd();
+#endif
+
+		{
+			HalfedgeLayer* hl = &(lg->m4.halfedgelayers[938616]);
+			dprint("fe", hl->id / 4, hl->left / 4);
+			dprint(rset.bound_halfedgelayer_flag[hl->id],
+				rset.bound_halfedgelayer_flag[lg->m4.another_layer(hl, 1)->id],
+				rset.bound_halfedgelayer_flag[lg->m4.another_layer(hl, 2)->id],
+				rset.bound_halfedgelayer_flag[lg->m4.another_layer(hl, 3)->id]);
+		}
+		//画boundarylayer
+#if 1
+		glLineWidth(6);
+		glBegin(GL_LINES);
+		for (int i = 0; i < rset.bound_halfedgelayer_flag.size(); ++i)
+		{
+			if (rset.bound_halfedgelayer_flag[i])
+			{
+				if (i / 4 == 938616 / 4)
+				{
+					int p = 0;
+				}
+				HalfedgeHandle hh = mesh.halfedge_handle(i / 4);
+				glVertex3dv(mesh.point(mesh.from_vertex_handle(hh)).data());
+				glVertex3dv(mesh.point(mesh.to_vertex_handle(hh)).data());
+			}
+		}
+		glEnd();
+#endif
+
+		//画所有柱体区域边界
+#if 1
+		glLineWidth(6);
+		glBegin(GL_LINES);
+		//for (auto &cy : lg->cset.cylinders)
+		for (auto rg : rset.regions)
+		{
+			if (rg->bounds.empty())
+				continue;
+			for (int i = 0; i < 2; ++i)
+			{
+				glColor3d(i, i, 1 - i);
+				if (rg->bounds[i].empty())
+					continue;
+				for (auto hl : rg->bounds[i])
+				{
+					glVertex3dv(mesh.point(mesh.to_vertex_handle(hl->h)).data());
+					glVertex3dv(mesh.point(mesh.from_vertex_handle(hl->h)).data());
+				}
+			}
+		}
+		glEnd();
+#endif
+
+		//画从边界出发的path
+#if 0
+		glLineWidth(6);
+		glColor3d(1, 0, 0);
+		for (int i = 0; i < rset.bridge.size(); ++i)
+		{
+			auto &path = rset.bridge[i];
+			if (path.size() < 2)
+				continue;
+			glBegin(GL_LINE_STRIP);
+			glVertex3dv(mesh.point(mesh.vertex_handle(i / 4)).data());
+			for (auto &poh : path)
+			{
+				glVertex3dv(poh.point(lg->m4).data());
+			}
+			glEnd();
+		}
+#endif
+
+#if 1
+		if (lg->cf->updateField)
+		{
+			lg->cf->updateField = false;
+			crossfield = lg->cf->getCrossField();
+			avgLen = 0.2 * calc_mesh_ave_edge_length(&mesh);
+			for (auto tf : mesh.faces())
+			{
+				OpenMesh::Vec3d c = mesh.calc_centroid(tf);
+				int i = tf.idx() * 4;
+				Eigen::Vector3d vc(c[0], c[1], c[2]);
+
+				crossfield.col(i) = vc + crossfield.col(i) * avgLen;
+				crossfield.col(i + 1) = vc + crossfield.col(i + 1) * avgLen;
+				crossfield.col(i + 2) = vc + crossfield.col(i + 2) * avgLen;
+				crossfield.col(i + 3) = vc + crossfield.col(i + 3) * avgLen;
+		}
+	}
+#endif
+	}
+
+
 	//画某个点
 #if 0
 	glColor3d(1, 0, 0);
@@ -1129,7 +1310,7 @@ void InteractiveViewerWidget::draw_submesh()
 #endif
 
 		//画path起始点
-#if 1
+#if 0
 		glColor3d(0, 0, 1);
 		glPointSize(15);
 		glBegin(GL_POINTS);
@@ -1236,7 +1417,7 @@ void InteractiveViewerWidget::draw_submesh()
 #endif
 
 		//画disk区域的面
-#if 1
+#if 0
 		glColor3d(0, 1, 0);
 		glBegin(GL_TRIANGLES);
 		for (auto &disk : lg->dset.disks)
@@ -1255,7 +1436,7 @@ void InteractiveViewerWidget::draw_submesh()
 #endif
 
 		//画disk边界
-#if 1
+#if 0
 		glLineWidth(3);
 		glBegin(GL_LINES);
 		glColor3d(0.5, 0.0, 0.5);
@@ -1368,7 +1549,7 @@ void InteractiveViewerWidget::draw_submesh()
 #endif
 
 		//画所有柱体区域边界
-#if 1
+#if 0
 		glLineWidth(6);
 		glBegin(GL_LINES);
 		for (auto &cy : lg->cset.cylinders)
@@ -1617,7 +1798,7 @@ void InteractiveViewerWidget::draw_submesh()
 #endif
 
 		//画新设的场
-#if 1
+#if 0
 		double avgl = 0.2*calc_mesh_ave_edge_length(&mesh);
 		glColor3d(1, 0, 0);
 		glBegin(GL_LINES);
@@ -1662,26 +1843,6 @@ void InteractiveViewerWidget::draw_submesh()
 			glVertex3dv(poin.data());
 		}
 		glEnd();
-#endif
-
-#if 1
-		if (lg->cf->updateField)
-		{
-			lg->cf->updateField = false;
-			crossfield = lg->cf->getCrossField();
-			avgLen = 0.2 * calc_mesh_ave_edge_length(&mesh);
-			for (auto tf : mesh.faces())
-			{
-				OpenMesh::Vec3d c = mesh.calc_centroid(tf);
-				int i = tf.idx() * 4;
-				Eigen::Vector3d vc(c[0], c[1], c[2]);
-
-				crossfield.col(i) = vc + crossfield.col(i) * avgLen;
-				crossfield.col(i + 1) = vc + crossfield.col(i + 1) * avgLen;
-				crossfield.col(i + 2) = vc + crossfield.col(i + 2) * avgLen;
-				crossfield.col(i + 3) = vc + crossfield.col(i + 3) * avgLen;
-			}
-		}
 #endif
 
 	}

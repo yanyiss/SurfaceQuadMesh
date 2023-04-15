@@ -95,8 +95,12 @@ namespace LoopGen
 		std::vector<FaceLayer*> faces;
 		BoolVector face_flag;
 		std::vector<std::vector<HalfedgeLayer*>> bounds;
+		std::vector<std::pair<int, int>> handle_to_layer;
 
+		region() {}
+		~region() {}
 		void set_face(M4 &m4);
+		virtual void set_bound() {}
 	};
 
 	struct cylinder : region
@@ -104,7 +108,6 @@ namespace LoopGen
 		std::vector<VertexLayer*> cut;
 		std::vector<int> vidmap;
 		Eigen::VectorXd uv[2];
-		std::vector<std::pair<int, int>> handle_to_layer;
 
 		cylinder() {}
 		cylinder(cylinder &&cy);
@@ -113,11 +116,11 @@ namespace LoopGen
 		inline double GetRegularU(int vlid) { return uv[0](vidmap[vlid]) - std::floor(uv[0](vidmap[vlid])); }
 		inline double GetU(int vlid) { return uv[0](vidmap[vlid]); }
 		inline double GetV(int vlid) { return uv[1](vidmap[vlid]); }
-		void set_bound();
+		void set_bound() override;
 		void parametrize(M4 &m4, const Eigen::Matrix3Xd& normal);
 	};
 
-	struct cylinder_set
+	/*struct cylinder_set
 	{
 		std::vector<cylinder> cylinders;
 		std::vector<PlaneLoop> all_path;
@@ -129,7 +132,7 @@ namespace LoopGen
 
 		void ProcessOverlap(M4 &m4);
 	};
-
+*/
 	struct disk : region
 	{
 		std::pair<int, int> from_bound;
@@ -139,20 +142,33 @@ namespace LoopGen
 		disk(){}
 		disk(disk &&dk);
 		disk& operator=(disk&& dk);
-		void set_bound();
+		void set_bound() override;
 	};
 
-
-
-	struct disk_set
+	/*struct disk_set
 	{
 		std::vector<disk> disks;
 
 		void ProcessOverlap(M4 &m4);
-	};
+	};*/
 
 	struct region_set
 	{
+		std::vector<region*> regions;
+		std::vector<PlaneLoop> bridge;
+		BoolVector bound_halfedgelayer_flag;
+		BoolVector has_verticelayer;
+		BoolVector has_facelayer;
+		std::vector<std::pair<int, int>> verticelayer_bound_index;
 
+		int disk_mark = -1;
+		region_set() {}
+		~region_set() { for (auto rg : regions) delete rg; }
+		void ProcessOverlap(M4 &m4, int type);
+		void clearRegion() { for (auto rg : regions) if (rg) { delete rg; rg = nullptr; } }
 	};
+	extern region_set rset;
+
+#define cyPtr(rg) static_cast<cylinder*>(rg)
+#define dkPtr(rg) static_cast<disk*>(rg)
 }

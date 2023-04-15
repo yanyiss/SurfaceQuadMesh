@@ -53,29 +53,36 @@ namespace LoopGen
 		void InitializeSimilarityEnergy(bool re_compute = false);
 
 		//用于数据交换与绘制的变量
+		std::vector<VertexLayer*> seed_vertex;
+		std::vector<double> similarity_energy;
+		std::vector<VertexLayer*> overt;
+		std::vector<VertexLayer*> nvert;
+		std::vector<FaceLayer*> oface;
+		std::vector<FaceLayer*> nface;
+
 		//std::vector<VertexHandle> region_vertex;
 		//std::vector<VertexHandle> sub_vertex; std::vector<FaceHandle> sub_face;
-		BoolVector old_face_flag;
-		BoolVector old_vert_flag;
-		BoolVector new_face_flag;
-		BoolVector new_vert_flag;
-		Eigen::VectorXd uv_para[2];
-		std::vector<int> vertexidmap;
-		Eigen::Matrix3Xd xaxis;
-		BoolVector cut_vertex_flag;
-		std::vector<int> growDIR;
-		BoolVector v_cache_flag;
-		std::vector<VertexLayer*> v_cache;
-		std::vector<PlaneLoop> region_path;
+		//BoolVector old_face_flag;
+		//BoolVector old_vert_flag;
+		//BoolVector new_face_flag;
+		//BoolVector new_vert_flag;
+		//Eigen::VectorXd uv_para[2];
+		//std::vector<int> vertexidmap;
+		//Eigen::Matrix3Xd xaxis;
+		//BoolVector cut_vertex_flag;
+		//std::vector<int> growDIR;
+		//BoolVector v_cache_flag;
+		//std::vector<VertexLayer*> v_cache;
+		//std::vector<PlaneLoop> region_path;
 
-		std::deque<bool> bound_edge_flag;
-		std::vector<double> similarity_energy;
-		std::vector<PlaneLoop> all_plane_loop;
-		//std::vector<Vec3d> u0point5;
-		std::vector<VertexLayer*> seed_vertex;
-		std::vector<VertexLayer*> cut_vertex;
-		std::vector<std::vector<VertexLayer*>> cylinder_link_path;
-		std::vector<VertexLayer*> search_loop;
+		//std::deque<bool> bound_edge_flag;
+		//
+		//std::vector<PlaneLoop> all_plane_loop;
+		////std::vector<Vec3d> u0point5;
+		//
+		//std::vector<VertexLayer*> cut_vertex;
+		//std::vector<std::vector<VertexLayer*>> cylinder_link_path;
+		//std::vector<VertexLayer*> search_loop;
 
 		//算法重要参数
 		double energy_threshold = 0.2;
@@ -83,8 +90,6 @@ namespace LoopGen
 		int extend_layer = 3;
 
 		//优化阶段变量
-		cylinder_set cset;
-		disk_set dset;
 		//优化阶段函数
 		void AssembleSampling(VertexLayer* vl, Eigen::Matrix3Xd &sampling, LocalParametrization &lp, int loop_sampling_num);
 		void AssembleSimilarityAngle(VertexLayer* vl, Eigen::VectorXd& sa, LocalParametrization& lp, int loop_fragment_num);
@@ -101,9 +106,9 @@ namespace LoopGen
 		void ConstructCylinder();
 
 		//Loop迭代阶段
-		bool CylinderBasedPLSearch(VertexLayer* vl, std::vector<VertexLayer*> &loop, std::vector<std::vector<VertexLayer*>> &link_on_cylinder);
+		//bool CylinderBasedPLSearch(VertexLayer* vl, std::vector<VertexLayer*> &loop, std::vector<std::vector<VertexLayer*>> &link_on_cylinder);
 		void OptimizeCylinder();
-		void IterateCylinder();
+		//void IterateCylinder();
 		void RecoverCylinder(std::vector<std::vector<int>> &vh_set, std::vector<OpenMesh::Vec3d> &dir,
 			bool set_cut = true, bool set_bound = true, bool set_parameter = true,
 			bool set_flag = true, bool set_intersection = true);
