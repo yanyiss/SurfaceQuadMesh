@@ -39,7 +39,7 @@ namespace LoopGen
 		std::vector<int> constraintId;
 		Eigen::Matrix3Xd constraintVector;
 		void setCurvatureConstraint();
-		void setOuterConstraint(BoolVector& cons_flag, Eigen::Matrix3Xd& cons_direction);
+		void setOuterConstraint(BoolVector& cons_flag, Eigen::Matrix3Xd& cons_direction, bool curvature_constraint = true);
 
 		Eigen::Matrix3Xd crossfield;  Eigen::Matrix3Xd& getCrossField() { return crossfield; }   void setField();
 
@@ -53,6 +53,7 @@ namespace LoopGen
 		void write_field();
 
 		double axisDif(HalfedgeHandle hh);
+		std::vector<std::pair<double, double>> cur;
 	};
 }
 //class crossField

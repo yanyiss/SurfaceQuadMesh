@@ -13,22 +13,28 @@ namespace LoopGen
 
 	void crossField::setNormal()
 	{
-		normal.resize(3, mesh->n_faces());
+		/*normal.resize(3, mesh->n_faces());
 		for (auto& tf : mesh->faces())
 		{
 			std::vector<int> id; id.reserve(3);
 			for (auto& tfv : mesh->fv_range(tf)) id.push_back(tfv.idx());
 			normal.col(tf.idx()) = (position.col(id[1]) - position.col(id[0])).cross(position.col(id[2]) - position.col(id[1])).normalized();
+		}*/
+		mesh->update_face_normals();
+		normal.resize(3, mesh->n_faces());
+		for (auto tf : mesh->faces())
+		{
+			OpenMesh::Vec3d n = mesh->calc_face_normal(tf);
+			normal.col(tf.idx()) << n[0], n[1], n[2];
 		}
 	}
 
 	void crossField::setFaceBase()
 	{
-		mesh->update_face_normals();
 		faceBase.resize(3, mesh->n_faces() * 2);
 		for (auto& tf : mesh->faces())
 		{
-			Eigen::Matrix3d v;
+			/*Eigen::Matrix3d v;
 			int i = 0;
 			for (auto& tfv : mesh->fv_range(tf))
 			{
@@ -37,7 +43,11 @@ namespace LoopGen
 			}
 			i = tf.idx() * 2;
 			faceBase.col(i) = (v.col(1) - v.col(0)).normalized();
-			faceBase.col(i + 1) = faceBase.col(i).cross((v.col(2) - v.col(0)).cross(v.col(1) - v.col(0))).normalized();
+			faceBase.col(i + 1) = faceBase.col(i).cross((v.col(2) - v.col(0)).cross(v.col(1) - v.col(0))).normalized();*/
+			OpenMesh::Vec3d hh = mesh->calc_edge_vector(mesh->fh_begin(tf).handle()).normalized();
+			int i = tf.idx() * 2;
+			faceBase.col(i) << hh[0], hh[1], hh[2];
+			faceBase.col(i + 1) << normal.col(i / 2).cross(faceBase.col(i));
 		}
 	}
 
@@ -50,6 +60,7 @@ namespace LoopGen
 
 	void crossField::setCurvatureConstraint()
 	{
+#if 0
 		if (!mesh->has_vertex_normals())
 		{
 			mesh->request_vertex_normals();
@@ -81,8 +92,8 @@ namespace LoopGen
 			auto h0 = mesh->halfedge_handle(e_h, 0);
 			auto h1 = mesh->halfedge_handle(e_h, 1);
 
-			auto vec0 = mesh->calc_edge_vector(h0);
-			auto vec1 = mesh->calc_edge_vector(h1);
+			/*auto vec0 = mesh->calc_edge_vector(h0);
+			auto vec1 = mesh->calc_edge_vector(h1);*/
 
 			/*auto el0 = +h_local[h0];
 			auto el1 = -h_local[h1];*/
@@ -164,15 +175,17 @@ namespace LoopGen
 		//OpenMesh::FPropHandleT<OpenMesh::Vec3d> f0;
 		OpenMesh::FPropHandleT<Eigen::Vector3d> f0;
 		mesh->add_property(f0);
-
+		cur.clear();
+		cur.reserve(mesh->n_faces());
 		for (auto f_h : mesh->faces())
 		{
 			int f_id = f_h.idx();
 			Eigen::EigenSolver<Eigen::Matrix2d> cur_solver(f_II[f_h.idx()]);
 
-			double k0 = std::abs(cur_solver.eigenvalues()[0].real());
-			double k1 = std::abs(cur_solver.eigenvalues()[1].real());
-
+			double k0 = cur_solver.eigenvalues()[0].real();
+			double k1 = cur_solver.eigenvalues()[1].real();
+			cur.emplace_back(k0, k1);
+			k0 = std::fabs(k0); k1 = std::fabs(k1);
 			//std::cout << k0 << " " << k1 << std::endl;
 			if (k0 <= 10.0 * k1 && k1 <= 10.0 * k0) continue;
 			//if (k0 <= 1.0 * k1 && k1 <= 1.0 * k0) continue;
@@ -184,11 +197,14 @@ namespace LoopGen
 			//mesh->property(f0, f_h) = eigen_vectors(0, max_k)*faceBase[f_id * 2] + eigen_vectors(1, max_k)*faceBase[f_id * 2 + 1];
 			mesh->property(f0, f_h) = eigen_vectors(0, max_k) * faceBase.col(f_id * 2) + eigen_vectors(1, max_k) * faceBase.col(f_id * 2 + 1);
 			if (k0 > 1.0e-2 || k1 > 1.0e-2)
-				max_cur.update(f_h.idx(), std::abs(k0 * k1));
+			{
+				max_cur.update(f_h.idx(), std::abs(k0 * k1)/*std::max(k0 / (k1 + 1.0e-6), k1 / (k0 + 1.0e-6))*/);
+			}
 		}
 		std::cout << "#Constraints " << max_cur.size() << std::endl;
 
 		auto id = max_cur.get_ids();
+		//id.erase(id.begin() + 1, id.end());
 		constraintId.resize(id.size());
 		constraintVector.resize(3, id.size());
 		for (int i = 0; i < id.size(); ++i)
@@ -196,27 +212,82 @@ namespace LoopGen
 			constraintId[i] = id[i];
 			constraintVector.col(i) = mesh->property(f0, mesh->face_handle(id[i]));
 		}
-
 		mesh->remove_property(f0);
+#else
+		int n_constraints = std::max(20, (int)mesh->n_faces() / 2);
+		StatisticsMostValues<double, true> max_cur(n_constraints);
+		std::vector<double> k[2];
+		std::vector<OpenMesh::Vec3d> dir[2];
+		compute_principal_curvature(mesh, k[0], k[1], dir[0], dir[1]);
+		std::vector<Eigen::Matrix3d> cur_tensor(mesh->n_vertices());
+		for (auto tv : mesh->vertices())
+		{
+			int id = tv.idx();
+			OpenMesh::Vec3d normal = OpenMesh::cross(dir[0][id], dir[1][id]);
+			Eigen::Matrix3d H;
+			H << dir[0][id][0], dir[1][id][0], normal[0],
+				dir[0][id][1], dir[1][id][1], normal[1],
+				dir[0][id][2], dir[1][id][2], normal[2];
+			cur_tensor[id].setZero();
+			cur_tensor[id](0, 0) = k[0][id];
+			cur_tensor[id](1, 1) = k[1][id];
+			cur_tensor[id] = H * cur_tensor[id] * H.transpose();
+		}
+		Eigen::Matrix3d face_tensor;
+		Eigen::Matrix3d U;
+		Eigen::Vector3d sv;
+		for (auto tf : mesh->faces())
+		{
+			face_tensor.setZero();
+			for (auto tfv : mesh->fv_range(tf))
+				face_tensor += cur_tensor[tfv.idx()];
+			face_tensor /= 3.0;
+			Eigen::JacobiSVD<Eigen::Matrix3d> svd(face_tensor, Eigen::ComputeFullU | Eigen::ComputeFullV);
+			U = svd.matrixU(); sv = svd.singularValues();
+
+		}
+#endif
 	}
 
-	void crossField::setOuterConstraint(BoolVector& cons_flag, Eigen::Matrix3Xd& cons_direction)
+	void crossField::setOuterConstraint(BoolVector& cons_flag, Eigen::Matrix3Xd& cons_direction, bool curvature_constraint)
 	{
-		int count = 0;
-		for (int i = 0; i < mesh->n_faces(); ++i)
-			if (cons_flag[i])
-				++count;
-		constraintId.clear();
-		constraintId.reserve(count);
-		constraintVector.resize(3, count);
-		int cols = 0;
-		for (int i = 0; i < mesh->n_faces(); ++i)
+		if (curvature_constraint)
 		{
-			if (cons_flag[i])
+			setCurvatureConstraint();
+			int count = 0;
+			for (int i = 0; i < mesh->n_faces(); ++i)
+				if (cons_flag[i])
+					++count;
+			int cols = constraintVector.cols();
+			constraintVector.conservativeResize(3, cols + count);
+			for (int i = 0; i < mesh->n_faces(); ++i)
 			{
-				constraintId.push_back(i);
-				constraintVector.col(cols) = cons_direction.col(i);
-				++cols;
+				if (cons_flag[i])
+				{
+					constraintId.push_back(i);
+					constraintVector.col(cols) = cons_direction.col(i);
+					++cols;
+				}
+			}
+		}
+		else
+		{
+			int count = 0;
+			for (int i = 0; i < mesh->n_faces(); ++i)
+				if (cons_flag[i])
+					++count;
+			constraintId.clear();
+			constraintId.reserve(count);
+			constraintVector.resize(3, count);
+			int cols = 0;
+			for (int i = 0; i < mesh->n_faces(); ++i)
+			{
+				if (cons_flag[i])
+				{
+					constraintId.push_back(i);
+					constraintVector.col(cols) = cons_direction.col(i);
+					++cols;
+				}
 			}
 		}
 	}

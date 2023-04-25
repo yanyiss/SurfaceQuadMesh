@@ -60,29 +60,6 @@ namespace LoopGen
 		std::vector<FaceLayer*> oface;
 		std::vector<FaceLayer*> nface;
 
-		//std::vector<VertexHandle> region_vertex;
-		//std::vector<VertexHandle> sub_vertex; std::vector<FaceHandle> sub_face;
-		//BoolVector old_face_flag;
-		//BoolVector old_vert_flag;
-		//BoolVector new_face_flag;
-		//BoolVector new_vert_flag;
-		//Eigen::VectorXd uv_para[2];
-		//std::vector<int> vertexidmap;
-		//Eigen::Matrix3Xd xaxis;
-		//BoolVector cut_vertex_flag;
-		//std::vector<int> growDIR;
-		//BoolVector v_cache_flag;
-		//std::vector<VertexLayer*> v_cache;
-		//std::vector<PlaneLoop> region_path;
-
-		//std::deque<bool> bound_edge_flag;
-		//
-		//std::vector<PlaneLoop> all_plane_loop;
-		////std::vector<Vec3d> u0point5;
-		//
-		//std::vector<VertexLayer*> cut_vertex;
-		//std::vector<std::vector<VertexLayer*>> cylinder_link_path;
-		//std::vector<VertexLayer*> search_loop;
 
 		//算法重要参数
 		double energy_threshold = 0.2;
@@ -106,9 +83,9 @@ namespace LoopGen
 		void ConstructCylinder();
 
 		//Loop迭代阶段
-		//bool CylinderBasedPLSearch(VertexLayer* vl, std::vector<VertexLayer*> &loop, std::vector<std::vector<VertexLayer*>> &link_on_cylinder);
+		bool CylinderBasedPLSearch(VertexLayer* vl, std::vector<VertexLayer*> &loop, std::vector<std::vector<VertexLayer*>> &link_on_cylinder);
 		void OptimizeCylinder();
-		//void IterateCylinder();
+		void IterateCylinder();
 		void RecoverCylinder(std::vector<std::vector<int>> &vh_set, std::vector<OpenMesh::Vec3d> &dir,
 			bool set_cut = true, bool set_bound = true, bool set_parameter = true,
 			bool set_flag = true, bool set_intersection = true);
@@ -125,7 +102,18 @@ namespace LoopGen
 		std::vector<double> vert_path_similarity_energy;
 		std::vector<std::pair<int, double>> eee;
 
-		//void SetUParaLine(InfoOnVertex& iov, LocalParametrization& lp, std::deque<bool>& visited_v, std::deque<bool>& visited_f);
+		//划分区域阶段
+		bool BFS(int sid, std::vector<VertexHandle> &path, BoolVector &constraint_info, BoolVector &break_info);
+		bool FieldAlignedPath(VertexLayer* vl, PlaneLoop &path, BoolVector &break_info);
+		void DivideRegion();
+		void ExtractRegion();
+
+		std::vector<std::vector<VertexHandle>> sing_connector;
+		PlaneLoop& better_cutter(std::vector<VertexHandle> &path, PLS &field_path);
+		PLS sing_cutter;
+
+		void test();
+		std::vector<PLS> color_path;
 	};
 
 }

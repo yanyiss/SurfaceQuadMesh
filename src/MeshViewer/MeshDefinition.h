@@ -26,8 +26,10 @@ struct MeshTraits : public OpenMesh::DefaultTraits
 	EdgeTraits
 	{
 		EdgeT()
-		{
+	    {
 		};
+	public:
+		double weight;
 	};
 
 	HalfedgeTraits
@@ -104,6 +106,7 @@ void initMeshStatusAndNormal(T& m)
 	m.update_face_normals();
 	m.update_vertex_normals();
 }
+
 
 #if 0
 #pragma region functions by yanyisheshou at GCL

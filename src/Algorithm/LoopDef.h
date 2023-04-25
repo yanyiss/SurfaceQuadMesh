@@ -29,16 +29,16 @@ namespace LoopGen
 	typedef std::vector<PointOnHalfedgeLayer> PlaneLoop;
 	typedef std::vector<PlaneLoop> PLS;
 
-	struct LayerNode
+	struct Node
 	{
 		int id;//顶点编号
 		int count;//加入队列的次数
 		double dist;//与源点的距离
-		LayerNode() {}
-		LayerNode(int id_, double dist_, int count_) :id(id_), dist(dist_), count(count_) {}
-		bool operator>(const LayerNode& x) const { return dist > x.dist; }
+		Node() {}
+		Node(int id_, double dist_, int count_) :id(id_), dist(dist_), count(count_) {}
+		bool operator>(const Node& x) const { return dist > x.dist; }
 	};
-	typedef std::priority_queue<LayerNode, std::vector<LayerNode>, std::greater<LayerNode>> layernode_pq;
+	typedef std::priority_queue<Node, std::vector<Node>, std::greater<Node>> node_pq;
 
 	enum DIRECTION {
 		Forward,
@@ -142,7 +142,7 @@ namespace LoopGen
 		disk(){}
 		disk(disk &&dk);
 		disk& operator=(disk&& dk);
-		void set_bound() override;
+		void set_bound(M4 &m4);
 	};
 
 	/*struct disk_set
@@ -171,4 +171,15 @@ namespace LoopGen
 
 #define cyPtr(rg) static_cast<cylinder*>(rg)
 #define dkPtr(rg) static_cast<disk*>(rg)
+
+	class SegmentTree
+	{
+	public:
+		SegmentTree(PlaneLoop &pl, M4 &m4);
+		~SegmentTree() {};
+	public:
+		double closest_distance(OpenMesh::Vec3d &in);
+	private:
+		std::vector<OpenMesh::Vec3d> pos;
+	};
 }

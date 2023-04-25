@@ -337,6 +337,10 @@ void InteractiveViewerWidget::pick_face(int x,int y)
 	if(desiredFace < 0) return;
 	lastestFace = desiredFace;
 	printf("Select Face : %d\n", desiredFace);
+	if (lg)
+	{
+		dprint("curvature:", lg->cf->cur[lastestFace].first, lg->cf->cur[lastestFace].second);
+	}
 	std::vector<int>::iterator it;
 	if( (it = std::find(selectedFace.begin(),selectedFace.end(),desiredFace)) == selectedFace.end() )
 	{
@@ -754,11 +758,11 @@ void InteractiveViewerWidget::showLoop()
 	{
 		loop_gen_init = true;
 
-#if 0
+#if 1
 		lg->m4.set_base(&mesh, lg->cf); lg->m4.init(); lg->m4.update(); lg->m4.set_weight();
 #else
 		{
-#if 0
+#if 1
 			lg->InitializePlaneLoop();
 			lg->InitializeSimilarityEnergy();
 			lg->ConstructCylinder();
@@ -767,8 +771,9 @@ void InteractiveViewerWidget::showLoop()
 #if 0
 			lg->IterateCylinder();
 #endif
-#if 1
+#if 0
 			lg->ReLoop();
+			lg->DivideRegion();
 #endif
 		}
 #endif
@@ -866,7 +871,7 @@ void InteractiveViewerWidget::draw_energy()
 		glBegin(GL_LINES);
 		for(int i=0;i<mesh.n_edges();++i)
 		{
-			double t = lg->similarity_energy[i];// std::min(lg->similarity_energy[i * 8], lg->similarity_energy[i * 8 + 1]);
+			double t = /*lg->similarity_energy[i];*/ std::min(lg->similarity_energy[i * 8], lg->similarity_energy[i * 8 + 1]);
 			if (t > max_e)
 				glColor3d(0, 1, 0);
 			else
@@ -930,11 +935,23 @@ void InteractiveViewerWidget::draw_submesh()
 #endif
 
 		//画新搜索的点
-#if 1
+#if 0
 		glColor3d(1, 1, 1);
-		glPointSize(5);
+		glPointSize(10);
 		glBegin(GL_POINTS);
 		for (auto vl : lg->nvert)
+		{
+			glVertex3dv(mesh.point(vl->v).data());
+		}
+		glEnd();
+#endif
+
+		//画已有的点
+#if 0
+		glColor3d(0, 1, 1);
+		glPointSize(10);
+		glBegin(GL_POINTS);
+		for (auto vl : lg->overt)
 		{
 			glVertex3dv(mesh.point(vl->v).data());
 		}
@@ -955,14 +972,12 @@ void InteractiveViewerWidget::draw_submesh()
 		glEnd();
 #endif
 
-		//画所有disk区域的面
+		//画所有cylinder, disk区域的面
 #if 1
 		glColor3d(0, 1, 0);
 		glBegin(GL_TRIANGLES);
 		for (auto rg : rset.regions)
 		{
-			if (rg->id < rset.disk_mark)
-				continue;
 			for (auto fl : rg->faces)
 			{
 				auto fvPtr = mesh.fv_begin(fl->f);
@@ -974,26 +989,26 @@ void InteractiveViewerWidget::draw_submesh()
 		glEnd();
 #endif
 
-		{
+		/*{
 			HalfedgeLayer* hl = &(lg->m4.halfedgelayers[938616]);
 			dprint("fe", hl->id / 4, hl->left / 4);
 			dprint(rset.bound_halfedgelayer_flag[hl->id],
 				rset.bound_halfedgelayer_flag[lg->m4.another_layer(hl, 1)->id],
 				rset.bound_halfedgelayer_flag[lg->m4.another_layer(hl, 2)->id],
 				rset.bound_halfedgelayer_flag[lg->m4.another_layer(hl, 3)->id]);
-		}
+		}*/
 		//画boundarylayer
-#if 1
+#if 0
 		glLineWidth(6);
 		glBegin(GL_LINES);
 		for (int i = 0; i < rset.bound_halfedgelayer_flag.size(); ++i)
 		{
 			if (rset.bound_halfedgelayer_flag[i])
 			{
-				if (i / 4 == 938616 / 4)
+				/*if (i / 4 == 938616 / 4)
 				{
 					int p = 0;
-				}
+				}*/
 				HalfedgeHandle hh = mesh.halfedge_handle(i / 4);
 				glVertex3dv(mesh.point(mesh.from_vertex_handle(hh)).data());
 				glVertex3dv(mesh.point(mesh.to_vertex_handle(hh)).data());
@@ -1002,7 +1017,7 @@ void InteractiveViewerWidget::draw_submesh()
 		glEnd();
 #endif
 
-		//画所有柱体区域边界
+		//画所有cylinder和disk区域边界
 #if 1
 		glLineWidth(6);
 		glBegin(GL_LINES);
@@ -1026,6 +1041,66 @@ void InteractiveViewerWidget::draw_submesh()
 		glEnd();
 #endif
 
+		//画奇异点的连接线
+#if 1
+		glColor3d(0.8, 0.7, 0.3);
+		glLineWidth(10);
+		for (auto &pl : lg->sing_connector)
+		{
+			glBegin(GL_LINE_STRIP);
+			for (auto &poh : pl)
+			{
+				glVertex3dv(mesh.point(poh).data());
+			}
+			glEnd();
+		}
+#endif
+		
+		//画奇异点的分割线
+#if 1
+		glColor3d(0.2, 0.7, 0.3);
+		glLineWidth(10);
+		for (auto &pl : lg->sing_cutter)
+		{
+			glBegin(GL_LINE_STRIP);
+			for (auto &poh : pl)
+			{
+				glVertex3dv(poh.point(lg->m4).data());
+			}
+			glEnd();
+		}
+#endif
+		
+		//画分割线的所有面
+#if 0
+		glColor3d(0.9, 0.1, 0.3);
+		glBegin(GL_TRIANGLES);
+		for (auto &pl : lg->sing_cutter)
+		{
+			for (auto &poh : pl)
+			{
+				if (poh.hl)
+				{
+					auto fv = mesh.fv_begin(mesh.face_handle(poh.hl->left / 4));
+					glVertex3dv(mesh.point(fv.handle()).data()); ++fv;
+					glVertex3dv(mesh.point(fv.handle()).data()); ++fv;
+					glVertex3dv(mesh.point(fv.handle()).data()); 
+				}
+				else
+				{
+					for (auto vf : mesh.vf_range(mesh.vertex_handle(poh.c)))
+					{
+						auto fv = mesh.fv_begin(vf);
+						glVertex3dv(mesh.point(fv.handle()).data()); ++fv;
+						glVertex3dv(mesh.point(fv.handle()).data()); ++fv;
+						glVertex3dv(mesh.point(fv.handle()).data());
+					}
+				}
+			}
+		}
+		glEnd();
+#endif
+
 		//画从边界出发的path
 #if 0
 		glLineWidth(6);
@@ -1043,6 +1118,20 @@ void InteractiveViewerWidget::draw_submesh()
 			}
 			glEnd();
 		}
+#endif
+
+		//画固定方向的面
+#if 1
+		glBegin(GL_TRIANGLES);
+		glColor3d(0.5, 0.05, 0.05);
+		for (auto fid : lg->cf->constraintId)
+		{
+			for (auto fv : mesh.fv_range(mesh.face_handle(fid)))
+			{
+				glVertex3dv(mesh.point(fv).data());
+			}
+		}
+		glEnd();
 #endif
 
 #if 1

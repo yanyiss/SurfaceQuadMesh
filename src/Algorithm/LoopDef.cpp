@@ -258,10 +258,74 @@ namespace LoopGen
 		return *this;
 	}
 
-	void disk::set_bound()
+	void disk::set_bound(M4 &m4)
 	{
 		bounds.resize(2);
-		
+		HalfedgeLayer* hl;
+		int shift;
+
+		shift = to_bound.second == 0 ? 1 : 3;
+		for (auto hl_transfer : rset.regions[to_bound.first]->bounds[to_bound.second])
+		{
+			if (vertice_flag[m4.another_layer(hl_transfer, shift)->to]
+				&& !vertice_flag[m4.another_layer(hl_transfer, shift)->from])
+			{
+				hl = m4.another_layer(hl_transfer, shift)->oppo;
+				break;
+			}
+		}
+		while (true)
+		{
+			if (!face_flag[hl->left] && face_flag[hl->oppo->left])
+				break;
+			hl = hl->oppo->next;
+		}
+		shift = from_bound.second == 0 ? 1 : 3;
+		auto &fvf = rset.regions[from_bound.first]->vertice_flag;
+		while (!fvf[m4.another_layer(hl, shift)->to])
+		{
+			bounds[0].push_back(hl);
+			hl = hl->oppo;
+			while (true)
+			{
+				if (!face_flag[hl->left] && face_flag[hl->oppo->left])
+					break;
+				hl = hl->oppo->next;
+			}
+		}
+		bounds[0].push_back(hl);
+
+
+		shift = from_bound.second == 0 ? 3 : 1;
+		for (auto hl_transfer : rset.regions[from_bound.first]->bounds[from_bound.second])
+		{
+			if (vertice_flag[m4.another_layer(hl_transfer, shift)->to]
+				&& !vertice_flag[m4.another_layer(hl_transfer, shift)->from])
+			{
+				hl = m4.another_layer(hl_transfer, shift)->oppo;
+				break;
+			}
+		}
+		while (true)
+		{
+			if (!face_flag[hl->left] && face_flag[hl->oppo->left])
+				break;
+			hl = hl->oppo->next;
+		}
+		shift = to_bound.second == 0 ? 3 : 1;
+		auto &tvf = rset.regions[to_bound.first]->vertice_flag;
+		while (!tvf[m4.another_layer(hl, shift)->to])
+		{
+			bounds[1].push_back(hl);
+			hl = hl->oppo;
+			while (true)
+			{
+				if (!face_flag[hl->left] && face_flag[hl->oppo->left])
+					break;
+				hl = hl->oppo->next;
+			}
+		}
+		bounds[1].push_back(hl);
 	}
 
 	void region_set::ProcessOverlap(M4 &m4, int type)
@@ -322,13 +386,15 @@ namespace LoopGen
 					ris = region_index[i].size();
 				}
 			}
-			std::vector<region*>::iterator ptr = std::remove_if(regions.begin(), regions.end(), [&](region* rhs) { return rhs->id == -1; });
-			for (auto p = ptr; p != regions.end(); ++p)
+			for (auto rg : regions)
 			{
-				delete *p;
-				*p = nullptr;
+				if (rg->id == -1)
+				{
+					delete rg;
+					rg = nullptr;
+				}
 			}
-			regions.erase(ptr);
+			regions.erase(std::remove_if(regions.begin(), regions.end(), [&](region* rhs) {return rhs->id == -1; }), regions.end());
 			int count = 0;
 			for (auto rg : regions)
 				rg->id = count++;
@@ -360,6 +426,7 @@ namespace LoopGen
 					region* cd = regions[child];
 					if (pd->faces.size() < cd->faces.size())
 					{
+						std::swap(regions[parent], regions[child]);
 						std::swap(pd, cd);
 					}
 					cd->id = -1;
@@ -373,17 +440,71 @@ namespace LoopGen
 					ris = region_index[i].size();
 				}
 			}
-			//regions.erase(std::remove_if(regions.begin() + disk_mark, regions.end(), [&](region* rhs) { return rhs->id == -1; }));
-			std::vector<region*>::iterator ptr = std::remove_if(regions.begin() + disk_mark, regions.end(), [&](region* rhs) { return rhs->id == -1; });
-			for (auto p = ptr; p != regions.end(); ++p)
+			for (auto rg : regions)
 			{
-				delete *p;
-				*p = nullptr;
+				if (rg->id == -1)
+				{
+					delete rg;
+					rg = nullptr;
+				}
 			}
-			regions.erase(ptr);
+			regions.erase(std::remove_if(regions.begin(), regions.end(), [&](region* rhs) {return rhs->id == -1; }), regions.end());
 			int count = 0;
 			for (auto rg : regions)
 				rg->id = count++;
 		}
+	}
+
+	SegmentTree::SegmentTree(PlaneLoop &pl, M4 &m4)
+	{
+		pos.reserve(pl.size());
+		for (auto &poh : pl)
+			pos.push_back(poh.point(m4));
+	}
+
+	double SegmentTree::closest_distance(OpenMesh::Vec3d &in)
+	{
+		OpenMesh::Vec3d p01, pin;
+		double proj, norm;
+		double dis = YYSS_INFINITE;
+		for (int i = 0; i < pos.size() - 1; ++i)
+		{
+			auto &p0 = pos[i];
+			auto &p1 = pos[i + 1];
+			p01 = (p1 - p0).normalized();
+			pin = in - p0;
+			proj = pin.dot(p01);
+			if (proj <= 0)
+			{
+				norm = pin.norm();
+				if (norm < dis)
+				{
+					dis = norm;
+				}
+			}
+			else
+			{
+				pin = in - p1;
+				proj = pin.dot(-p01);
+				if (proj <= 0)
+				{
+					norm = pin.norm();
+					if (norm < dis)
+					{
+						dis = norm;
+					}
+				}
+				else
+				{
+					pin = p1 + proj * (-p01);
+					norm = (pin - in).norm();
+					if (norm < dis)
+					{
+						dis = norm;
+					}
+				}
+			}
+		}
+		return dis;
 	}
 }
