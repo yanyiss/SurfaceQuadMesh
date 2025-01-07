@@ -46,6 +46,7 @@ namespace LoopGen
 		void LeastSquarePlane(Eigen::VectorXd xyz[3], double plane[4]);
 		double EvaluatePlanarity(Eigen::VectorXd xyz[3], double plane[4]);
 
+
 		void InitializeField();
 		//void InitializeGraphWeight(double alpha = 900);
 		//void InitializePQ();
@@ -65,6 +66,7 @@ namespace LoopGen
 		double energy_threshold = 0.2;
 		double disk_e = 0.1;
 		int extend_layer = 3;
+		double GRAD_THRESHOLD = 2.0;
 
 		//优化阶段变量
 		//优化阶段函数
@@ -114,6 +116,10 @@ namespace LoopGen
 
 		void test();
 		std::vector<PLS> color_path;
+
+		std::vector<std::pair<VertexLayer*,PlaneLoop>> GetBoundIsoParaLine(cylinder &cy);
+		void set_feature_flag_and_split_with_cylinder_boundary
+		(std::vector<int>& feature, std::string mesh_file);
 	};
 
 }

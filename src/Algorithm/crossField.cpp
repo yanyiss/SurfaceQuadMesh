@@ -60,7 +60,7 @@ namespace LoopGen
 
 	void crossField::setCurvatureConstraint()
 	{
-#if 0
+#if 1
 		if (!mesh->has_vertex_normals())
 		{
 			mesh->request_vertex_normals();

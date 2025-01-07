@@ -58,6 +58,7 @@ namespace LoopGen
 		std::vector<HalfedgeLayer> halfedgelayers;
 		std::vector<FaceLayer> facelayers;
 		Eigen::VectorXd weight;
+		Eigen::VectorXd weight_2ring;
 
 		void set_base(Mesh* mesh_, crossField* cf_) { mesh = mesh_; cf = cf_; }
 		int calc_shift(VertexHandle v, HalfedgeHandle h)
@@ -229,7 +230,9 @@ namespace LoopGen
 			auto &position = cf->getPosition();
 			auto &normal = cf->getNormal();
 			weight.resize(halfedgelayers.size());
+			weight_2ring.resize(halfedgelayers.size());
 			double quarterPI = PI * 0.25;
+			double halfPI = PI * 0.5;
 			//for (auto te : mesh->edges())
 			for (auto th : mesh->halfedges())
 			{
@@ -242,13 +245,60 @@ namespace LoopGen
 					auto ev = position.col(mesh->to_vertex_handle(h0).idx()) - position.col(mesh->from_vertex_handle(h0).idx());
 					double arc0 = atan2(ev.cross(fv).dot(normal.col(hl.left / layer)), ev.dot(fv));
 					double arc1 = atan2(ev.cross(gv).dot(normal.col(hl.oppo->left / layer)), ev.dot(gv));
+					
+#if 0
 					double arc = fabs(atan2(sin(arc0) + sin(arc1), cos(arc0) + cos(arc1)));
 					if (arc < quarterPI)
-						weight(hl.id) = ev.norm() * sqrt(alpha*sin(arc)*sin(arc) + 1);
+						weight(hl.id) = ev.norm() * sqrt(alpha * sin(arc) * sin(arc) + 1);
 					/*{
 						weight(hl.id) = sin(arc);
 						weight(hl.id) *= weight(hl.id);
 					}*/
+					/*else if (arc < halfPI)
+						weight(hl.id) = YYSS_INFINITE / 2;*/
+					else
+						weight(hl.id) = YYSS_INFINITE;
+#else
+					//if (arc0 < 0) arc0 += 2 * PI;
+					//if (arc1 < 0) arc1 += 2 * PI;
+					double arc = (fabs(arc0) + fabs(arc1)) / 2;
+					if (arc < quarterPI)
+						weight(hl.id) = ev.norm() * sqrt(alpha * sin(arc) * sin(arc) + 1);
+					//else if (arc < 1.57)
+					//	weight(hl.id) = ev.norm() * sqrt(alpha * sin(arc) * sin(arc) + 1);
+					else
+						weight(hl.id) = YYSS_INFINITE;
+#endif
+				}
+			}
+
+			for (auto th : mesh->halfedges())
+			{
+				HalfedgeHandle h0 = th;
+				for (int j = 0; j < layer; ++j)
+				{
+					HalfedgeLayer& hl = halfedgelayers[h0.idx() * layer + j];
+					auto& fv = crossfield.col(hl.left);
+					auto& gv = crossfield.col(hl.next->oppo->left);
+					auto n0 = normal.col(hl.left / 4);
+					auto n1 = normal.col(hl.next->oppo->left / 4);
+
+					auto p0 = position.col(hl.from / 4);
+					auto p1 = position.col(hl.to / 4);
+					auto p2 = position.col(hl.next->to / 4);
+					auto p3 = position.col(hl.next->oppo->next->to / 4);
+
+
+
+
+
+					auto ev = position.col(mesh->to_vertex_handle(h0).idx()) - position.col(mesh->from_vertex_handle(h0).idx());
+					double arc0 = atan2(ev.cross(fv).dot(normal.col(hl.left / layer)), ev.dot(fv));
+					double arc1 = atan2(ev.cross(gv).dot(normal.col(hl.oppo->left / layer)), ev.dot(gv));
+
+					double arc = (fabs(arc0) + fabs(arc1)) / 2;
+					if (arc < quarterPI)
+						weight(hl.id) = ev.norm() * sqrt(alpha * sin(arc) * sin(arc) + 1);
 					else
 						weight(hl.id) = YYSS_INFINITE;
 				}

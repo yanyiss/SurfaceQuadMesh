@@ -1,9 +1,9 @@
 #include "LoopGen.h"
 #include <omp.h>
 
-#define COMPUTE_NEW_FIELD 1
-#define COMPUTE_NEW_PLANELOOP 1
-#define COMPUTE_NEW_ENERGY 1
+#define COMPUTE_NEW_FIELD 0
+#define COMPUTE_NEW_PLANELOOP 0
+#define COMPUTE_NEW_ENERGY 0
 #define PRINT_WHY_EXIT 0
 namespace LoopGen
 {
@@ -248,6 +248,7 @@ namespace LoopGen
 				if (!m4.sing_flag[vid])
 				{
 					int toid = hl_transfer->to;
+			
 					pq.emplace(toid, w, ++count[toid]);
 					distance[toid] = w;
 					prev[toid] = hl_transfer;
@@ -272,17 +273,23 @@ namespace LoopGen
 			return fabs(plane_func(0)*p[0] + plane_func(1)*p[1] + plane_func(2)*p[2] + plane_func(3));
 		};*/
 		VertexLayer* last_vl = nullptr;
+		//dprint();
 		while (true)
 		{
 			Node ln;
 			do
 			{
-				if (pq.empty())
+				if (pq.empty()) //goto fes;
 					return false;
 				ln = pq.top();
 				pq.pop();
 			} while (ln.count != count[ln.id]);
 			int fromid = ln.id;
+			/*dprint(fromid/4);
+			if (fromid/4 == 14602 )
+			{
+				int li = 0;
+			}*/
 			//if (fromid == vl->id)
 			if (break_info[fromid])
 			{
@@ -290,6 +297,7 @@ namespace LoopGen
 				break;
 			}
 
+			bool flag = false;
 			hl_begin = m4.verticelayers[fromid].hl;
 			hl_transfer = hl_begin;
 			do
@@ -309,6 +317,7 @@ namespace LoopGen
 						if (distance[fromid] + w < distance[toid])
 						{
 							distance[toid] = distance[fromid] + w;
+							flag = true;
 							pq.emplace(toid, distance[toid], ++count[toid]);
 							prev[toid] = hl_transfer;
 							//vid = m4.verticemap[vid];
@@ -324,7 +333,13 @@ namespace LoopGen
 				}
 				hl_transfer = hl_transfer->prev->oppo;
 			} while (hl_transfer != hl_begin);
+			if (!flag)
+			{
+
+			}
 		}
+		
+	//fes:;
 
 		path.clear();
 		path.push_back(last_vl);
@@ -348,12 +363,14 @@ namespace LoopGen
 		cf->setCurvatureConstraint();
 		cf->setField();
 		cf->initFieldInfo();
+		cf->write_field();
 #else
 		std::ifstream file_reader;
 		std::string field_file = "../resource//field//" + model_name + ".field";
 		file_reader.open(field_file, std::ios::in);
 		if (file_reader.good())
 		{
+			dprint("Read field file!");
 			file_reader.close();
 			cf = new crossField(mesh, field_file);
 			cf->read_field();
@@ -418,6 +435,7 @@ namespace LoopGen
 #pragma omp parallel for
 			for (int i = 0; i < nv; ++i)
 			{
+				//dprint(i);
 				if (m4.sing_flag[i])
 					continue;
 				//VertexLayer* vl = &m4.verticelayers[m4.verticemap[i]];
@@ -470,6 +488,7 @@ namespace LoopGen
 #pragma omp parallel for
 			for (int k = 0; k < mesh->n_edges(); ++k)
 			{
+				//dprint(k);
 				for (int m = 0; m < 2; ++m)
 				{
 					int hlid = k * 8 + m;
@@ -1013,7 +1032,7 @@ namespace LoopGen
 			{
 				double grad = LoopLenGrad(vertex_cache, lp, vertex_cache_flag, i);
 				//dprint("grad:", i, grad);
-				if (grad > PI)
+				if (grad > GRAD_THRESHOLD)
 				{
 #if PRINT_WHY_EXIT
 					dprint("因loop梯度过高，", i, "号方向停止搜索");
@@ -1588,11 +1607,11 @@ namespace LoopGen
 				constraint_dir.col(fl->f.idx()) = cf->crossfield.col(fl->id);
 			}
 		}
-		cf->setOuterConstraint(constraint_flag, constraint_dir, false);
+		/*cf->setOuterConstraint(constraint_flag, constraint_dir, false);
 		cf->setField();
 		cf->initFieldInfo();
 		cf->write_field();
-		tr.out("repair field:");
+		tr.out("repair field:");*/
 		dprint("Construct Cylinder Done");
 	}
 
@@ -4214,4 +4233,321 @@ namespace LoopGen
 		//	}
 		//}
 	}
+
+	std::vector<std::pair<VertexLayer*, PlaneLoop>> LoopGen::GetBoundIsoParaLine(cylinder& cy)
+	{
+		std::vector<std::pair<VertexLayer*, PlaneLoop>> output;
+		output.emplace_back(nullptr, PlaneLoop());
+		output.emplace_back(nullptr, PlaneLoop());
+		int cut_vh[2] = { -1,-1 };
+		for (int i = 0; i < 2; ++i)
+		{
+			double vmax = -DBL_MAX;
+			double vmin = DBL_MAX;
+			//dprint("fesfmn");
+			for (auto hl : cy.bounds[i])
+			{
+				//dprint(hl->id,vmin,vmax);
+				//dprint(cy->uv[1].size(),cy->vidmap[hl->to]);
+				if (cy.uv[1].size() <= cy.vidmap[hl->to] || cy.vidmap[hl->to] < 0)
+					continue;
+				if (i == 0)
+				{
+					double v = cy.GetV(hl->to);
+					if (v > vmax)
+					{
+						vmax = v;
+						cut_vh[i] = hl->to;
+					}
+				}
+				else
+				{
+					double v = cy.GetV(hl->to);
+					if (v < vmin)
+					{
+						vmin = v;
+						cut_vh[i] = hl->to;
+					}
+				}
+			}
+			output[i].first = &m4.verticelayers[cut_vh[i]];
+		}
+
+		for (int i = 0; i < 2; ++i)
+		{
+			VertexLayer* vl = output[i].first;
+			double standard_v = cy.GetV(vl->id);
+			HalfedgeLayer* hl_begin = vl->hl;
+			HalfedgeLayer* hl_transfer = hl_begin->next;
+			BoolVector& face_flag = cy.face_flag;
+			auto& pl = output[i].second;
+			do
+			{
+				if (face_flag[hl_transfer->left])
+				{
+					double from_v = cy.GetV(hl_transfer->from);
+					double to_v = cy.GetV(hl_transfer->to);
+					if (standard_v > from_v && standard_v < to_v)
+					{
+						pl.emplace_back(hl_transfer, (to_v - standard_v) / (to_v - from_v));
+						break;
+					}
+				}
+				hl_begin = hl_begin->prev->oppo;
+				hl_transfer = hl_begin->next;
+			} while (hl_begin != vl->hl);
+			if (pl.empty())
+				continue;
+			do
+			{
+				double from_v = cy.GetV(hl_transfer->from);
+				double to_v = cy.GetV(hl_transfer->to);
+				hl_transfer = hl_transfer->oppo->next;
+				if (hl_transfer->to == vl->id)
+					break;
+				double ref_v = cy.GetV(hl_transfer->to);
+				if (ref_v > standard_v)
+				{
+					pl.emplace_back(hl_transfer, (ref_v - standard_v) / (ref_v - from_v));
+				}
+				else
+				{
+					hl_transfer = hl_transfer->next;
+					pl.emplace_back(hl_transfer, (to_v - standard_v) / (to_v - ref_v));
+				}
+			} while (true);
+		}
+
+		return output;
+#if 0
+		double v_para = lp.GetV(vl->id);
+		auto hl_begin = vl->hl;
+		auto hl_transfer = hl_begin;
+		if (!visited_f[hl_transfer->left])
+			return false;
+		double s0 = lp.GetV(hl_transfer->to) - v_para;
+		double distance[2];
+		PointOnHalfedgeLayer pohl[2];
+		int id[2] = { 0,0 };
+
+		double s1 = lp.GetV(hl_transfer->next->to) - v_para;
+		do
+		{
+			if (visited_v[hl_transfer->next->to])
+				s1 = lp.GetV(hl_transfer->next->to) - v_para;
+			if (visited_f[hl_transfer->left])
+			{
+				if (s0 * s1 < 0)
+				{
+					if (s0 < 0)
+					{
+						pohl[0].hl = hl_transfer->next;
+						pohl[0].c = s1 / (s1 - s0);
+						distance[0] = s0; distance[1] = s1;
+						++id[0];
+					}
+					else
+					{
+						pohl[1].hl = hl_transfer->next->oppo;
+						pohl[1].c = s0 / (s0 - s1);
+						++id[1];
+					}
+				}
+			}
+			s0 = s1;
+			hl_transfer = hl_transfer->prev->oppo;
+		} while (hl_transfer != hl_begin);
+
+		if (id[0] != 1 || id[1] != 1)
+			return false;
+
+		PlaneLoop planar_loop;
+		planar_loop.push_back(pohl[0]);
+		auto hl = pohl[0].hl;
+
+		while (hl != pohl[1].hl)
+		{
+			int vlid = hl->oppo->next->to;
+			if (!visited_v[vlid])
+				return false;
+			double s = lp.GetV(vlid) - v_para;
+			if (s > 0)
+			{
+				hl = hl->oppo->next;
+				distance[1] = s;
+			}
+			else
+			{
+				hl = hl->oppo->prev;
+				distance[0] = s;
+			}
+			planar_loop.emplace_back(hl, distance[1] / (distance[1] - distance[0]));
+		}
+
+		lp.sp->all_pl[vl->id] = std::move(planar_loop);
+		return true;
+#endif
+	}
+
+	void LoopGen::set_feature_flag_and_split_with_cylinder_boundary(std::vector<int>& feature, std::string mesh_file)
+	{
+		for (auto edge : mesh->edges())
+		{
+			mesh->data(edge).set_flag(false);
+		}
+		for (auto feid : feature)
+		{
+			mesh->data(mesh->edge_handle(feid)).set_flag(true);
+		}
+		
+		std::vector<std::pair<VertexLayer*, PlaneLoop>> vpl_set;
+		for (auto rg : rset.regions)
+		{
+			cylinder* cy = cyPtr(rg);
+			auto vpl = GetBoundIsoParaLine(*cy);
+			vpl_set.push_back(std::move(vpl[0]));
+			vpl_set.push_back(std::move(vpl[1]));
+		}
+		for (auto& vpl : vpl_set)
+		{
+			VertexLayer* vl = vpl.first;
+			PlaneLoop& pl = vpl.second;
+			if (pl.empty())
+				continue;
+
+			VertexHandle fvh = vl->v;
+			VertexHandle tvh;
+			for (auto &pohl : pl)
+			{
+				//dprintwithprecision(15,rg->id,pohl.c);
+				/*dprint(pohl.hl->id / 8);
+				if (pohl.c > 0.7617128061255 && pohl.c < 0.7617128061256)
+				{
+					int p = 0;
+				}*/
+				EdgeHandle eh = mesh->edge_handle(pohl.hl->h);
+				// tvh=mesh->add_vertex(pohl.point(m4));
+				// mesh->split_edge(eh,tvh);
+				tvh = mesh->split(eh, pohl.point(m4));
+				HalfedgeHandle newhh = mesh->find_halfedge(fvh, tvh);
+				if (newhh.idx() == -1)
+				{
+					int p = 0;
+					break;
+				}
+				if (newhh.idx() != -1)
+					mesh->data(mesh->edge_handle(newhh)).set_flag(true);
+				//goto fes;
+				fvh = tvh;
+			}
+			tvh = vl->v;
+			HalfedgeHandle newhh = mesh->find_halfedge(fvh, tvh);
+			if (newhh.idx() == -1)
+			{
+				int p = 0;
+			}
+			if (newhh.idx() != -1)
+				mesh->data(mesh->edge_handle(newhh)).set_flag(true);
+		}
+
+		for (auto rg : rset.regions)
+		{
+			break;
+			cylinder* cy = cyPtr(rg);
+			int cut_vh[2] = { -1,-1 };
+			for (int i = 0; i < 2; ++i)
+			{
+				double vmax = -DBL_MAX;
+				double vmin = DBL_MAX;
+				//dprint("fesfmn");
+				for (auto hl : cy->bounds[i])
+				{
+					//dprint(hl->id,vmin,vmax);
+					//dprint(cy->uv[1].size(),cy->vidmap[hl->to]);
+					if (cy->uv[1].size() <= cy->vidmap[hl->to] || cy->vidmap[hl->to] < 0)
+						continue;
+					if (i == 0)
+					{
+						double v = cy->GetV(hl->to);
+						if (v > vmax)
+						{
+							vmax = v;
+							cut_vh[i] = hl->to;
+						}
+					}
+					else
+					{
+						if (hl->id == 102168)
+						{
+							int fw = 0;
+						}
+						double v = cy->GetV(hl->to);
+						if (v < vmin)
+						{
+							vmin = v;
+							cut_vh[i] = hl->to;
+						}
+					}
+				}
+			}
+			//transform to isoparametric line
+			for (int i = 0; i < 2; ++i)
+			{
+				if (cut_vh[i] == -1)
+					continue;
+				VertexLayer* vl = &m4.verticelayers[cut_vh[i]];
+				auto& iov = InfoOnMesh[vl->id];
+				auto& pl = pls[iov.plid];
+				VertexHandle fvh = vl->v;
+				VertexHandle tvh;
+				dprint("v", fvh.idx());
+				for (auto pohl : pl)
+				{
+					//dprintwithprecision(15,rg->id,pohl.c);
+					dprint(pohl.hl->id / 8);
+					if (pohl.c > 0.7617128061255 && pohl.c < 0.7617128061256)
+					{
+						int p = 0;
+					}
+					EdgeHandle eh = mesh->edge_handle(pohl.hl->h);
+					// tvh=mesh->add_vertex(pohl.point(m4));
+					// mesh->split_edge(eh,tvh);
+					tvh = mesh->split(eh, pohl.point(m4));
+					HalfedgeHandle newhh = mesh->find_halfedge(fvh, tvh);
+					if (newhh.idx() == -1)
+					{
+						int p = 0;
+						break;
+
+					}
+					if (newhh.idx() != -1)
+						mesh->data(mesh->edge_handle(newhh)).set_flag(true);
+					//goto fes;
+					fvh = tvh;
+				}
+				tvh = vl->v;
+				HalfedgeHandle newhh = mesh->find_halfedge(fvh, tvh);
+				if (newhh.idx() == -1)
+				{
+					int p = 0;
+				}
+				if (newhh.idx() != -1)
+					mesh->data(mesh->edge_handle(newhh)).set_flag(true);
+			}
+		}
+	//fes:;
+		mesh->garbage_collection();
+		initMeshStatusAndNormal(*mesh);
+		feature.clear();
+		for (auto eh : mesh->edges())
+		{
+			if (mesh->data(eh).get_flag())
+			{
+				feature.push_back(eh.idx());
+			}
+		}
+
+		OpenMesh::IO::write_mesh(*mesh, mesh_file);
+	}
+
 }

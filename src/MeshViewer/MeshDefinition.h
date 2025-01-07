@@ -25,11 +25,14 @@ struct MeshTraits : public OpenMesh::DefaultTraits
 
 	EdgeTraits
 	{
-		EdgeT()
+		EdgeT():flag(false)
 	    {
 		};
 	public:
 		double weight;
+		bool flag;
+		void set_flag(bool f) { flag = f; }
+		bool get_flag() { return flag; }
 	};
 
 	HalfedgeTraits

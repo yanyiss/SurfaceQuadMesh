@@ -20,7 +20,7 @@ namespace LoopGen
 	bool WritePlaneLoop(std::vector<PlaneLoop> &pls, std::string& model_name, Mesh *mesh)
 	{
 		std::ofstream file_writer;
-		file_writer.open("..//resource//plane loop//" + model_name + ".pl");
+		file_writer.open("..//resource//plane_loop//" + model_name + ".pl");
 		if (file_writer.fail()) {
 			return false;
 		}
@@ -52,7 +52,7 @@ namespace LoopGen
 		}*/
 		file_writer.close();
 
-		file_writer.open("..//resource//plane loop//" + model_name + "_pl.txt");
+		file_writer.open("..//resource//plane_loop//" + model_name + "_pl.txt");
 		if (file_writer.fail()) {
 			return false;
 		}
@@ -65,7 +65,7 @@ namespace LoopGen
 	bool ReadPlaneLoop(M4 &m4, std::vector<PlaneLoop>& pls, std::string& model_name, Mesh *mesh)
 	{
 		std::ifstream file_reader;
-		file_reader.open("..//resource//plane loop//" + model_name + "_pl.txt", std::ios::in);
+		file_reader.open("..//resource//plane_loop//" + model_name + "_pl.txt", std::ios::in);
 		if (!file_reader.good())
 			return false;
 		int lineNum = 0;
@@ -78,7 +78,7 @@ namespace LoopGen
 		FILE* fp;
 		int size = 0;
 		char* ar;
-		fp = fopen(("..//resource//plane loop//" + model_name + ".pl").c_str(), "r");
+		fp = fopen(("..//resource//plane_loop//" + model_name + ".pl").c_str(), "r");
 		if (NULL == fp)
 		{
 			return false;

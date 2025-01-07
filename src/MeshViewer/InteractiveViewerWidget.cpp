@@ -598,7 +598,7 @@ void InteractiveViewerWidget::draw_selected_edge()
 	if( selectedEdge.size() > 0)
 	{
 		glLineWidth(2);
-		glColor3f(0.1, 0.1, 0.1);
+		glColor3f(0.9, 0.1, 0.1);
 		Mesh::Point p1; Mesh::Point p2;
 		Mesh::EdgeHandle e_handle;
 		Mesh::HalfedgeHandle he_handle;
@@ -641,8 +641,8 @@ void InteractiveViewerWidget::draw_field()
 
 		glLineWidth(5);
 		glColor3d(0.1, 0.1, 0.1);
-		glVertex3dv(mesh.point(mesh.from_vertex_handle(mesh.halfedge_handle(2 * 75815))).data());
-		glVertex3dv(mesh.point(mesh.to_vertex_handle(mesh.halfedge_handle(2 * 75815))).data());
+		/*glVertex3dv(mesh.point(mesh.from_vertex_handle(mesh.halfedge_handle(2 * 75815))).data());
+		glVertex3dv(mesh.point(mesh.to_vertex_handle(mesh.halfedge_handle(2 * 75815))).data());*/
 		glEnd();
 
 		auto& sing = lg->cf->getSingularity();
@@ -662,17 +662,12 @@ void InteractiveViewerWidget::draw_field()
 		glEnd();
 
 
+		int path_vertex[4] = { 38912,38956,38976,39022};
 		glPointSize(12);
 		glBegin(GL_POINTS);
 		glColor3d(0.7, 0.1, 0.0);
-		//glVertex3dv(mesh.point(mesh.vertex_handle(2836)).data());
-		/*glColor3d(0.0, 0.7, 0.60);
-		glVertex3dv(mesh.point(mesh.vertex_handle(37644)).data());
-		glVertex3dv(mesh.point(mesh.vertex_handle(34504)).data());
-		glVertex3dv(mesh.point(mesh.vertex_handle(37606)).data());
-		glVertex3dv(mesh.point(mesh.vertex_handle(27276)).data());
-		glVertex3dv(mesh.point(mesh.vertex_handle(40641)).data());
-		glVertex3dv(mesh.point(mesh.vertex_handle(27270)).data());*/
+		for(int i=0;i<4;++i)
+		glVertex3dv(mesh.point(mesh.vertex_handle(path_vertex[i]/4)).data());
 		glEnd();
 	}
 }
@@ -711,11 +706,13 @@ void InteractiveViewerWidget::showField()
 		lg->SetModelName(file_name);
 		lg->InitializeField();
 		crossfield = lg->cf->getCrossField();
+		dprint(mesh.n_faces());
 		avgLen = 0.2 * calc_mesh_ave_edge_length(&mesh);
 		for (auto tf : mesh.faces())
 		{
 			OpenMesh::Vec3d c = mesh.calc_centroid(tf);
 			int i = tf.idx() * 4;
+			//dprint(tf.idx(), i);
 			Eigen::Vector3d vc(c[0], c[1], c[2]);
 			Eigen::Vector3d temp = crossfield.col(i + 1);
 #if 0
@@ -731,19 +728,28 @@ void InteractiveViewerWidget::showField()
 #endif
 		}
 	}
+	dprint(mesh.n_faces() * 4);
 	if_draw_field = !if_draw_field;
 	setDrawMode(InteractiveViewerWidget::SOLID_FLAT);
 	setMouseMode(InteractiveViewerWidget::TRANS);
+	dprint("fes");
 }
 
 #include "../Algorithm/AngleDefectMinimizer.h"
 void InteractiveViewerWidget::showLoop()
 {
+	/*selectedVertex.clear();
+	selectedVertex.push_back(10856);
+	selectedEdge.clear();
+	selectedEdge = { 33111,34161,34163,34816 };
+	setDrawMode(InteractiveViewerWidget::SOLID_FLAT);
+	setMouseMode(InteractiveViewerWidget::TRANS);
+	return;*/
 	static bool ii = 0;
 	if (ii == 0)
 	{
-		LoopGen::AngleDefectMinimizer adm(&mesh);
-		adm.run();
+		//LoopGen::AngleDefectMinimizer adm(&mesh);
+		//adm.run();
 		ii = 1;
 	}
 
@@ -758,7 +764,7 @@ void InteractiveViewerWidget::showLoop()
 	{
 		loop_gen_init = true;
 
-#if 1
+#if 0
 		lg->m4.set_base(&mesh, lg->cf); lg->m4.init(); lg->m4.update(); lg->m4.set_weight();
 #else
 		{
@@ -766,7 +772,10 @@ void InteractiveViewerWidget::showLoop()
 			lg->InitializePlaneLoop();
 			lg->InitializeSimilarityEnergy();
 			lg->ConstructCylinder();
-			lg->OptimizeCylinder();
+			lg->set_feature_flag_and_split_with_cylinder_boundary(selectedEdge,
+				std::string("C:\\Git Code\\SurfaceQuadMesh\\resource\\mesh\\teddy_cut.obj"));
+			
+			//lg->OptimizeCylinder();
 #endif
 #if 0
 			lg->IterateCylinder();
@@ -792,17 +801,18 @@ void InteractiveViewerWidget::showLoop()
 	}
 	tr.out("all time:");
 
+
 	/*if (selectedVertex.empty())
 		return;
 	selectedVertex = { selectedVertex.back() };
 	plane_loop[0] = lg->InfoOnMesh[selectedVertex.back() * 2].pl;
 	plane_loop[1] = lg->InfoOnMesh[selectedVertex.back() * 2 + 1].pl;*/
-#if 1
+#if 0
 #if 1
 	if (selectedVertex.empty())
 		return;
 #else
-	selectedVertex.push_back(601);//2836
+	selectedVertex.push_back(9728);//2836
 #endif
 	selectedVertex = { selectedVertex.back() };
 	selectedEdge.clear();
@@ -812,7 +822,7 @@ void InteractiveViewerWidget::showLoop()
 	LoopGen::VertexLayer* vl = &lg->m4.verticelayers[vnow.idx() * 4];
 	if (!lg->m4.sing_flag[vnow.idx()])
 	{
-		for (int i = 0; i < 2; ++i, ++vl)
+		for (int i = 1; i < 2; ++i, ++vl)
 		{
 			//if (i == 0)
 				//continue;
